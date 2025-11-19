@@ -1,0 +1,22 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Coverage reports
+.coverage
+htmlcov/
+
+# Generated test data
+sampled_programs.txt
+sampled_programs_list.txt
+programs_with_errors.json
+scripts/programs_with_errors.json
+
+.DS_Store
