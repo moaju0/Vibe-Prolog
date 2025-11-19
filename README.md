@@ -6,6 +6,9 @@ I was working on something else and as a side effect accidently vibe coded a pro
 
 I haven't used Prolog for 20 years, and but it does seem to be roughly correct. 
 
+![It's the Vibe](./images/TheCastle.jpg)
+
+
 This project is to see how far I can push it. 🚀
 
 Did I really ask Codex to add more Emojis to this README? Yes I did...
@@ -13,9 +16,7 @@ Did I really ask Codex to add more Emojis to this README? Yes I did...
 ## The Rules 📜
 
 - No human written code. Can prompt things, can tell tools what changes to make but no human written code should be used. 
-
 - Don't deliberatly add slop. If you notice it doing something wrong, get it fixed. 
-
 - Use all the tools you can. Add lots of tests! Add automatic code reviews! Add security audits!
 
 ## Push the AI harder 💪
@@ -28,7 +29,7 @@ Did I really ask Codex to add more Emojis to this README? Yes I did...
 
 ## Be very cautious ⚠️
 
-- I don't know if this works at all
+- I don't know if this works at all. It *seems* to work, and there are some tests that work but that's it.
 - I'm putting it under a MIT license but as AI written code it isn't clear if it can be copyrighted at all
 - There are lots of real Prolog implementations that are probably better than this! Use them.
 
