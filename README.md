@@ -13,6 +13,32 @@ This project is to see how far I can push it. 🚀
 
 Did I really ask Codex to add more Emojis to this README? Yes I did...
 
+## Try it out
+
+```
+> uv run main.py ./examples/examples.pl  -q "mammal(X)" -v
+
+Loading program from './examples/examples.pl'...
+Successfully loaded './examples/examples.pl'
+Query: mammal(X).
+Solution 1:
+X = dog
+
+Solution 2:
+X = cat
+
+> uv run main.py ./examples/examples.pl  -q "grandparent('tom', Y)" -v
+Loading program from './examples/examples.pl'...
+Successfully loaded './examples/examples.pl'
+Query: grandparent('tom', Y).
+Solution 1:
+Y = ann
+
+Solution 2:
+Y = pat
+```
+
+
 ## The Rules 📜
 
 - No human written code. Can prompt things, can tell tools what changes to make but no human written code should be used. 
