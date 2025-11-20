@@ -1,3 +1,11 @@
+# Goals
+
+These goals are what we are working towards in this project:
+- A complete, widely compatible Prolog implementation
+- Robust: It should handle all kinds of error conditions gracefully
+- Fast: It should run prolog programs fast
+- Scalable: It should be able to run large prolog programs
+
 # Prolog Interpreter - Development Guide
 
 This document provides an overview of the project structure and guidelines for development and testing.
@@ -20,67 +28,12 @@ prolog/
 │
 ```
 
-## Built-in Predicates
+## Features
 
-### Core Unification and Comparison
-- `=/2` - Unification
-- `\=/2` - Not unifiable
-- `=:=/2, </2, >/2, =</2, >=/2` - Arithmetic comparisons
+See @FEATURES.md
 
-### Arithmetic
-- `is/2` - Arithmetic evaluation
-- Operators: `+, -, *, /, //, mod`
+You must keep ./FEATURES.md up to date when you add or change these
 
-### Type Checking
-- `fail/0` - Always fails
-- `atom/1` - Check if term is an atom
-- `number/1` - Check if term is a number
-- `var/1` - Check if term is an unbound variable
-- `nonvar/1` - Check if term is not an unbound variable
-
-### Term Manipulation
-- `functor/3` - Extract or construct functor (e.g., `functor(foo(a,b), F, N)` gives F=foo, N=2)
-- `arg/3` - Access Nth argument of compound term (1-based indexing)
-- `=../2` (univ) - Convert between term and list (e.g., `foo(a,b) =.. [foo, a, b]`)
-
-### List Operations
-- `member/2` - List membership
-- `append/3` - List concatenation
-- `length/2` - List length (bidirectional: compute or generate)
-- `reverse/2` - Reverse a list
-- `sort/2` - Sort list and remove duplicates
-
-### Solution Collection
-- `findall/3` - Collect all solutions to a goal (returns empty list if none)
-- `bagof/3` - Collect solutions with duplicates (fails if no solutions)
-- `setof/3` - Collect unique sorted solutions (fails if no solutions)
-
-### Database Modification
-- `assert/1` - Add a fact to the database dynamically
-- `retract/1` - Remove a clause from the database (backtracks over matching clauses)
-
-### Meta-Predicates
-- `clause/2` - Retrieve clause bodies from the knowledge base
-- `call/1` - Call a goal dynamically
-- `once/1` - Call a goal and commit to first solution (prevents backtracking into the goal)
-- `true/0` - Always succeeds
-- `!/0` - Cut operator (prevents backtracking)
-
-### Control Flow
-- `;/2` - Disjunction (logical OR)
-- `->/2` - If-then
-- `(Cond -> Then ; Else)` - If-then-else pattern
-- `,/2` - Conjunction (logical AND) - handles explicit conjunction in goals
-
-### I/O
-- `format/2` - Print formatted string to stdout (e.g., `format("Value: ~w", [X])`)
-- `format/3` - String formatting with format specifiers (~w, ~d, ~f, ~n, ~~) to atom
-- `write/1` - Print term without newline
-- `writeln/1` - Print term with newline
-- `nl/0` - Print newline
-
-### Higher-Order
-- `maplist/2` - Apply a goal to each element of a list
 
 ## Testing Guidelines
 

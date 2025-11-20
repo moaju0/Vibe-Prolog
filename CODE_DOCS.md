@@ -4,32 +4,7 @@ A minimal Prolog interpreter implementation in Python, capable of solving logic 
 
 ## Features
 
-- **Unification**: Robinson's unification algorithm with occurs check
-- **Backtracking**: Full backtracking search for finding all solutions
-- **Built-in Predicates**:
-  - **Unification**: `=/2`, `\=/2`
-  - **Type Checking**: `var/1`, `nonvar/1`, `atom/1`, `number/1`, `integer/1`, `compound/1`
-  - **Arithmetic**: `is/2` with operators `+`, `-`, `*`, `/`, `//`, `mod`, `**` (power)
-  - **Comparisons**: `=:=/2`, `</2`, `>/2`, `=</2`, `>=/2`
-  - **Lists**: `member/2`, `append/3`, `length/2`, `reverse/2`, `sort/2`
-  - **Term Manipulation**: `functor/3`, `arg/3`, `=../2` (univ)
-  - **Control Flow**: `!/0` (cut), `true/0`, `fail/0`, `;/2` (or), `->/2` (if-then), `,/2` (and)
-  - **Meta-predicates**: `call/1`, `once/1`, `clause/2`
-  - **Solution Collection**: `findall/3`, `bagof/3`, `setof/3`
-  - **Database**: `assert/1`, `retract/1`
-  - **I/O**: `write/1`, `writeln/1`, `nl/0`, `format/2`, `format/3`
-  - **Higher-Order**: `maplist/2`
-- **Advanced Parser Features**:
-  - Binary (`0b1011`), octal (`0o755`), and hex (`0xFF`) number literals
-  - Scientific notation (`1.0e-10`)
-  - Character codes (`0'a`, `0'\n`, `0'''`)
-  - Block comments (`/* ... */`) and line comments (`% ...`)
-  - Curly braces syntax sugar (`{X}` → `{}(X)`)
-  - Special atoms (`[]`, `{}`, `:-`, operators as atoms)
-- **Data Types**: Atoms, integers, floats, variables, lists, and compound terms
-- **Python Integration**: Use as a library from Python code
-- **Comprehensive Test Suite**: 69+ passing tests covering ISO Prolog core functionality
-
+See [FEATURES.md](Features)
 
 ## Usage
 
