@@ -13,8 +13,7 @@
 - ✅ `fail/0` – Always fails
 - ✅ `,/2` – Conjunction (and)
 - ✅ `;/2` – Disjunction (or)
-- ✅ `->/2` – If-then (implemented as if-then-else)
-- ❌ `->/2` – If-then-else (missing else branch support)
+- ✅ `->/2` – If-then-else
 - ✅ `\+/1` – Negation as failure
 - ✅ `!/0` – Cut operator
 
@@ -61,7 +60,7 @@
 - ✅ `setof/3` – Collect unique sorted solutions
 
 ### Database Modification (ISO 8.9)
-- ✅ `asserta/1` – Add clause at beginning
+- ❌ `asserta/1` – Add clause at beginning
 - ❌ `assertz/1` – Add clause at end (assert/1 adds at end)
 - ✅ `retract/1` – Remove clause
 - ❌ `abolish/1` – Remove all clauses for predicate
@@ -148,7 +147,7 @@
 
 ## Execution Model
 - ✅ Robinson-style unification
-- ⚠️ Occurs check (not implemented - allows cyclic terms)
+- ✅ Occurs check (prevents cyclic terms)
 - ✅ Full backtracking search
 - ✅ Dynamic clause enumeration
 - ✅ Recursion handling
@@ -174,10 +173,9 @@
 5. **Operator Definition**: `op/3` for custom operators
 
 ### Significant Deviations
-1. **Occurs Check**: Missing - allows creation of cyclic terms (X = f(X) succeeds)
-2. **Assert Ordering**: `assert/1` adds at end, not beginning like `assertz/1`
-3. **Exception Handling**: Simplified `catch/3` without full ISO exception types
-4. **Character Code Syntax**: Some advanced character code forms not supported
+1. **Assert Ordering**: `assert/1` adds at end, not beginning like `assertz/1`
+2. **Exception Handling**: Simplified `catch/3` without full ISO exception types
+3. **Character Code Syntax**: Some advanced character code forms not supported
 
 ### Parser Limitations
 1. **Hex Character Codes**: `0'\xHH\` syntax not fully supported
