@@ -309,3 +309,209 @@ class TestComplexUnificationPatterns:
         assert result['Y'] == 2
         assert result is not None
         assert result['Z'] == 3
+
+
+class TestTermComparison:
+    """Term comparison operators: ==, \==, @<, @=<, @>, @>="""
+
+    def test_term_identity_equal(self):
+        """Test ==/2 - term identity (structural equality)"""
+        prolog = PrologInterpreter()
+
+        # Atoms
+        assert prolog.has_solution("a == a")
+        assert not prolog.has_solution("a == b")
+
+        # Numbers
+        assert prolog.has_solution("42 == 42")
+        assert prolog.has_solution("3.14 == 3.14")
+        assert not prolog.has_solution("42 == 43")
+
+        # Compound terms
+        assert prolog.has_solution("f(a, b) == f(a, b)")
+        assert not prolog.has_solution("f(a, b) == f(a, c)")
+        assert not prolog.has_solution("f(a, b) == g(a, b)")
+
+        # Lists
+        assert prolog.has_solution("[] == []")
+        assert prolog.has_solution("[1, 2, 3] == [1, 2, 3]")
+        assert not prolog.has_solution("[1, 2] == [1, 2, 3]")
+        assert not prolog.has_solution("[1, 2, 3] == [1, 3, 2]")
+
+        # Variables (unbound are equal to themselves)
+        assert prolog.has_solution("X == X")
+
+    def test_term_identity_not_equal(self):
+        """Test \==/2 - term non-identity"""
+        prolog = PrologInterpreter()
+
+        # Atoms
+        assert not prolog.has_solution("a \\== a")
+        assert prolog.has_solution("a \\== b")
+
+        # Numbers
+        assert not prolog.has_solution("42 \\== 42")
+        assert prolog.has_solution("42 \\== 43")
+
+        # Compound terms
+        assert not prolog.has_solution("f(a, b) \\== f(a, b)")
+        assert prolog.has_solution("f(a, b) \\== f(a, c)")
+        assert prolog.has_solution("f(a, b) \\== g(a, b)")
+
+        # Lists
+        assert not prolog.has_solution("[] \\== []")
+        assert not prolog.has_solution("[1, 2, 3] \\== [1, 2, 3]")
+        assert prolog.has_solution("[1, 2] \\== [1, 2, 3]")
+        assert prolog.has_solution("[1, 2, 3] \\== [1, 3, 2]")
+
+        # Variables
+        assert not prolog.has_solution("X \\== X")
+
+    def test_term_less_than(self):
+        """Test @</2 - term less than"""
+        prolog = PrologInterpreter()
+
+        # Atoms (lexicographic order)
+        assert prolog.has_solution("a @< b")
+        assert not prolog.has_solution("b @< a")
+        assert not prolog.has_solution("a @< a")
+
+        # Numbers
+        assert prolog.has_solution("1 @< 2")
+        assert prolog.has_solution("1.5 @< 2.0")
+        assert not prolog.has_solution("2 @< 1")
+        assert not prolog.has_solution("2 @< 2")
+
+        # Mixed types (Variables < Numbers < Atoms < Compounds)
+        assert prolog.has_solution("X @< 1")
+        assert prolog.has_solution("1 @< a")
+        assert prolog.has_solution("a @< f(x)")
+
+        # Compound terms
+        assert prolog.has_solution("f(a) @< f(b)")
+        assert prolog.has_solution("f(a, b) @< f(a, c)")
+        assert prolog.has_solution("f(a) @< g(a)")  # Different functors
+
+        # Lists
+        assert prolog.has_solution("[] @< [a]")
+        assert prolog.has_solution("[a] @< [b]")
+        assert prolog.has_solution("[a, b] @< [a, c]")
+
+    def test_term_less_equal(self):
+        """Test @=</2 - term less than or equal"""
+        prolog = PrologInterpreter()
+
+        # Atoms
+        assert prolog.has_solution("a @=< b")
+        assert prolog.has_solution("a @=< a")
+        assert not prolog.has_solution("b @=< a")
+
+        # Numbers
+        assert prolog.has_solution("1 @=< 2")
+        assert prolog.has_solution("2 @=< 2")
+        assert not prolog.has_solution("2 @=< 1")
+
+        # Mixed types
+        assert prolog.has_solution("X @=< 1")
+        assert prolog.has_solution("1 @=< a")
+        assert prolog.has_solution("a @=< f(x)")
+        assert prolog.has_solution("X @=< X")  # Variables equal to themselves
+
+        # Compound terms
+        assert prolog.has_solution("f(a) @=< f(b)")
+        assert prolog.has_solution("f(a) @=< f(a)")
+        assert prolog.has_solution("f(a) @=< g(a)")
+
+        # Lists
+        assert prolog.has_solution("[] @=< [a]")
+        assert prolog.has_solution("[a] @=< [a]")
+        assert prolog.has_solution("[a, b] @=< [a, c]")
+
+    def test_term_greater_than(self):
+        """Test @>/2 - term greater than"""
+        prolog = PrologInterpreter()
+
+        # Atoms
+        assert prolog.has_solution("b @> a")
+        assert not prolog.has_solution("a @> b")
+        assert not prolog.has_solution("a @> a")
+
+        # Numbers
+        assert prolog.has_solution("2 @> 1")
+        assert not prolog.has_solution("1 @> 2")
+        assert not prolog.has_solution("2 @> 2")
+
+        # Mixed types
+        assert prolog.has_solution("a @> 1")
+        assert prolog.has_solution("f(x) @> a")
+
+        # Compound terms
+        assert prolog.has_solution("f(b) @> f(a)")
+        assert prolog.has_solution("g(a) @> f(a)")
+
+        # Lists
+        assert prolog.has_solution("[a] @> []")
+        assert prolog.has_solution("[b] @> [a]")
+
+    def test_term_greater_equal(self):
+        """Test @>=/2 - term greater than or equal"""
+        prolog = PrologInterpreter()
+
+        # Atoms
+        assert prolog.has_solution("b @>= a")
+        assert prolog.has_solution("a @>= a")
+        assert not prolog.has_solution("a @>= b")
+
+        # Numbers
+        assert prolog.has_solution("2 @>= 1")
+        assert prolog.has_solution("2 @>= 2")
+        assert not prolog.has_solution("1 @>= 2")
+
+        # Mixed types
+        assert prolog.has_solution("a @>= 1")
+        assert prolog.has_solution("f(x) @>= a")
+        assert prolog.has_solution("X @>= X")
+
+        # Compound terms
+        assert prolog.has_solution("f(b) @>= f(a)")
+        assert prolog.has_solution("f(a) @>= f(a)")
+        assert prolog.has_solution("g(a) @>= f(a)")
+
+        # Lists
+        assert prolog.has_solution("[a] @>= []")
+        assert prolog.has_solution("[a] @>= [a]")
+
+    def test_term_comparison_with_variables(self):
+        """Test term comparisons involving variables"""
+        prolog = PrologInterpreter()
+
+        # Variables are equal to themselves
+        assert prolog.has_solution("X == X")
+        assert not prolog.has_solution("X \\== X")
+        assert not prolog.has_solution("X @< X")
+        assert prolog.has_solution("X @=< X")
+        assert not prolog.has_solution("X @> X")
+        assert prolog.has_solution("X @>= X")
+
+        # Variables vs constants
+        assert prolog.has_solution("X @< a")
+        assert prolog.has_solution("a @> X")
+        assert prolog.has_solution("X @=< a")
+        assert prolog.has_solution("a @>= X")
+
+    def test_term_comparison_complex_terms(self):
+        """Test term comparisons with complex nested terms"""
+        prolog = PrologInterpreter()
+
+        # Nested compounds
+        assert prolog.has_solution("f(g(a)) @< f(g(b))")
+        assert prolog.has_solution("f(a, b) @< f(a, c)")
+        assert prolog.has_solution("f(a, b) @< f(b, a)")  # Lexicographic on args
+
+        # Lists with compounds
+        assert prolog.has_solution("[f(a)] @< [f(b)]")
+        assert prolog.has_solution("[a, b] @< [a, b, c]")
+
+        # Mixed structures
+        assert prolog.has_solution("f(a) @< [a]")
+        assert prolog.has_solution("f(a) @< []")

@@ -144,6 +144,13 @@ class PrologEngine:
                 return iter([result])
             return iter([])
 
+        # Term comparisons
+        if functor in ["==", "\\==", "@<", "@=<", "@>", "@>="] and len(args) == 2:
+            result = self._builtin_term_compare(functor, args[0], args[1], subst)
+            if result is not None:
+                return iter([result])
+            return iter([])
+
         # format/3 - String formatting (format(atom(X), FormatString, Args))
         if functor == "format" and len(args) == 3:
             result = self._builtin_format(args[0], args[1], args[2], subst)
@@ -395,6 +402,35 @@ class PrologEngine:
             return subst
         elif op == ">=" and left_val >= right_val:
             return subst
+
+        return None
+
+    def _builtin_term_compare(self, op: str, left: any, right: any, subst: Substitution) -> Substitution | None:
+        """Built-in term comparison predicates."""
+        left_term = deref(left, subst)
+        right_term = deref(right, subst)
+
+        if op == "==":
+            # Term identity (structural equality)
+            if self._terms_equal(left_term, right_term):
+                return subst
+        elif op == "\\==":
+            # Term non-identity
+            if not self._terms_equal(left_term, right_term):
+                return subst
+        else:
+            # Ordering comparisons: @<, @=<, @>, @>=
+            left_key = self._term_sort_key(left_term)
+            right_key = self._term_sort_key(right_term)
+
+            if op == "@<" and left_key < right_key:
+                return subst
+            elif op == "@=<" and left_key <= right_key:
+                return subst
+            elif op == "@>" and left_key > right_key:
+                return subst
+            elif op == "@>=" and left_key >= right_key:
+                return subst
 
         return None
 
@@ -1477,7 +1513,7 @@ class PrologEngine:
 
         # List of all built-in functors
         builtins = {
-            "=", "\\=", "\\+", "is", "=:=", "<", ">", "=<", ">=", "=..",
+            "=", "\\=", "\\+", "is", "=:=", "<", ">", "=<", ">=", "==", "\\==", "@<", "@=<", "@>", "@>=", "=..",
             "member", "append", "length", "reverse", "sort",
             "clause", "call", "once", "true", "fail", "!",
             "write", "writeln", "nl", "format",
