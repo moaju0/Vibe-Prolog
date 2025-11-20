@@ -1,57 +1,187 @@
+# ISO Prolog Coverage Map
+
+## Status Legend
+- ✅ **Implemented**: Fully compliant with ISO standard
+- ⚠️ **Partial**: Implemented but with deviations or limitations
+- ❌ **Missing**: Not implemented
+- ❓ **Unknown**: Needs verification
+
 ## Built-in Predicates
 
-### Core Unification and Comparison
-- `=/2` – Robinson-style unification with full term handling (atoms, numbers, lists, compounds).
-- `\=/2` – Explicit failure when two terms cannot unify.
-- Arithmetic comparison operators `=:=/2`, `<`, `>`, `=<`, `>=` predicate-based evaluation with operator precedence.
+### Control Constructs (ISO 7.8)
+- ✅ `true/0` – Always succeeds
+- ✅ `fail/0` – Always fails
+- ✅ `,/2` – Conjunction (and)
+- ✅ `;/2` – Disjunction (or)
+- ✅ `->/2` – If-then-else
+- ✅ `\+/1` – Negation as failure
+- ✅ `!/0` – Cut operator
 
-### Arithmetic
-- `is/2` – Arithmetic evaluation that combines integers, floats, scientific notation, unary minus, and computed expressions.
-- Binary (`0b`), octal (`0o`), and hex (`0x`) literals along with division `/`, integer division `//`, modulo `mod`, and support for the `**` operator in expressions.
+### Term Unification and Comparison (ISO 7.3, 8.4)
+- ✅ `=/2` – Unification
+- ✅ `\=/2` – Not unifiable
+- ❌ `==/2` – Term identity (structural equality)
+- ❌ `\==/2` – Term non-identity
+- ❌ `@</2` – Term less than
+- ❌ `@=</2` – Term less than or equal
+- ❌ `@>/2` – Term greater than
+- ❌ `@>=/2` – Term greater than or equal
 
-### Type Checking
-- `atom/1`, `number/1`, `integer/1`, `var/1`, `nonvar/1`, `compound/1` – Predicate checks for term types and variable instantiation status.
+### Type Testing (ISO 8.3)
+- ✅ `var/1` – Test for unbound variable
+- ✅ `nonvar/1` – Test for bound term
+- ✅ `atom/1` – Test for atom
+- ✅ `number/1` – Test for number (integer or float)
+- ✅ `integer/1` – Test for integer
+- ❌ `float/1` – Test for float
+- ❌ `atomic/1` – Test for atomic term (atom or number)
+- ✅ `compound/1` – Test for compound term
+- ❌ `callable/1` – Test for callable term
+- ❌ `ground/1` – Test for ground term (no variables)
 
-### Term Manipulation
-- `functor/3`, `arg/3`, `=../2` – Term decomposition and construction that work with atoms, numbers, compounds, and lists, including nested arguments and bidirectional univ conversions.
+### Term Manipulation (ISO 8.5)
+- ✅ `functor/3` – Extract/construct functor name and arity
+- ✅ `arg/3` – Access compound term arguments
+- ✅ `=../2` – Term decomposition/construction (univ)
+- ❌ `copy_term/2` – Create term copy with fresh variables
 
-### List Operations
-- `member/2`, `append/3`, `length/2`, `reverse/2`, `sort/2` – Fully bidirectional list support that enumerates through tails, handles open and nested tails, fails on improper lists, enumerates all solutions via backtracking, and produces sorted/deduplicated lists.
+### Arithmetic Evaluation (ISO 9.1)
+- ✅ `is/2` – Arithmetic evaluation
+- ✅ `=:=/2` – Arithmetic equality
+- ❌ `=\=/2` – Arithmetic inequality
+- ✅ `</2` – Arithmetic less than
+- ✅ `=</2` – Arithmetic less than or equal
+- ✅ `>/2` – Arithmetic greater than
+- ✅ `>=/2` – Arithmetic greater than or equal
 
-### Solution Collection
-- `findall/3`, `bagof/3`, `setof/3` – Collection predicates that cooperate with dynamic goals, arithmetic filters, compound templates, and the usual success/failure semantics (`findall` yields `[]` when no solutions, `bagof`/`setof` fail without answers, `setof` deduplicates and sorts).
+### All Solutions (ISO 8.10)
+- ✅ `findall/3` – Collect all solutions
+- ✅ `bagof/3` – Collect solutions with duplicates
+- ✅ `setof/3` – Collect unique sorted solutions
 
-### Database Modification
-- `assert/1`, `retract/1`, `clause/2` – Dynamic database updates for facts and rule-like structures plus clause inspection even for built-in goals, with backtracking-aware retrieval and if-then usage.
+### Database Modification (ISO 8.9)
+- ❌ `asserta/1` – Add clause at beginning
+- ❌ `assertz/1` – Add clause at end (assert/1 adds at end)
+- ✅ `retract/1` – Remove clause
+- ❌ `abolish/1` – Remove all clauses for predicate
+- ✅ `clause/2` – Retrieve clause definition
 
-### Inspection & Error Handling
-- `predicate_property/2` – Query predicate metadata, including whether a goal is a built-in, for dynamic reflection.
-- `catch/3` – Simplified exception handling that attempts a goal and provides a recovery branch, mirroring ISO semantics in structure.
+### Meta-Logical Predicates (ISO 7.8)
+- ✅ `call/1` – Call goal dynamically
+- ✅ `once/1` – Call goal, commit to first solution
 
-### Meta-Predicates
-- `call/1`, `once/1` – Dynamic goal invocation and commitment to the first solution.
+### Exception Handling (ISO 7.12)
+- ⚠️ `catch/3` – Exception handling (simplified, no full ISO exception system)
+- ❌ `throw/1` – Throw exception
 
-### Control Flow
-- `true/0`, `fail/0`, `;/2`, `->/2`, `,/2`, `\+/1`, `!/0` – Standard Prolog control constructs, including disjunction, conjunction, if-then(-else), negation-as-failure, and the cut operator to prune choice points.
+### Input/Output (ISO 8.11-8.12)
+- ✅ `write/1` – Write term
+- ✅ `writeln/1` – Write term with newline
+- ✅ `nl/0` – Write newline
+- ✅ `format/2`, `format/3` – Formatted output
+- ❌ `read/1` – Read term from input
+- ❌ `get_char/1`, `put_char/1` – Character I/O
+- ❌ `open/3`, `close/1` – File stream operations
+- ❌ `current_input/1`, `current_output/1` – Stream selection
 
-### I/O
-- `write/1`, `writeln/1`, `nl/0`, `format/2`, `format/3` – Output helpers that format atoms, numbers, compound terms, and unbound variables.
+### Predicate Inspection (ISO 8.8)
+- ⚠️ `predicate_property/2` – Query predicate properties (limited to built-in detection)
+- ❌ `current_predicate/1` – Enumerate defined predicates
 
-### Higher-Order
-- `maplist/2` – Apply goals over lists (including lists with explicit tails).
+### List Operations (Common Extensions)
+- ✅ `member/2` – List membership
+- ✅ `append/3` – List concatenation
+- ✅ `length/2` – List length
+- ✅ `reverse/2` – List reversal
+- ✅ `sort/2` – List sorting with deduplication
+
+### Higher-Order Operations (Common Extensions)
+- ✅ `maplist/2` – Apply goal to list elements
+
+## Directives (ISO 7.4)
+
+### Program Directives
+- ❌ `:- dynamic/1` – Declare dynamic predicate
+- ❌ `:- multifile/1` – Declare multifile predicate
+- ❌ `:- discontiguous/1` – Declare discontiguous predicate
+- ❌ `:- initialization/1` – Specify initialization goal
+
+### Operator Directives
+- ❌ `:- op/3` – Define operator
+- ❌ `:- char_conversion/2` – Define character conversion
+
+## Syntactic Constructs (ISO 6)
+
+### Terms
+- ✅ Atoms (unquoted, quoted)
+- ✅ Numbers (integers, floats, scientific notation)
+- ✅ Variables
+- ✅ Compound terms
+- ✅ Lists (proper and improper)
+- ✅ Character codes (`0'X`, `0'\n`, etc.)
+- ⚠️ Character codes (`0'\\xHH\\` - hex escape syntax missing)
+
+### Operators
+- ✅ Arithmetic operators (`+`, `-`, `*`, `/`, `//`, `mod`, `**`)
+- ✅ Comparison operators (`=`, `\=`, `=:=`, `=\=`, `<`, `=<`, `>`, `>=`)
+- ✅ Control operators (`,`, `;`, `->`, `\+`, `!`)
+- ❌ Term comparison operators (`==`, `\==`, `@<`, `@=<`, `@>`, `@>=`)
+
+### Number Literals
+- ✅ Decimal integers
+- ✅ Binary (`0b`), octal (`0o`), hexadecimal (`0x`)
+- ✅ Scientific notation
+- ✅ Floating point
+- ⚠️ Character code arithmetic (`16'mod'2` - base'char'number syntax missing)
+
+### Comments
+- ✅ Line comments (`%`)
+- ✅ Block comments (`/* */`)
+- ✅ Nested block comments
+
+### Special Syntax
+- ✅ Curly braces `{Term}` (sugar for `{}(Term)`)
+- ✅ List syntax `[H|T]`, `[Elements]`
+- ✅ String syntax (double and single quoted)
+- ✅ Operator syntax with proper precedence
 
 ## Execution Model
-- Robinson-style unification with occurs-check defenses, full backtracking search, and dynamic clause enumeration deliver a robust proof search engine that handles recursion, limit-aware queries (e.g., `member/2` backtracking), and compound predicate evaluation.
-
-## Parser & Syntax
-- Binary, octal, and hex number literals plus scientific notation and `**` arithmetic.
-- Character codes (`0'a`, `0'\n`, `0'''`) and the usual mix of unary minus and spaced prefixes.
-- Block (`/* ... */`) and line (`% ...`) comments, curly braces (`{Term}` sugar for `{}(Term)`), and special atoms such as `[]`, `{}`, `:-`, and `\+`.
-- Parser recognizes `[]` and `'[]'` as equivalent terms, list tail syntax with variables or atoms, and complex operator atoms (e.g., `:-` as an atom in lists and terms).
+- ✅ Robinson-style unification
+- ✅ Occurs check (prevents cyclic terms)
+- ✅ Full backtracking search
+- ✅ Dynamic clause enumeration
+- ✅ Recursion handling
+- ✅ Cut operator semantics
 
 ## Data Types
-- Atoms, integers, floats, variables, proper and improper lists, and compound terms with nested arguments, open tails, or quoted atoms.
+- ✅ Atoms
+- ✅ Integers (arbitrary precision via Python)
+- ✅ Floats
+- ✅ Variables
+- ✅ Proper lists
+- ✅ Improper lists
+- ✅ Compound terms
+- ✅ Empty list `[]` equivalent to `'[]'`
 
--## Tooling & Tests
+## High-Priority Gaps and Deviations
+
+### Critical Missing Features
+1. **Exception System**: `throw/1` and full ISO exception handling
+2. **File I/O**: Essential for practical Prolog programs
+3. **Term Comparison Operators**: `==/2`, `@</2`, etc. for term ordering
+4. **Dynamic Declarations**: `dynamic/1`, `multifile/1` for module system
+5. **Operator Definition**: `op/3` for custom operators
+
+### Significant Deviations
+1. **Assert Ordering**: `assert/1` adds at end, not beginning like `assertz/1`
+2. **Exception Handling**: Simplified `catch/3` without full ISO exception types
+3. **Character Code Syntax**: Some advanced character code forms not supported
+
+### Parser Limitations
+1. **Hex Character Codes**: `0'\xHH\` syntax not fully supported
+2. **Base Character Arithmetic**: `16'mod'2` syntax not implemented
+3. **Complex Operator Atoms**: Some edge cases in operator parsing
+
+## Tooling & Tests
 - Use the interpreter as a Python library (`from prolog import PrologInterpreter`) and exercise it via a comprehensive test suite (69+ tests covering ISO core predicates, parser edge cases, and built-in behavior).
 -`PrologInterpreter` exposes `consult/consult_string`, `query`, `query_once`, and `has_solution` helpers, plus optional stdout capture for capturing `write`/`format` output while still returning solution bindings.

@@ -1,7 +1,7 @@
 from prolog import PrologInterpreter
 
 prolog = PrologInterpreter()
-prolog.consult("test_mi_with_explain.pl")
+prolog.consult("tests/test_mi_with_explain.pl")
 
 print("1. Test explain_goal(rule(X), Msg)...")
 results = prolog.query("explain_goal(rule(X), Msg).")
