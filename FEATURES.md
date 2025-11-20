@@ -20,12 +20,12 @@
 ### Term Unification and Comparison (ISO 7.3, 8.4)
 - ✅ `=/2` – Unification
 - ✅ `\=/2` – Not unifiable
-- ❌ `==/2` – Term identity (structural equality)
-- ❌ `\==/2` – Term non-identity
-- ❌ `@</2` – Term less than
-- ❌ `@=</2` – Term less than or equal
-- ❌ `@>/2` – Term greater than
-- ❌ `@>=/2` – Term greater than or equal
+- ✅ `==/2` – Term identity (structural equality)
+- ✅ `\==/2` – Term non-identity
+- ✅ `@</2` – Term less than
+- ✅ `@=</2` – Term less than or equal
+- ✅ `@>/2` – Term greater than
+- ✅ `@>=/2` – Term greater than or equal
 
 ### Type Testing (ISO 8.3)
 - ✅ `var/1` – Test for unbound variable
@@ -125,7 +125,7 @@
 - ✅ Arithmetic operators (`+`, `-`, `*`, `/`, `//`, `mod`, `**`)
 - ✅ Comparison operators (`=`, `\=`, `=:=`, `=\=`, `<`, `=<`, `>`, `>=`)
 - ✅ Control operators (`,`, `;`, `->`, `\+`, `!`)
-- ❌ Term comparison operators (`==`, `\==`, `@<`, `@=<`, `@>`, `@>=`)
+- ✅ Term comparison operators (`==`, `\==`, `@<`, `@=<`, `@>`, `@>=`)
 
 ### Number Literals
 - ✅ Decimal integers
@@ -168,9 +168,8 @@
 ### Critical Missing Features
 1. **Exception System**: `throw/1` and full ISO exception handling
 2. **File I/O**: Essential for practical Prolog programs
-3. **Term Comparison Operators**: `==/2`, `@</2`, etc. for term ordering
-4. **Dynamic Declarations**: `dynamic/1`, `multifile/1` for module system
-5. **Operator Definition**: `op/3` for custom operators
+3. **Dynamic Declarations**: `dynamic/1`, `multifile/1` for module system
+4. **Operator Definition**: `op/3` for custom operators
 
 ### Significant Deviations
 1. **Assert Ordering**: `assert/1` adds at end, not beginning like `assertz/1`
