@@ -43,7 +43,7 @@
 - ✅ `functor/3` – Extract/construct functor name and arity
 - ✅ `arg/3` – Access compound term arguments
 - ✅ `=../2` – Term decomposition/construction (univ)
-- ❌ `copy_term/2` – Create term copy with fresh variables
+- ✅ `copy_term/2` – Create term copy with fresh variables
 
 ### Arithmetic Evaluation (ISO 9.1)
 - ✅ `is/2` – Arithmetic evaluation

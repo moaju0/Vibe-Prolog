@@ -319,6 +319,13 @@ class PrologEngine:
                 return iter([result])
             return iter([])
 
+        # copy_term/2 - Copy term with fresh variables
+        if functor == "copy_term" and len(args) == 2:
+            result = self._builtin_copy_term(args[0], args[1], subst)
+            if result is not None:
+                return iter([result])
+            return iter([])
+
         # findall/3 - Collect all solutions
         if functor == "findall" and len(args) == 3:
             result = self._builtin_findall(args[0], args[1], args[2], subst)
@@ -1198,6 +1205,44 @@ class PrologEngine:
                 return unify(term, first, subst)
 
         return None
+
+    def _builtin_copy_term(self, source: any, copy: any, subst: Substitution) -> Substitution | None:
+        """Built-in copy_term/2 predicate - Create a copy of a term with fresh variables."""
+        # Dereference the source term
+        source = deref(source, subst)
+
+        # Create a copy with fresh variables
+        var_map = {}  # Map from original variables to fresh variables
+        copied_term = self._copy_term_recursive(source, var_map)
+
+        # Unify the copied term with the copy argument
+        return unify(copy, copied_term, subst)
+
+    def _copy_term_recursive(self, term: any, var_map: dict) -> any:
+        """Recursively copy a term, creating fresh variables and maintaining consistency."""
+        if isinstance(term, Variable):
+            # If we've seen this variable before, use the same fresh variable
+            if term in var_map:
+                return var_map[term]
+            else:
+                # Create a fresh variable
+                import time
+                suffix = str(int(time.time() * 1000000) % 1000000)
+                fresh_var = Variable(f"_Copy{term.name}_{suffix}")
+                var_map[term] = fresh_var
+                return fresh_var
+        elif isinstance(term, Compound):
+            # Copy compound term recursively
+            new_args = tuple(self._copy_term_recursive(arg, var_map) for arg in term.args)
+            return Compound(term.functor, new_args)
+        elif isinstance(term, List):
+            # Copy list recursively
+            new_elements = tuple(self._copy_term_recursive(elem, var_map) for elem in term.elements)
+            new_tail = self._copy_term_recursive(term.tail, var_map) if term.tail is not None else None
+            return List(new_elements, new_tail)
+        else:
+            # Atoms, numbers, etc. - return as is
+            return term
 
     def _builtin_findall(self, template: any, goal: any, result: any, subst: Substitution) -> Substitution | None:
         """Built-in findall/3 predicate - Collect all solutions."""
