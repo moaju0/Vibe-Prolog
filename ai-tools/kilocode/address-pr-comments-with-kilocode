@@ -1,0 +1,146 @@
+#!/usr/bin/env python
+from __future__ import annotations
+
+import json
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+from kilocode_autocoder_utils import (
+    check_commands_available,
+    ensure_env,
+    get_owner_repo,
+    get_repo_root,
+    has_staged_changes,
+    run,
+    stage_changes,
+)
+
+
+def get_pr_info(owner: str, repo: str, pr_number: str) -> dict:
+    """
+    Check that the PR exists and return basic info, including headRefName.
+    """
+    json_output = run(
+        [
+            "gh",
+            "pr",
+            "view",
+            pr_number,
+            "--repo",
+            f"{owner}/{repo}",
+            "--json",
+            "number,headRefName",
+        ]
+    )
+    try:
+        data = json.loads(json_output)
+    except json.JSONDecodeError as exc:
+        raise SystemExit(f"Failed to parse JSON from gh output: {exc}\nRaw output:\n{json_output}")
+    if not isinstance(data, dict):
+        raise SystemExit(f"Unexpected JSON type from gh: {type(data)}")
+    return data
+
+
+def checkout_pr_branch(branch_name: str) -> None:
+    """
+    Switch to the branch the PR is for.
+
+    If the branch does not exist locally, attempt to create it tracking origin.
+    """
+    try:
+        run(["git", "checkout", branch_name], capture_output=False)
+        return
+    except SystemExit:
+        # Try creating the branch from origin/<branch_name>
+        run(["git", "checkout", "-b", branch_name, f"origin/{branch_name}"], capture_output=False)
+
+
+def ensure_gh_pr_helper(repo_root: Path) -> Path:
+    helper_path = repo_root / "ai-tools" / "gh-pr-helper" / "gh-pr-helper"
+    if not helper_path.is_file():
+        raise SystemExit(f"Unable to locate gh-pr-helper at {helper_path}")
+    if not os.access(helper_path, os.X_OK):
+        raise SystemExit(f"gh-pr-helper is not executable: {helper_path}")
+    return helper_path
+
+
+def get_gh_pr_output(helper_path: Path, owner: str, repo: str, pr_number: str) -> str:
+    return run(
+        [
+            str(helper_path),
+            "--owner",
+            owner,
+            "--repo",
+            repo,
+            "--pr",
+            pr_number,
+        ]
+    )
+
+
+def run_kilocode_with_pr_output(pr_output: str) -> None:
+    # Equivalent to: printf '%s\n' "$GH_PR_OUTPUT" | kilocode --auto
+    run(["kilocode", "--auto"], input_text=pr_output, capture_output=False)
+
+
+def stage_changes() -> None:
+    stage_changes()
+
+
+def create_commit_from_pr_output(pr_output: str) -> None:
+    if not has_staged_changes():
+        print("No changes to commit.")
+        return
+
+    commit_message = run(
+        [
+            "llm",
+            "-s",
+            "give me a git commit message for changes that address these review comments",
+        ],
+        input_text=pr_output,
+    ).strip()
+    if not commit_message:
+        commit_message = "Address review comments"
+    run(["git", "commit", "-m", commit_message], capture_output=False)
+
+
+def push_current_branch() -> None:
+    run(["git", "push"], capture_output=False)
+
+
+def main(argv: list[str]) -> None:
+    check_commands_available()
+    ensure_env()
+
+    if len(argv) < 2 or argv[1] in {"-h", "--help"}:
+        print(f"Usage: {argv[0]} <pr-number>", file=sys.stderr)
+        raise SystemExit(1)
+
+    pr_number = argv[1]
+
+    repo_root = get_repo_root()
+    os.chdir(repo_root)
+
+    owner, repo = get_owner_repo()
+    pr_info = get_pr_info(owner, repo, pr_number)
+    branch_name = str(pr_info.get("headRefName", "")).strip()
+    if not branch_name:
+        raise SystemExit(f"Unable to determine headRefName for PR #{pr_number}")
+
+    checkout_pr_branch(branch_name)
+    run(["git", "pull"], capture_output=False)
+
+    helper_path = ensure_gh_pr_helper(repo_root)
+    pr_output = get_gh_pr_output(helper_path, owner, repo, pr_number)
+
+    run_kilocode_with_pr_output(pr_output)
+    stage_changes()
+    create_commit_from_pr_output(pr_output)
+    push_current_branch()
+
+
+if __name__ == "__main__":
+    main(sys.argv)

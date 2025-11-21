@@ -1,0 +1,159 @@
+#!/usr/bin/env python
+import json
+import sys
+from typing import Any
+
+from kilocode_autocoder_utils import (
+    check_commands_available,
+    ensure_env,
+    has_staged_changes,
+    run,
+    stage_changes,
+)
+
+
+def get_issue_content(issue_number: str) -> str:
+    template = (
+        "# Issue: \n"
+        "{{.title}}\n\n"
+        "# Description\n"
+        "{{.body}}\n\n"
+        "# Comments\n\n"
+        "{{range .comments}}## Comment\n"
+        "{{.body}}\n\n"
+        "{{end}}"
+    )
+    return run(
+        [
+            "gh",
+            "issue",
+            "view",
+            issue_number,
+            "--json",
+            "title,body,comments",
+            "--template",
+            template,
+        ]
+    )
+
+
+def create_branch_name(issue_number: str, issue_content: str) -> str:
+    prompt = (
+        "create a good git branch title for a branch that addresses this issue. "
+        f"It should start with `fix-kilocode/{issue_number}-` and must be a valid branch name"
+    )
+    # Mirror the shell script: feed issue content on stdin, give the instruction
+    # as the prompt argument to `llm`.
+    raw_output = run(["llm", prompt], input_text=issue_content).strip()
+
+    # Be defensive: some llm configurations may return explanatory text.
+    # Prefer the first line that contains the required prefix, otherwise
+    # fall back to the first non-empty line.
+    lines = [line.strip() for line in raw_output.splitlines() if line.strip()]
+    temp_branch_name = ""
+    for line in lines:
+        if f"fix-kilocode/{issue_number}" in line:
+            temp_branch_name = line
+            break
+    if not temp_branch_name and lines:
+        temp_branch_name = lines[0]
+    if not temp_branch_name:
+        raise SystemExit(f"llm did not return a usable branch name: {raw_output!r}")
+
+    # Normalise and validate like `git check-ref-format --normalize`
+    normalized = run(["git", "check-ref-format", "--normalize", temp_branch_name]).strip()
+    return normalized
+
+
+def run_kilocode(issue_content: str) -> None:
+    run(["kilocode", "--auto"], input_text=issue_content, capture_output=False)
+
+
+def create_commit_if_needed() -> None:
+    if not has_staged_changes():
+        print("No changes to commit.")
+        return
+
+    diff = run(["git", "diff", "--cached"])
+    commit_message = run(
+        ["llm", "-s", "give me a git commit message for these changes"],
+        input_text=diff,
+    ).strip()
+    if not commit_message:
+        commit_message = "Update from kilocode"
+    run(["git", "commit", "-m", commit_message], capture_output=False)
+
+
+def push_branch(branch_name: str) -> None:
+    run(["git", "push", "--set-upstream", "origin", branch_name], capture_output=False)
+
+
+def build_pr_title_body(issue_number: str) -> dict[str, Any]:
+    git_log_output = run(["git", "log", "origin/main.."])
+    prompt = (
+        "Looking at this git log output, summarise into a `title` and `body` suitable for a pull request. "
+        f"The `body` MUST start with `Closes #{issue_number}`"
+    )
+    # Force the model that understands `--schema`
+    pr_title_body_json = run(
+        [
+            "llm",
+            "--schema",
+            "title,body",
+            "-m",
+            "gpt-5-nano",
+            prompt,
+        ],
+        input_text=git_log_output,
+    )
+    try:
+        data = json.loads(pr_title_body_json)
+    except json.JSONDecodeError as e:
+        raise SystemExit(f"Failed to parse JSON from llm output: {e}\nRaw output:\n{pr_title_body_json}")
+    if not isinstance(data, dict):
+        raise SystemExit(f"Unexpected JSON type from llm: {type(data)}")
+    return data
+
+
+def create_pr(issue_number: str) -> None:
+    pr_data = build_pr_title_body(issue_number)
+    title = str(pr_data.get("title", "")).strip()
+    body = str(pr_data.get("body", "")).strip()
+    run(
+        [
+            "gh",
+            "pr",
+            "create",
+            "--title",
+            title,
+            "--body",
+            body,
+        ],
+        capture_output=False,
+    )
+
+
+def main(argv: list[str]) -> None:
+    check_commands_available()
+    ensure_env()
+
+    if len(argv) < 2 or argv[1] in {"-h", "--help"}:
+        print(f"Usage: {argv[0]} <issue-number>", file=sys.stderr)
+        raise SystemExit(1)
+
+    issue_number = argv[1]
+
+    issue_content = get_issue_content(issue_number)
+
+    branch_name = create_branch_name(issue_number, issue_content)
+    run(["git", "checkout", "-b", branch_name], capture_output=False)
+
+    run_kilocode(issue_content)
+    stage_changes()
+    create_commit_if_needed()
+    push_branch(branch_name)
+    create_pr(issue_number)
+
+
+if __name__ == "__main__":
+    main(sys.argv)
