@@ -20,3 +20,9 @@ programs_with_errors.json
 scripts/programs_with_errors.json
 
 .DS_Store
+
+# Website
+website/node_modules/
+website/dist/
+website/src/content/
+website/.astro/

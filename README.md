@@ -4,7 +4,7 @@ In early November 2025, Anthropic had a program giving out $250 credits for Clau
 
 I was working on something else and as a side effect accidently vibe coded a prolog interpretor on my phone over the weekend. 
 
-I haven't used Prolog for 20 years, and but it does seem to be roughly correct. 
+I haven't used Prolog for 20 years, but it does seem to be roughly correct. 
 
 ![It's the Vibe](./images/TheCastle.jpg)
 
