@@ -35,12 +35,9 @@ ISSUE_CONTENT="$(
 {{end}}'
 )"
 
-temp_branch_name="$(
-  printf '%s\n' "$ISSUE_CONTENT" | llm "create a good git branch title for a branch that addresses this issue. \
-   It should start with \`fix-kilocode/$ISSUE_NUMBER-\` and must be a valid branch name"
+branch_name="$(
+  printf '%s\n' "$ISSUE_CONTENT" | llm "create a good git branch title for a branch that addresses this issue. It should start with \`fix-kilocode/$ISSUE_NUMBER-\`"
 )"
-
-branch_name=$(git check-ref-format --normalize "$temp_branch_name")
 
 git checkout -b "$branch_name"
 
