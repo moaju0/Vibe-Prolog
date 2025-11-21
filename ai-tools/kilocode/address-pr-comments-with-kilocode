@@ -89,10 +89,6 @@ def run_kilocode_with_pr_output(pr_output: str) -> None:
     run(["kilocode", "--auto"], input_text=pr_output, capture_output=False)
 
 
-def stage_changes() -> None:
-    stage_changes()
-
-
 def create_commit_from_pr_output(pr_output: str) -> None:
     if not has_staged_changes():
         print("No changes to commit.")
