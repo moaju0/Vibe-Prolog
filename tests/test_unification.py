@@ -312,7 +312,7 @@ class TestComplexUnificationPatterns:
 
 
 class TestTermComparison:
-    """Term comparison operators: ==, \==, @<, @=<, @>, @>="""
+    r"""Term comparison operators: ==, \==, @<, @=<, @>, @>="""
 
     def test_term_identity_equal(self):
         """Test ==/2 - term identity (structural equality)"""
@@ -342,7 +342,7 @@ class TestTermComparison:
         assert prolog.has_solution("X == X")
 
     def test_term_identity_not_equal(self):
-        """Test \==/2 - term non-identity"""
+        r"""Test \==/2 - term non-identity"""
         prolog = PrologInterpreter()
 
         # Atoms

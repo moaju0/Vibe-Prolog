@@ -138,14 +138,14 @@ class PrologEngine:
             return iter([])
 
         # Arithmetic comparisons
-        if functor in ["=:=", "=\=", "<", ">", "=<", ">="] and len(args) == 2:
+        if functor in ["=:=", r"=\=", "<", ">", "=<", ">="] and len(args) == 2:
             result = self._builtin_arithmetic_compare(functor, args[0], args[1], subst)
             if result is not None:
                 return iter([result])
             return iter([])
 
         # Term comparisons
-        if functor in ["==", "\\==", "@<", "@=<", "@>", "@>="] and len(args) == 2:
+        if functor in ["==", r"\==", "@<", "@=<", "@>", "@>="] and len(args) == 2:
             result = self._builtin_term_compare(functor, args[0], args[1], subst)
             if result is not None:
                 return iter([result])
@@ -440,7 +440,7 @@ class PrologEngine:
 
         if op == "=:=" and left_val == right_val:
             return subst
-        elif op == "=\=" and left_val != right_val:
+        elif op == r"=\=" and left_val != right_val:
             return subst
         elif op == "<" and left_val < right_val:
             return subst
@@ -1644,7 +1644,7 @@ class PrologEngine:
 
         # List of all built-in functors
         builtins = {
-            "=", "\\=", "\\+", "is", "=:=", "=\=", "<", ">", "=<", ">=", "==", "\\==", "@<", "@=<", "@>", "@>=", "=..",
+            "=", r"\=", r"\+", "is", "=:=", r"=\=", "<", ">", "=<", ">=", "==", r"\==", "@<", "@=<", "@>", "@>=", "=..",
             "member", "append", "length", "reverse", "sort",
             "clause", "call", "once", "true", "fail", "!",
             "write", "writeln", "nl", "format",
@@ -1683,9 +1683,9 @@ class PrologEngine:
             # Control constructs
             ("true", 0), ("fail", 0), ("!", 0), ("nl", 0),
             # Unification and comparison
-            ("=", 2), ("\\=", 2), ("==", 2), ("\\==", 2), ("@<", 2), ("@=<", 2), ("@>", 2), ("@>=", 2),
+            ("=", 2), (r"\=", 2), ("==", 2), (r"\==", 2), ("@<", 2), ("@=<", 2), ("@>", 2), ("@>=", 2),
             # Arithmetic
-            ("is", 2), ("=:=", 2), ("=\=", 2), ("<", 2), (">", 2), ("=<", 2), (">=", 2),
+            ("is", 2), ("=:=", 2), (r"=\=", 2), ("<", 2), (">", 2), ("=<", 2), (">=", 2),
             # Type testing
             ("var", 1), ("nonvar", 1), ("atom", 1), ("number", 1), ("integer", 1), ("float", 1),
             ("atomic", 1), ("compound", 1), ("callable", 1), ("ground", 1),
