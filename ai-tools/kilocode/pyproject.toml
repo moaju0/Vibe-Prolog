@@ -1,0 +1,14 @@
+[project]
+name = "kilocode-autocoder-utils"
+version = "0.1.0"
+description = "Automate fixing a GitHub issue with kilocode and opening a PR."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = []
+
+[project.scripts]
+fix-issue-with-kilocode = "kilocode_autocoder_utils:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
