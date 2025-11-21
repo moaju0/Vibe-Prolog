@@ -1,0 +1,467 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="AI Tools - Vibe Prolog" description="AI coding tools and automation workflows used to build Vibe Prolog">
+  <div class="hero">
+    <h1>AI Tools & Automation</h1>
+    <p class="subtitle">How multiple AI coding tools work together to build Vibe Prolog</p>
+  </div>
+
+  <div class="content">
+    <section>
+      <h2>Overview</h2>
+      <p>
+        Vibe Prolog is built entirely with AI code generation, demonstrating what's possible when
+        you leverage multiple AI coding tools working together. This page documents the tools and
+        workflows used throughout the development process.
+      </p>
+    </section>
+
+    <section>
+      <h2>Primary Development Tools</h2>
+
+      <div class="tool-card">
+        <h3>Claude Code</h3>
+        <p>
+          The main development interface for iterative coding. Claude Code provides an interactive
+          CLI that integrates with the codebase, allowing for natural language programming and
+          complex multi-step tasks.
+        </p>
+        <ul>
+          <li>Interactive development sessions</li>
+          <li>Code generation and refactoring</li>
+          <li>Test writing and debugging</li>
+          <li>Documentation generation</li>
+        </ul>
+      </div>
+
+      <div class="tool-card">
+        <h3>Claude Sonnet 4.5</h3>
+        <p>
+          The core AI model powering the implementation. Handles complex architectural decisions,
+          algorithm implementations, and maintains code quality throughout the project.
+        </p>
+        <ul>
+          <li>Core Prolog engine implementation</li>
+          <li>Parser design and unification algorithm</li>
+          <li>Built-in predicate implementation</li>
+          <li>Comprehensive test suite development</li>
+        </ul>
+      </div>
+    </section>
+
+    <section>
+      <h2>Automation & Workflows</h2>
+
+      <div class="tool-card">
+        <h3>Kilocode</h3>
+        <p>
+          Automated issue-to-PR workflow tools that streamline the development process by handling
+          the entire cycle from issue creation to pull request submission.
+        </p>
+
+        <h4><code>fix-issue-with-kilocode</code></h4>
+        <p>Automates the complete workflow of fixing a GitHub issue:</p>
+        <ol>
+          <li>Creates a new branch based on the issue</li>
+          <li>Runs <code>kilocode</code> against the issue content</li>
+          <li>Commits and pushes any changes</li>
+          <li>Opens a pull request with generated title and body</li>
+        </ol>
+
+        <div class="code-example">
+          <pre><code>fix-issue-with-kilocode 123</code></pre>
+        </div>
+
+        <h4><code>address-pr-comments-with-kilocode</code></h4>
+        <p>Automatically addresses review comments on pull requests:</p>
+        <ol>
+          <li>Fetches PR details and review comments</li>
+          <li>Checks out the PR branch</li>
+          <li>Runs <code>kilocode --auto</code> to address comments</li>
+          <li>Commits changes with AI-generated commit message</li>
+          <li>Pushes updates to the PR</li>
+        </ol>
+
+        <div class="code-example">
+          <pre><code>address-pr-comments-with-kilocode 456</code></pre>
+        </div>
+
+        <p class="tool-requirements">
+          <strong>Requirements:</strong> <code>uv</code>, <code>git</code>, <code>gh</code>,
+          <code>kilocode</code>, <code>llm</code>, and <code>OPENAI_API_KEY</code> environment variable
+        </p>
+      </div>
+
+      <div class="tool-card">
+        <h3>gh-pr-helper</h3>
+        <p>
+          A utility that fetches GitHub PR comments and formats them in markdown suitable for
+          AI coding agents. Makes it easy to feed review feedback back into the AI development cycle.
+        </p>
+
+        <h4>Features</h4>
+        <ul>
+          <li>Fetches both general PR comments and inline code review comments</li>
+          <li>Organizes comments by file and line number</li>
+          <li>Includes code context (diff hunks) for inline comments</li>
+          <li>Filters out metadata not useful for AI agents</li>
+        </ul>
+
+        <div class="code-example">
+          <pre><code>gh-pr-helper nlothian/Vibe-Prolog/pull/10 > comments.md</code></pre>
+        </div>
+
+        <p class="tool-requirements">
+          <strong>Requirements:</strong> Python 3.12+, <code>gh</code> (GitHub CLI)
+        </p>
+      </div>
+    </section>
+
+    <section>
+      <h2>Supporting Tools</h2>
+
+      <div class="tool-list">
+        <div class="tool-item">
+          <h4>GitHub Copilot</h4>
+          <p>Provides real-time code suggestions and completions during development (via Cursor IDE)</p>
+        </div>
+
+        <div class="tool-item">
+          <h4>LLM CLI</h4>
+          <p>Command-line interface for large language models, used for commit message generation and text processing</p>
+        </div>
+
+        <div class="tool-item">
+          <h4>UV</h4>
+          <p>Fast Python package and project management tool, replacing traditional pip/virtualenv workflows</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Development Workflow</h2>
+
+      <div class="workflow">
+        <div class="workflow-step">
+          <div class="step-number">1</div>
+          <div class="step-content">
+            <h4>Issue Creation</h4>
+            <p>Create a GitHub issue describing the feature, bug fix, or improvement</p>
+          </div>
+        </div>
+
+        <div class="workflow-step">
+          <div class="step-number">2</div>
+          <div class="step-content">
+            <h4>Automated Implementation</h4>
+            <p>Run <code>fix-issue-with-kilocode</code> to automatically create branch, implement, and open PR</p>
+          </div>
+        </div>
+
+        <div class="workflow-step">
+          <div class="step-number">3</div>
+          <div class="step-content">
+            <h4>AI Review</h4>
+            <p>AI tools review the PR, run tests, and provide feedback on code quality</p>
+          </div>
+        </div>
+
+        <div class="workflow-step">
+          <div class="step-number">4</div>
+          <div class="step-content">
+            <h4>Address Comments</h4>
+            <p>Run <code>address-pr-comments-with-kilocode</code> to automatically address review feedback</p>
+          </div>
+        </div>
+
+        <div class="workflow-step">
+          <div class="step-number">5</div>
+          <div class="step-content">
+            <h4>Merge</h4>
+            <p>Once all checks pass and review is satisfied, merge the PR</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Installation & Setup</h2>
+
+      <p>To use these tools in your own projects:</p>
+
+      <h3>Kilocode Tools</h3>
+      <div class="code-example">
+        <pre><code>cd ai-tools/kilocode
+uv tool install .
+fix-issue-with-kilocode --help</code></pre>
+      </div>
+
+      <h3>gh-pr-helper</h3>
+      <div class="code-example">
+        <pre><code>cd ai-tools/gh-pr-helper
+chmod +x gh-pr-helper
+./gh-pr-helper nlothian/Vibe-Prolog/pull/10</code></pre>
+      </div>
+
+      <p>
+        See the individual README files in the <code>ai-tools/</code> directory for detailed
+        installation instructions and requirements.
+      </p>
+    </section>
+
+    <section>
+      <h2>The Philosophy</h2>
+
+      <p>
+        This project demonstrates that AI code generation is most powerful when multiple tools
+        work together in a coordinated workflow:
+      </p>
+
+      <ul>
+        <li><strong>Interactive AI</strong> for complex problem-solving and architecture</li>
+        <li><strong>Automated workflows</strong> for repetitive tasks and process automation</li>
+        <li><strong>Human oversight</strong> for quality control and strategic decisions</li>
+        <li><strong>Continuous iteration</strong> to improve code quality over time</li>
+      </ul>
+
+      <p>
+        By combining these approaches, we can achieve higher code quality and faster development
+        than any single approach alone.
+      </p>
+    </section>
+
+    <section class="cta">
+      <h2>Want to Contribute?</h2>
+      <p>
+        Tool vendors: Want to add your AI coding tool to this project? We'd love to try it!
+        Open a PR or issue on GitHub.
+      </p>
+      <a href="https://github.com/nlothian/Vibe-Prolog" class="button primary" target="_blank" rel="noopener">
+        View on GitHub
+      </a>
+    </section>
+  </div>
+</Layout>
+
+<style>
+  .hero {
+    text-align: center;
+    padding: 3rem 0;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 3rem;
+  }
+
+  .hero h1 {
+    font-size: 2.5rem;
+    margin-bottom: 1rem;
+    color: var(--primary);
+  }
+
+  .subtitle {
+    font-size: 1.2rem;
+    color: var(--text-light);
+  }
+
+  .content {
+    max-width: 900px;
+    margin: 0 auto;
+  }
+
+  section {
+    margin-bottom: 3rem;
+  }
+
+  h2 {
+    font-size: 2rem;
+    color: var(--primary);
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid var(--border);
+  }
+
+  h3 {
+    font-size: 1.5rem;
+    color: var(--text);
+    margin-bottom: 0.75rem;
+    margin-top: 1.5rem;
+  }
+
+  h4 {
+    font-size: 1.25rem;
+    color: var(--text);
+    margin-bottom: 0.5rem;
+    margin-top: 1rem;
+  }
+
+  .tool-card {
+    background-color: #f9fafb;
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .tool-card h3 {
+    margin-top: 0;
+    color: var(--primary);
+  }
+
+  .tool-card ul, .tool-card ol {
+    margin-left: 1.5rem;
+    margin-bottom: 1rem;
+  }
+
+  .tool-card li {
+    margin-bottom: 0.5rem;
+  }
+
+  .code-example {
+    background-color: var(--code-bg);
+    border-radius: 0.5rem;
+    padding: 1rem;
+    margin: 1rem 0;
+    overflow-x: auto;
+  }
+
+  .code-example pre {
+    margin: 0;
+  }
+
+  .code-example code {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 0.9rem;
+  }
+
+  .tool-requirements {
+    margin-top: 1rem;
+    padding: 0.75rem;
+    background-color: #fef3c7;
+    border-left: 3px solid #f59e0b;
+    border-radius: 0.25rem;
+    font-size: 0.9rem;
+  }
+
+  .tool-list {
+    display: grid;
+    gap: 1rem;
+  }
+
+  .tool-item {
+    padding: 1rem;
+    border-left: 3px solid var(--primary);
+    background-color: #f9fafb;
+  }
+
+  .tool-item h4 {
+    margin-top: 0;
+    color: var(--primary);
+  }
+
+  .tool-item p {
+    margin-bottom: 0;
+  }
+
+  .workflow {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    margin-top: 1.5rem;
+  }
+
+  .workflow-step {
+    display: flex;
+    gap: 1rem;
+    align-items: start;
+  }
+
+  .step-number {
+    flex-shrink: 0;
+    width: 2.5rem;
+    height: 2.5rem;
+    background-color: var(--primary);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 1.2rem;
+  }
+
+  .step-content {
+    flex-grow: 1;
+  }
+
+  .step-content h4 {
+    margin-top: 0;
+    margin-bottom: 0.25rem;
+  }
+
+  .step-content p {
+    margin-top: 0.25rem;
+    color: var(--text-light);
+  }
+
+  .cta {
+    text-align: center;
+    padding: 2rem;
+    background-color: #f9fafb;
+    border-radius: 0.5rem;
+    margin-top: 3rem;
+  }
+
+  .cta h2 {
+    border-bottom: none;
+    margin-bottom: 0.5rem;
+  }
+
+  .cta p {
+    margin-bottom: 1.5rem;
+  }
+
+  .button {
+    display: inline-block;
+    padding: 0.75rem 1.5rem;
+    border-radius: 0.5rem;
+    text-decoration: none;
+    font-weight: 600;
+    transition: all 0.2s;
+  }
+
+  .button.primary {
+    background-color: var(--primary);
+    color: white;
+  }
+
+  .button.primary:hover {
+    background-color: var(--primary-dark);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(99, 102, 241, 0.3);
+  }
+
+  @media (max-width: 768px) {
+    .hero h1 {
+      font-size: 2rem;
+    }
+
+    .subtitle {
+      font-size: 1rem;
+    }
+
+    h2 {
+      font-size: 1.5rem;
+    }
+
+    .workflow-step {
+      flex-direction: column;
+    }
+
+    .step-number {
+      width: 2rem;
+      height: 2rem;
+      font-size: 1rem;
+    }
+  }
+</style>
