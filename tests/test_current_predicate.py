@@ -145,3 +145,11 @@ class TestCurrentPredicate:
         assert not prolog.has_solution("current_predicate(nonexistent/0)")
         assert not prolog.has_solution("current_predicate(fake_pred/5)")
         assert not prolog.has_solution("current_predicate(write/2)")  # write is 1, not 2
+
+    def test_predicate_property_builtin(self):
+        """Test that current_predicate/1 is recognized as built-in by predicate_property/2."""
+        prolog = PrologInterpreter()
+
+        # current_predicate/1 should be recognized as built-in
+        result = prolog.query_once("predicate_property(current_predicate(_), built_in)")
+        assert result == {}

@@ -1609,7 +1609,7 @@ class PrologEngine:
             "findall", "bagof", "setof",
             "assert", "asserta", "assertz", "retract",
             "maplist",
-            "predicate_property", "catch"
+            "predicate_property", "current_predicate", "catch"
         }
 
         # Check if goal is a compound term with a built-in functor
