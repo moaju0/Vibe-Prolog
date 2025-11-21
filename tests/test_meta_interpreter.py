@@ -165,6 +165,12 @@ class TestPredicateProperty:
         result = prolog.query_once("predicate_property(clause(_, _), built_in).")
         assert result == {}
 
+    def test_builtin_arithmetic_inequality(self):
+        """Test that =\=/2 is recognized as built-in."""
+        prolog = PrologInterpreter()
+        result = prolog.query_once("predicate_property((_ =\= _), built_in).")
+        assert result == {}
+
     def test_non_builtin(self):
         """Test that user-defined predicates are not built-in."""
         prolog = PrologInterpreter()

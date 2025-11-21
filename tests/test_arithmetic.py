@@ -199,6 +199,14 @@ class TestArithmeticComparisons:
         assert prolog.has_solution("5 >= 5")
         assert not prolog.has_solution("3 >= 5")
 
+    def test_not_equal(self):
+        prolog = PrologInterpreter()
+
+        assert prolog.has_solution("5 =\= 3")
+        assert prolog.has_solution("2 + 3 =\= 6")
+        assert not prolog.has_solution("5 =\= 5")
+        assert not prolog.has_solution("10 - 5 =\= 5")
+
 
 class TestArithmeticInRules:
     """Using arithmetic in rules"""

@@ -138,7 +138,7 @@ class PrologEngine:
             return iter([])
 
         # Arithmetic comparisons
-        if functor in ["=:=", "<", ">", "=<", ">="] and len(args) == 2:
+        if functor in ["=:=", "=\=", "<", ">", "=<", ">="] and len(args) == 2:
             result = self._builtin_arithmetic_compare(functor, args[0], args[1], subst)
             if result is not None:
                 return iter([result])
@@ -393,6 +393,8 @@ class PrologEngine:
             return None
 
         if op == "=:=" and left_val == right_val:
+            return subst
+        elif op == "=\=" and left_val != right_val:
             return subst
         elif op == "<" and left_val < right_val:
             return subst
@@ -1513,7 +1515,7 @@ class PrologEngine:
 
         # List of all built-in functors
         builtins = {
-            "=", "\\=", "\\+", "is", "=:=", "<", ">", "=<", ">=", "==", "\\==", "@<", "@=<", "@>", "@>=", "=..",
+            "=", "\\=", "\\+", "is", "=:=", "=\=", "<", ">", "=<", ">=", "==", "\\==", "@<", "@=<", "@>", "@>=", "=..",
             "member", "append", "length", "reverse", "sort",
             "clause", "call", "once", "true", "fail", "!",
             "write", "writeln", "nl", "format",
