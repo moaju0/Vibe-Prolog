@@ -17,6 +17,25 @@ class TestListConversion:
         assert result["R"] == [1, 2, 3]
         assert result["T"] == [2]
 
+    def test_append_open_tail_bindings_not_truncated(self):
+        """Open tails must be bound, not silently dropped during conversion."""
+
+        prolog = PrologInterpreter()
+
+        result = prolog.query_once("append([1|Tail], [2], [1,2]).")
+
+        assert result is not None
+        assert result["Tail"] == []
+
+    def test_append_improper_list_fails(self):
+        """Improper lists should cause append to fail rather than truncate."""
+
+        prolog = PrologInterpreter()
+
+        result = prolog.query_once("append([1|3], [], R).")
+
+        assert result is None
+
 
 class TestMaplistStreaming:
     """maplist should stream predicate solutions."""

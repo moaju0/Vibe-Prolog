@@ -157,6 +157,7 @@
 - ✅ If-then/else evaluates conditions lazily (only first success) to preserve backtracking
 - ✅ Term comparison uses Prolog ordering (variables < numbers < atoms < compounds/lists) for deterministic sort/setof results
 - ✅ List conversions honor active substitutions when traversing open list tails (e.g., append/sort/reverse)
+- ✅ Python conversions reject improper or partially instantiated lists instead of silently truncating
 
 ## Data Types
 - ✅ Atoms

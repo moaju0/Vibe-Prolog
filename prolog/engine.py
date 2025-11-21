@@ -634,21 +634,25 @@ class PrologEngine:
 
         # If list1 is a concrete list, convert it to Python list, append, and unify
         if isinstance(list1, List) and not isinstance(list1, Variable) and isinstance(list2, List):
-            # Convert both lists to Python lists
-            py_list1 = self._list_to_python(list1, subst)
-            py_list2 = self._list_to_python(list2, subst)
+            try:
+                # Convert both lists to Python lists
+                py_list1 = self._list_to_python(list1, subst)
+                py_list2 = self._list_to_python(list2, subst)
+            except TypeError:
+                # Not proper lists; fall back to relational definition.
+                pass
+            else:
+                # Concatenate
+                concatenated = py_list1 + py_list2
 
-            # Concatenate
-            concatenated = py_list1 + py_list2
+                # Convert back to Prolog list
+                result_list = self._python_to_list(concatenated)
 
-            # Convert back to Prolog list
-            result_list = self._python_to_list(concatenated)
-
-            # Unify with result
-            new_subst = unify(result, result_list, subst)
-            if new_subst is not None:
-                yield new_subst
-            return
+                # Unify with result
+                new_subst = unify(result, result_list, subst)
+                if new_subst is not None:
+                    yield new_subst
+                return
 
         # Handle the recursive definition:
         # append([], L, L).
@@ -706,7 +710,7 @@ class PrologEngine:
                 yield from self._builtin_append(tail1_var, list2, tail3, subst1)
 
     def _list_to_python(self, prolog_list: List, subst: Substitution | None = None) -> list:
-        """Convert a Prolog list to a Python list using the active substitution."""
+        """Convert a proper Prolog list to a Python list using the active substitution."""
         subst = subst or Substitution()
         result = []
         current = deref(prolog_list, subst)
@@ -715,13 +719,20 @@ class PrologEngine:
             result.extend(apply_substitution(elem, subst) for elem in current.elements)
 
             if current.tail is None:
-                break
+                # Proper list terminated without an explicit tail.
+                return result
 
             current = deref(current.tail, subst)
-            if isinstance(current, Variable):
-                break
 
-        return result
+        # Allow explicit [] as a terminator.
+        if isinstance(current, Atom) and current.name == "[]":
+            return result
+
+        # Otherwise, the list was not proper (improper tail or open variable).
+        raise TypeError(
+            "Cannot convert non-proper Prolog list with tail "
+            f"'{self._term_to_string(current)}' to a Python list."
+        )
 
     def _python_to_list(self, py_list: list) -> List:
         """Convert a Python list to a Prolog list."""
@@ -813,7 +824,10 @@ class PrologEngine:
         if not isinstance(lst, List):
             return
 
-        elements = self._list_to_python(lst, subst)
+        try:
+            elements = self._list_to_python(lst, subst)
+        except TypeError:
+            return
 
         def apply_goal(index: int, current_subst: Substitution) -> Iterator[Substitution]:
             if index >= len(elements):
@@ -1482,23 +1496,31 @@ class PrologEngine:
         # Mode 1: first argument is bound, reverse it and unify with second
         if isinstance(lst, List):
             # Convert to Python list, reverse, and convert back
-            py_list = self._list_to_python(lst, subst)
-            reversed_py = list(reversed(py_list))
-            result = self._python_to_list(reversed_py)
+            try:
+                py_list = self._list_to_python(lst, subst)
+            except TypeError:
+                pass
+            else:
+                reversed_py = list(reversed(py_list))
+                result = self._python_to_list(reversed_py)
 
-            new_subst = unify(reversed_lst, result, subst)
-            if new_subst is not None:
-                yield new_subst
+                new_subst = unify(reversed_lst, result, subst)
+                if new_subst is not None:
+                    yield new_subst
         # Mode 2: second argument is bound, reverse it and unify with first
         elif isinstance(reversed_lst, List):
             # Convert to Python list, reverse, and convert back
-            py_list = self._list_to_python(reversed_lst, subst)
-            reversed_py = list(reversed(py_list))
-            result = self._python_to_list(reversed_py)
+            try:
+                py_list = self._list_to_python(reversed_lst, subst)
+            except TypeError:
+                pass
+            else:
+                reversed_py = list(reversed(py_list))
+                result = self._python_to_list(reversed_py)
 
-            new_subst = unify(lst, result, subst)
-            if new_subst is not None:
-                yield new_subst
+                new_subst = unify(lst, result, subst)
+                if new_subst is not None:
+                    yield new_subst
 
     def _builtin_sort(self, lst: any, sorted_lst: any, subst: Substitution) -> Substitution | None:
         """Built-in sort/2 predicate - Sort a list and remove duplicates."""
@@ -1508,7 +1530,10 @@ class PrologEngine:
             return None
 
         # Convert to Python list
-        py_list = self._list_to_python(lst, subst)
+        try:
+            py_list = self._list_to_python(lst, subst)
+        except TypeError:
+            return None
 
         # Remove duplicates
         unique = []
