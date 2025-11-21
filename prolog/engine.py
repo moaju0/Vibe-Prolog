@@ -2,6 +2,7 @@
 
 from typing import Callable, Iterator
 from collections import OrderedDict
+from collections.abc import Iterator as IteratorABC
 from prolog.parser import Compound, Atom, Variable, Number, List, Clause, Cut
 from prolog.unification import Substitution, unify, deref, apply_substitution
 
@@ -18,6 +19,7 @@ class PrologEngine:
         self.clauses = clauses
         self.call_depth = 0
         self.max_depth = 1000  # Prevent infinite recursion
+        self._builtin_registry = self._build_builtin_registry()
 
     def query(self, goals: list[Compound]) -> Iterator[Substitution]:
         """
@@ -81,330 +83,118 @@ class PrologEngine:
 
     def _try_builtin(self, goal: Compound, subst: Substitution) -> Iterator[Substitution] | None:
         """Try to solve goal as a built-in predicate. Returns None if not a builtin."""
-        # Check for cut operator (!)
         if isinstance(goal, Cut):
-            # Cut succeeds once and prevents backtracking
-            # We use a wrapper to signal cut after yielding results
             def cut_wrapper():
                 yield subst
-                # After first result, raise exception to prevent backtracking
                 raise CutException()
+
             return cut_wrapper()
 
-        if not isinstance(goal, Compound):
-            # Check for true
-            if isinstance(goal, Atom) and goal.name == "true":
-                return iter([subst])
-            # Check for nl (newline)
-            if isinstance(goal, Atom) and goal.name == "nl":
-                print()
-                return iter([subst])
+        key: tuple[str, int] | None = None
+        args: tuple = ()
+
+        if isinstance(goal, Compound):
+            key = (goal.functor, len(goal.args))
+            args = goal.args
+        elif isinstance(goal, Atom):
+            key = (goal.name, 0)
+
+        if key is None:
             return None
 
-        functor = goal.functor
-        args = goal.args
+        handler = self._builtin_registry.get(key)
+        if handler is None:
+            return None
 
-        # =/2 - Unification
-        if functor == "=" and len(args) == 2:
-            new_subst = unify(args[0], args[1], subst)
-            if new_subst is not None:
-                return iter([new_subst])
+        result = handler(args, subst)
+        return self._normalize_builtin_result(result)
+
+    def _build_builtin_registry(self) -> dict[tuple[str, int], Callable[[tuple, Substitution], Iterator[Substitution] | Substitution | None]]:
+        """Create the functor/arity dispatch table for built-in predicates."""
+        registry: dict[tuple[str, int], Callable[[tuple, Substitution], Iterator[Substitution] | Substitution | None]] = {}
+
+        def register(functor: str, arity: int, handler: Callable[[tuple, Substitution], Iterator[Substitution] | Substitution | None]):
+            registry[(functor, arity)] = handler
+
+        register("=", 2, lambda args, subst: unify(args[0], args[1], subst))
+        register(r"\=", 2, lambda args, subst: subst if unify(args[0], args[1], subst) is None else None)
+        register(r"\+", 1, lambda args, subst: self._negation_as_failure(args[0], subst))
+        register("member", 2, lambda args, subst: self._builtin_member(args[0], args[1], subst))
+        register("is", 2, lambda args, subst: self._builtin_is(args[0], args[1], subst))
+        for op in ["=:=", r"=\=", "<", ">", "=<", ">="]:
+            register(
+                op,
+                2,
+                lambda args, subst, op=op: self._builtin_arithmetic_compare(
+                    op, args[0], args[1], subst
+                ),
+            )
+        for op in ["==", r"\==", "@<", "@=<", "@>", "@>="]:
+            register(op, 2, lambda args, subst, op=op: self._builtin_term_compare(op, args[0], args[1], subst))
+        register("format", 3, lambda args, subst: self._builtin_format(args[0], args[1], args[2], subst))
+        register("append", 3, lambda args, subst: self._builtin_append(args[0], args[1], args[2], subst))
+        register("clause", 2, lambda args, subst: self._builtin_clause(args[0], args[1], subst))
+        register("call", 1, lambda args, subst: self._builtin_call(args[0], subst))
+        register("once", 1, lambda args, subst: self._builtin_once(args[0], subst))
+        register("write", 1, lambda args, subst: self._builtin_write(args[0], subst))
+        register("writeln", 1, lambda args, subst: self._builtin_writeln(args[0], subst))
+        register("maplist", 2, lambda args, subst: self._builtin_maplist(args[0], args[1], subst))
+        register("true", 0, lambda _args, subst: subst)
+        register("nl", 0, lambda _args, subst: self._newline_builtin(subst))
+        register(";", 2, lambda args, subst: self._builtin_disjunction(args[0], args[1], subst))
+        register("->", 2, lambda args, subst: self._builtin_if_then(args[0], args[1], subst))
+        register(",", 2, lambda args, subst: self._builtin_conjunction(args[0], args[1], subst))
+        register("format", 2, lambda args, subst: self._builtin_format_stdout(args[0], args[1], subst))
+        register("format", 1, lambda args, subst: self._builtin_format_stdout(args[0], List(()), subst))
+        register("fail", 0, lambda _args, _subst: iter([]))
+        register("atom", 1, lambda args, subst: self._builtin_atom(args[0], subst))
+        register("number", 1, lambda args, subst: self._builtin_number(args[0], subst))
+        register("var", 1, lambda args, subst: self._builtin_var(args[0], subst))
+        register("nonvar", 1, lambda args, subst: self._builtin_nonvar(args[0], subst))
+        register("compound", 1, lambda args, subst: self._builtin_compound(args[0], subst))
+        register("integer", 1, lambda args, subst: self._builtin_integer(args[0], subst))
+        register("float", 1, lambda args, subst: self._builtin_float(args[0], subst))
+        register("atomic", 1, lambda args, subst: self._builtin_atomic(args[0], subst))
+        register("callable", 1, lambda args, subst: self._builtin_callable(args[0], subst))
+        register("ground", 1, lambda args, subst: self._builtin_ground(args[0], subst))
+        register("functor", 3, lambda args, subst: self._builtin_functor(args[0], args[1], args[2], subst))
+        register("arg", 3, lambda args, subst: self._builtin_arg(args[0], args[1], args[2], subst))
+        register("=..", 2, lambda args, subst: self._builtin_univ(args[0], args[1], subst))
+        register("copy_term", 2, lambda args, subst: self._builtin_copy_term(args[0], args[1], subst))
+        register("findall", 3, lambda args, subst: self._builtin_findall(args[0], args[1], args[2], subst))
+        register("bagof", 3, lambda args, subst: self._builtin_bagof(args[0], args[1], args[2], subst))
+        register("setof", 3, lambda args, subst: self._builtin_setof(args[0], args[1], args[2], subst))
+        register("asserta", 1, lambda args, subst: self._builtin_assert(args[0], subst, position="front"))
+        register("assertz", 1, lambda args, subst: self._builtin_assert(args[0], subst, position="back"))
+        register("assert", 1, lambda args, subst: self._builtin_assert(args[0], subst, position="back"))
+        register("retract", 1, lambda args, subst: self._builtin_retract(args[0], subst))
+        register("length", 2, lambda args, subst: self._builtin_length(args[0], args[1], subst))
+        register("reverse", 2, lambda args, subst: self._builtin_reverse(args[0], args[1], subst))
+        register("sort", 2, lambda args, subst: self._builtin_sort(args[0], args[1], subst))
+        register("predicate_property", 2, lambda args, subst: self._builtin_predicate_property(args[0], args[1], subst))
+        register("current_predicate", 1, lambda args, subst: self._builtin_current_predicate(args[0], subst))
+        register("catch", 3, lambda args, subst: self._builtin_catch(args[0], args[1], args[2], subst))
+
+        return registry
+
+    def _normalize_builtin_result(self, result: Iterator[Substitution] | Substitution | None) -> Iterator[Substitution]:
+        """Normalize built-in handler return values to an iterator of substitutions."""
+        if result is None:
             return iter([])
-
-        # \=/2 - Not unifiable
-        if functor == "\\=" and len(args) == 2:
-            new_subst = unify(args[0], args[1], subst)
-            if new_subst is None:  # If they DON'T unify, succeed
-                return iter([subst])
-            return iter([])
-
-        # \+/1 - Negation as failure
-        if functor == "\\+" and len(args) == 1:
-            goal = args[0]
-            # Try to prove the goal - if it succeeds, negation fails
-            for _ in self._solve_goals([goal], subst):
-                return iter([])  # Goal succeeded, so negation fails
-            # Goal failed, so negation succeeds
-            return iter([subst])
-
-        # member/2 - List membership
-        if functor == "member" and len(args) == 2:
-            return self._builtin_member(args[0], args[1], subst)
-
-        # is/2 - Arithmetic evaluation
-        if functor == "is" and len(args) == 2:
-            result = self._builtin_is(args[0], args[1], subst)
-            if result is not None:
-                return iter([result])
-            return iter([])
-
-        # Arithmetic comparisons
-        if functor in ["=:=", r"=\=", "<", ">", "=<", ">="] and len(args) == 2:
-            result = self._builtin_arithmetic_compare(functor, args[0], args[1], subst)
-            if result is not None:
-                return iter([result])
-            return iter([])
-
-        # Term comparisons
-        if functor in ["==", r"\==", "@<", "@=<", "@>", "@>="] and len(args) == 2:
-            result = self._builtin_term_compare(functor, args[0], args[1], subst)
-            if result is not None:
-                return iter([result])
-            return iter([])
-
-        # format/3 - String formatting (format(atom(X), FormatString, Args))
-        if functor == "format" and len(args) == 3:
-            result = self._builtin_format(args[0], args[1], args[2], subst)
-            if result is not None:
-                return iter([result])
-            return iter([])
-
-        # append/3 - List concatenation
-        if functor == "append" and len(args) == 3:
-            return self._builtin_append(args[0], args[1], args[2], subst)
-
-        # clause/2 - Retrieve clause bodies
-        if functor == "clause" and len(args) == 2:
-            return self._builtin_clause(args[0], args[1], subst)
-
-        # call/1 - Call a goal dynamically
-        if functor == "call" and len(args) == 1:
-            return self._builtin_call(args[0], subst)
-
-        # once/1 - Call a goal and commit to first solution
-        if functor == "once" and len(args) == 1:
-            return self._builtin_once(args[0], subst)
-
-        # write/1 - Print a term
-        if functor == "write" and len(args) == 1:
-            result = self._builtin_write(args[0], subst)
-            if result is not None:
-                return iter([result])
-            return iter([])
-
-        # writeln/1 - Print a term followed by newline
-        if functor == "writeln" and len(args) == 1:
-            result = self._builtin_writeln(args[0], subst)
-            if result is not None:
-                return iter([result])
-            return iter([])
-
-        # maplist/2 - Apply a goal to each element of a list
-        if functor == "maplist" and len(args) == 2:
-            return self._builtin_maplist(args[0], args[1], subst)
-
-        # true/0 - Always succeeds
-        if functor == "true" and len(args) == 0:
-            return iter([subst])
-
-        # nl/0 - Print newline
-        if functor == "nl" and len(args) == 0:
-            print()
-            return iter([subst])
-
-        # ;/2 - Disjunction (or)
-        if functor == ";" and len(args) == 2:
-            return self._builtin_disjunction(args[0], args[1], subst)
-
-        # ->/2 - If-then
-        if functor == "->" and len(args) == 2:
-            return self._builtin_if_then(args[0], args[1], subst)
-
-        # ,/2 - Conjunction (and)
-        if functor == "," and len(args) == 2:
-            return self._builtin_conjunction(args[0], args[1], subst)
-
-        # format/2 - String formatting to stdout
-        if functor == "format" and len(args) == 2:
-            result = self._builtin_format_stdout(args[0], args[1], subst)
-            if result is not None:
-                return iter([result])
-            return iter([])
-
-        # format/1 - Print format string with no arguments
-        if functor == "format" and len(args) == 1:
-            result = self._builtin_format_stdout(args[0], List(()), subst)
-            if result is not None:
-                return iter([result])
-            return iter([])
-
-        # fail/0 - Always fails
-        if functor == "fail" and len(args) == 0:
-            return iter([])
-
-        # atom/1 - Type check for atom
-        if functor == "atom" and len(args) == 1:
-            result = self._builtin_atom(args[0], subst)
-            if result is not None:
-                return iter([result])
-            return iter([])
-
-        # number/1 - Type check for number
-        if functor == "number" and len(args) == 1:
-            result = self._builtin_number(args[0], subst)
-            if result is not None:
-                return iter([result])
-            return iter([])
-
-        # var/1 - Type check for unbound variable
-        if functor == "var" and len(args) == 1:
-            result = self._builtin_var(args[0], subst)
-            if result is not None:
-                return iter([result])
-            return iter([])
-
-        # nonvar/1 - Type check for bound term
-        if functor == "nonvar" and len(args) == 1:
-            result = self._builtin_nonvar(args[0], subst)
-            if result is not None:
-                return iter([result])
-            return iter([])
-
-        # compound/1 - Type check for compound term
-        if functor == "compound" and len(args) == 1:
-            result = self._builtin_compound(args[0], subst)
-            if result is not None:
-                return iter([result])
-            return iter([])
-
-        # integer/1 - Type check for integer
-        if functor == "integer" and len(args) == 1:
-            result = self._builtin_integer(args[0], subst)
-            if result is not None:
-                return iter([result])
-            return iter([])
-
-        # float/1 - Type check for float
-        if functor == "float" and len(args) == 1:
-            result = self._builtin_float(args[0], subst)
-            if result is not None:
-                return iter([result])
-            return iter([])
-
-        # atomic/1 - Type check for atomic term (atom or number)
-        if functor == "atomic" and len(args) == 1:
-            result = self._builtin_atomic(args[0], subst)
-            if result is not None:
-                return iter([result])
-            return iter([])
-
-        # callable/1 - Type check for callable term (atom or compound)
-        if functor == "callable" and len(args) == 1:
-            result = self._builtin_callable(args[0], subst)
-            if result is not None:
-                return iter([result])
-            return iter([])
-
-        # ground/1 - Type check for ground term (no variables)
-        if functor == "ground" and len(args) == 1:
-            result = self._builtin_ground(args[0], subst)
-            if result is not None:
-                return iter([result])
-            return iter([])
-
-        # functor/3 - Extract/construct functor
-        if functor == "functor" and len(args) == 3:
-            return self._builtin_functor(args[0], args[1], args[2], subst)
-
-        # arg/3 - Access compound arguments
-        if functor == "arg" and len(args) == 3:
-            result = self._builtin_arg(args[0], args[1], args[2], subst)
-            if result is not None:
-                return iter([result])
-            return iter([])
-
-        # =../2 (univ) - Convert between term and list
-        if functor == "=.." and len(args) == 2:
-            result = self._builtin_univ(args[0], args[1], subst)
-            if result is not None:
-                return iter([result])
-            return iter([])
-
-        # copy_term/2 - Copy term with fresh variables
-        if functor == "copy_term" and len(args) == 2:
-            result = self._builtin_copy_term(args[0], args[1], subst)
-            if result is not None:
-                return iter([result])
-            return iter([])
-
-        # findall/3 - Collect all solutions
-        if functor == "findall" and len(args) == 3:
-            result = self._builtin_findall(args[0], args[1], args[2], subst)
-            if result is not None:
-                return iter([result])
-            return iter([])
-
-        # bagof/3 - Collect solutions with duplicates
-        if functor == "bagof" and len(args) == 3:
-            result = self._builtin_bagof(args[0], args[1], args[2], subst)
-            if result is None:
-                return iter([])
+        if isinstance(result, IteratorABC):
             return result
+        return iter([result])
 
-        # setof/3 - Collect unique sorted solutions
-        if functor == "setof" and len(args) == 3:
-            result = self._builtin_setof(args[0], args[1], args[2], subst)
-            if result is None:
-                return iter([])
-            return result
+    def _newline_builtin(self, subst: Substitution) -> Substitution:
+        """Print a newline and succeed, used by the nl/0 built-in."""
+        print()
+        return subst
 
-        # asserta/1 - Add clause at beginning
-        if functor == "asserta" and len(args) == 1:
-            result = self._builtin_assert(args[0], subst, position="front")
-            if result is not None:
-                return iter([result])
+    def _negation_as_failure(self, goal: any, subst: Substitution) -> Iterator[Substitution]:
+        r"""Implement \+/1 using the registry dispatch."""
+        for _ in self._solve_goals([goal], subst):
             return iter([])
-
-        # assertz/1 - Add clause at end
-        if functor == "assertz" and len(args) == 1:
-            result = self._builtin_assert(args[0], subst, position="back")
-            if result is not None:
-                return iter([result])
-            return iter([])
-
-        # assert/1 - Add clause to database (equivalent to assertz/1)
-        if functor == "assert" and len(args) == 1:
-            result = self._builtin_assert(args[0], subst, position="back")
-            if result is not None:
-                return iter([result])
-            return iter([])
-
-        # retract/1 - Remove clause from database
-        if functor == "retract" and len(args) == 1:
-            return self._builtin_retract(args[0], subst)
-
-        # length/2 - List length
-        if functor == "length" and len(args) == 2:
-            return self._builtin_length(args[0], args[1], subst)
-
-        # reverse/2 - List reversal
-        if functor == "reverse" and len(args) == 2:
-            return self._builtin_reverse(args[0], args[1], subst)
-
-        # sort/2 - List sorting
-        if functor == "sort" and len(args) == 2:
-            result = self._builtin_sort(args[0], args[1], subst)
-            if result is not None:
-                return iter([result])
-            return iter([])
-
-        # predicate_property/2 - Check predicate properties
-        if functor == "predicate_property" and len(args) == 2:
-            result = self._builtin_predicate_property(args[0], args[1], subst)
-            if result is not None:
-                return iter([result])
-            return iter([])
-
-        # current_predicate/1 - Enumerate defined predicates
-        if functor == "current_predicate" and len(args) == 1:
-            return self._builtin_current_predicate(args[0], subst)
-
-        # catch/3 - Exception handling
-        if functor == "catch" and len(args) == 3:
-            return self._builtin_catch(args[0], args[1], args[2], subst)
-
-        # Not a built-in
-        return None
+        return iter([subst])
 
     def _builtin_member(self, elem: any, lst: any, subst: Substitution) -> Iterator[Substitution]:
         """Built-in member/2 predicate."""
