@@ -1,6 +1,7 @@
 """Prolog query engine with backtracking."""
 
-from typing import Iterator
+from typing import Callable, Iterator
+from collections import OrderedDict
 from prolog.parser import Compound, Atom, Variable, Number, List, Clause, Cut
 from prolog.unification import Substitution, unify, deref, apply_substitution
 
@@ -336,16 +337,16 @@ class PrologEngine:
         # bagof/3 - Collect solutions with duplicates
         if functor == "bagof" and len(args) == 3:
             result = self._builtin_bagof(args[0], args[1], args[2], subst)
-            if result is not None:
-                return iter([result])
-            return iter([])
+            if result is None:
+                return iter([])
+            return result
 
         # setof/3 - Collect unique sorted solutions
         if functor == "setof" and len(args) == 3:
             result = self._builtin_setof(args[0], args[1], args[2], subst)
-            if result is not None:
-                return iter([result])
-            return iter([])
+            if result is None:
+                return iter([])
+            return result
 
         # asserta/1 - Add clause at beginning
         if functor == "asserta" and len(args) == 1:
@@ -1259,57 +1260,62 @@ class PrologEngine:
         # Unify with result
         return unify(result, result_list, subst)
 
-    def _builtin_bagof(self, template: any, goal: any, result: any, subst: Substitution) -> Substitution | None:
+    def _builtin_bagof(self, template: any, goal: any, result: any, subst: Substitution) -> Iterator[Substitution] | None:
         """Built-in bagof/3 predicate - Collect solutions with duplicates."""
-        # For now, implement as findall (simplified version)
-        # A full implementation would handle free variables differently
-        solutions = []
-        for solution_subst in self._solve_goals([goal], subst):
-            instantiated = apply_substitution(template, solution_subst)
-            solutions.append(instantiated)
-
-        # bagof fails if no solutions found (unlike findall)
-        if not solutions:
+        free_vars, groups = self._collect_bagof_groups(template, goal, subst)
+        if not groups:
             return None
+        return self._yield_grouped_results(free_vars, groups, result, subst, lambda sols: sols)
 
-        result_list = List(tuple(solutions), None)
-        return unify(result, result_list, subst)
-
-    def _builtin_setof(self, template: any, goal: any, result: any, subst: Substitution) -> Substitution | None:
+    def _builtin_setof(self, template: any, goal: any, result: any, subst: Substitution) -> Iterator[Substitution] | None:
         """Built-in setof/3 predicate - Collect unique sorted solutions."""
-        # Collect all solutions
-        solutions = []
-        for solution_subst in self._solve_goals([goal], subst):
-            instantiated = apply_substitution(template, solution_subst)
-            solutions.append(instantiated)
-
-        # setof fails if no solutions found
-        if not solutions:
+        free_vars, groups = self._collect_bagof_groups(template, goal, subst)
+        if not groups:
             return None
+        return self._yield_grouped_results(
+            free_vars,
+            groups,
+            result,
+            subst,
+            self._unique_and_sort_solutions,
+        )
 
-        # Remove duplicates and sort
-        unique_solutions = []
-        seen = []
-        for sol in solutions:
-            # Check if we've seen this solution before
-            is_duplicate = False
-            for seen_sol in seen:
-                if self._terms_equal(sol, seen_sol):
-                    is_duplicate = True
-                    break
-            if not is_duplicate:
-                unique_solutions.append(sol)
-                seen.append(sol)
+    def _yield_grouped_results(
+        self,
+        free_vars: list[str],
+        groups: OrderedDict,
+        result: any,
+        subst: Substitution,
+        transform: Callable[[list], list],
+    ) -> Iterator[Substitution]:
+        """Yield unified substitutions for each grouped bagof/setof solution list."""
 
-        # Sort solutions
+        def _results():
+            for key, solutions in groups.items():
+                processed_solutions = transform(solutions)
+
+                group_subst = subst
+                for var_name, value in zip(free_vars, key):
+                    group_subst = unify(Variable(var_name), value, group_subst)
+                    if group_subst is None:
+                        break
+                if group_subst is None:
+                    continue
+
+                result_list = List(tuple(processed_solutions), None)
+                final_subst = unify(result, result_list, group_subst)
+                if final_subst is not None:
+                    yield final_subst
+
+        return _results()
+
+    def _unique_and_sort_solutions(self, solutions: list) -> list:
+        """Remove duplicates while preserving order, then sort if comparable."""
+        unique_solutions = list(OrderedDict.fromkeys(solutions))
         try:
-            sorted_solutions = sorted(unique_solutions, key=lambda x: self._term_sort_key(x))
-        except:
-            # If sorting fails, just use unique solutions
-            sorted_solutions = unique_solutions
-
-        result_list = List(tuple(sorted_solutions), None)
-        return unify(result, result_list, subst)
+            return sorted(unique_solutions, key=lambda x: self._term_sort_key(x))
+        except TypeError:
+            return unique_solutions
 
     def _builtin_assert(self, clause_term: any, subst: Substitution, position: str = "back") -> Substitution | None:
         """Built-in assert predicates - Add a clause to the database."""
@@ -1541,6 +1547,91 @@ class PrologEngine:
 
         result = self._python_to_list(sorted_py)
         return unify(sorted_lst, result, subst)
+
+    def _collect_bagof_groups(self, template: any, goal: any, subst: Substitution) -> tuple[list[str], OrderedDict]:
+        """Collect solutions for bagof/setof, grouped by free variable bindings."""
+        template = deref(template, subst)
+        goal = deref(goal, subst)
+
+        goal, existential_vars = self._strip_existentials(goal, subst)
+
+        template_vars = self._collect_vars(template, subst)
+        goal_vars_in_order = self._collect_vars_in_order(goal, subst)
+
+        seen: set[str] = set()
+        free_vars: list[str] = []
+        for var in goal_vars_in_order:
+            if var in seen or var in template_vars or var in existential_vars:
+                continue
+            seen.add(var)
+            free_vars.append(var)
+
+        groups: OrderedDict[tuple, list] = OrderedDict()
+        for solution_subst in self._solve_goals([goal], subst):
+            instantiated = apply_substitution(template, solution_subst)
+            key = tuple(apply_substitution(Variable(var), solution_subst) for var in free_vars)
+            groups.setdefault(key, []).append(instantiated)
+
+        return free_vars, groups
+
+    def _strip_existentials(self, goal: any, subst: Substitution) -> tuple[any, set[str]]:
+        """Peel off existential quantifiers (Var^Goal) and collect bound variables."""
+        existential_vars: set[str] = set()
+        while isinstance(goal, Compound) and goal.functor == "^" and len(goal.args) == 2:
+            var_part = goal.args[0]
+            existential_vars |= self._collect_vars(var_part, subst)
+            goal = goal.args[1]
+        return goal, existential_vars
+
+    def _collect_vars(self, term: any, subst: Substitution) -> set[str]:
+        """Collect variable names from a term, following dereferences."""
+        term = deref(term, subst)
+        vars_found: set[str] = set()
+
+        if isinstance(term, Variable):
+            vars_found.add(term.name)
+        elif isinstance(term, Compound):
+            for arg in term.args:
+                vars_found |= self._collect_vars(arg, subst)
+        elif isinstance(term, List):
+            for elem in term.elements:
+                vars_found |= self._collect_vars(elem, subst)
+            if term.tail is not None:
+                vars_found |= self._collect_vars(term.tail, subst)
+        elif isinstance(term, list):
+            # Clause bodies and goal lists are represented as Python lists internally.
+            for item in term:
+                vars_found |= self._collect_vars(item, subst)
+
+        return vars_found
+
+    def _collect_vars_in_order(self, term: any, subst: Substitution, seen: set[str] | None = None) -> list[str]:
+        """Collect variable names in first-seen order from a term."""
+        if seen is None:
+            seen = set()
+
+        term = deref(term, subst)
+
+        if isinstance(term, Variable):
+            if term.name not in seen:
+                seen.add(term.name)
+                return [term.name]
+            return []
+
+        vars_found: list[str] = []
+        if isinstance(term, Compound):
+            for arg in term.args:
+                vars_found.extend(self._collect_vars_in_order(arg, subst, seen))
+        elif isinstance(term, List):
+            for elem in term.elements:
+                vars_found.extend(self._collect_vars_in_order(elem, subst, seen))
+            if term.tail is not None:
+                vars_found.extend(self._collect_vars_in_order(term.tail, subst, seen))
+        elif isinstance(term, list):
+            for item in term:
+                vars_found.extend(self._collect_vars_in_order(item, subst, seen))
+
+        return vars_found
 
     def _terms_equal(self, term1: any, term2: any) -> bool:
         """Check if two terms are structurally equal."""

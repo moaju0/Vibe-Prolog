@@ -260,6 +260,19 @@ class TestSolutionCollection:
         assert result is not None
         assert result['L'] == [1, 2, 3]
 
+    def test_bagof_respects_free_var_order(self):
+        """Bagof should group free variables in goal order, not sorted order."""
+        prolog = PrologInterpreter()
+        results = list(
+            prolog.query(
+                "bagof(0, (member(B, [b1, b2]), member(A, [a1, a2])), L)."
+            )
+        )
+
+        bindings = [(res['B'], res['A']) for res in results]
+        assert bindings == [('b1', 'a1'), ('b1', 'a2'), ('b2', 'a1'), ('b2', 'a2')]
+        assert all(res['L'] == [0] for res in results)
+
     def test_bagof_no_solutions_fails(self):
         """Test bagof/3 fails when no solutions."""
         prolog = PrologInterpreter()
