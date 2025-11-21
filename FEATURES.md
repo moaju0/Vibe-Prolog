@@ -34,10 +34,10 @@
 - ✅ `number/1` – Test for number (integer or float)
 - ✅ `integer/1` – Test for integer
 - ✅ `float/1` – Test for float
-- ❌ `atomic/1` – Test for atomic term (atom or number)
+- ✅ `atomic/1` – Test for atomic term (atom or number)
 - ✅ `compound/1` – Test for compound term
-- ❌ `callable/1` – Test for callable term
-- ❌ `ground/1` – Test for ground term (no variables)
+- ✅ `callable/1` – Test for callable term
+- ✅ `ground/1` – Test for ground term (no variables)
 
 ### Term Manipulation (ISO 8.5)
 - ✅ `functor/3` – Extract/construct functor name and arity

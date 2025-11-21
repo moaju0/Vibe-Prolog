@@ -280,6 +280,27 @@ class PrologEngine:
                 return iter([result])
             return iter([])
 
+        # atomic/1 - Type check for atomic term (atom or number)
+        if functor == "atomic" and len(args) == 1:
+            result = self._builtin_atomic(args[0], subst)
+            if result is not None:
+                return iter([result])
+            return iter([])
+
+        # callable/1 - Type check for callable term (atom or compound)
+        if functor == "callable" and len(args) == 1:
+            result = self._builtin_callable(args[0], subst)
+            if result is not None:
+                return iter([result])
+            return iter([])
+
+        # ground/1 - Type check for ground term (no variables)
+        if functor == "ground" and len(args) == 1:
+            result = self._builtin_ground(args[0], subst)
+            if result is not None:
+                return iter([result])
+            return iter([])
+
         # functor/3 - Extract/construct functor
         if functor == "functor" and len(args) == 3:
             return self._builtin_functor(args[0], args[1], args[2], subst)
@@ -1006,6 +1027,47 @@ class PrologEngine:
         if isinstance(term, Number) and isinstance(term.value, float):
             return subst
         return None
+
+    def _builtin_atomic(self, term: any, subst: Substitution) -> Substitution | None:
+        """Built-in atomic/1 predicate - succeeds if term is atomic (atom or number)."""
+        term = deref(term, subst)
+        if isinstance(term, (Atom, Number)) or (isinstance(term, List) and not term.elements and term.tail is None):
+            return subst
+        return None
+
+    def _builtin_callable(self, term: any, subst: Substitution) -> Substitution | None:
+        """Built-in callable/1 predicate - succeeds if term is callable (atom or compound)."""
+        term = deref(term, subst)
+        if isinstance(term, (Atom, Compound)) or (isinstance(term, List) and not term.elements and term.tail is None):
+            return subst
+        return None
+
+    def _builtin_ground(self, term: any, subst: Substitution) -> Substitution | None:
+        """Built-in ground/1 predicate - succeeds if term contains no variables."""
+        term = deref(term, subst)
+        if self._is_ground(term):
+            return subst
+        return None
+
+    def _is_ground(self, term: any) -> bool:
+        """Helper method to check if a term is ground (contains no variables)."""
+        if isinstance(term, Variable):
+            return False
+        elif isinstance(term, (Atom, Number)):
+            return True
+        elif isinstance(term, Compound):
+            return all(self._is_ground(arg) for arg in term.args)
+        elif isinstance(term, List):
+            # Check elements
+            for elem in term.elements:
+                if not self._is_ground(elem):
+                    return False
+            # Check tail
+            if term.tail is not None:
+                return self._is_ground(term.tail)
+            return True
+        else:
+            return True
 
     def _builtin_functor(self, term: any, name: any, arity: any, subst: Substitution) -> Iterator[Substitution]:
         """Built-in functor/3 predicate - Extract or construct functor."""
