@@ -202,10 +202,10 @@ class TestArithmeticComparisons:
     def test_not_equal(self):
         prolog = PrologInterpreter()
 
-        assert prolog.has_solution("5 =\= 3")
-        assert prolog.has_solution("2 + 3 =\= 6")
-        assert not prolog.has_solution("5 =\= 5")
-        assert not prolog.has_solution("10 - 5 =\= 5")
+        assert prolog.has_solution(r"5 =\= 3")
+        assert prolog.has_solution(r"2 + 3 =\= 6")
+        assert not prolog.has_solution(r"5 =\= 5")
+        assert not prolog.has_solution(r"10 - 5 =\= 5")
 
 
 class TestArithmeticInRules:
