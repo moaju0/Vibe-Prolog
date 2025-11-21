@@ -1,0 +1,191 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { readFileSync } from 'fs';
+import { join } from 'path';
+import { marked } from 'marked';
+
+const readmePath = join(process.cwd(), 'src', 'content', 'README.md');
+let readmeContent = '';
+try {
+  readmeContent = readFileSync(readmePath, 'utf-8');
+} catch (e) {
+  console.error('Error reading README.md:', e);
+}
+
+// Configure marked to fix relative image paths
+const base = import.meta.env.BASE_URL;
+const renderer = new marked.Renderer();
+const originalImageRenderer = renderer.image.bind(renderer);
+renderer.image = function(token: any) {
+  // Fix relative paths to use base URL
+  if (token.href && typeof token.href === 'string' && token.href.startsWith('./')) {
+    token.href = `${base}/${token.href.substring(2)}`;
+  }
+  return originalImageRenderer(token);
+};
+
+marked.setOptions({ renderer });
+
+const htmlContent = marked.parse(readmeContent) as string;
+---
+
+<Layout title="Vibe Prolog" description="A Prolog interpreter implementation in Python, built with AI">
+  <div class="hero">
+    <h1>Vibe Prolog</h1>
+    <p class="tagline">A Prolog interpreter implementation in Python</p>
+    <p class="subtitle">Built entirely with AI code generation</p>
+    <div class="cta-buttons">
+      <a href="https://github.com/nlothian/Vibe-Prolog" class="button primary" target="_blank" rel="noopener">
+        View on GitHub
+      </a>
+      <a href={`${import.meta.env.BASE_URL}/docs`} class="button secondary">
+        Read Documentation
+      </a>
+    </div>
+  </div>
+
+  <div class="content" set:html={htmlContent} />
+</Layout>
+
+<style>
+  .hero {
+    text-align: center;
+    padding: 3rem 0;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 3rem;
+  }
+
+  .hero h1 {
+    font-size: 3rem;
+    margin-bottom: 1rem;
+    color: var(--primary);
+  }
+
+  .tagline {
+    font-size: 1.5rem;
+    color: var(--text-light);
+    margin-bottom: 0.5rem;
+  }
+
+  .subtitle {
+    font-size: 1.1rem;
+    color: var(--text-light);
+    margin-bottom: 2rem;
+  }
+
+  .cta-buttons {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .button {
+    padding: 0.75rem 1.5rem;
+    border-radius: 0.5rem;
+    text-decoration: none;
+    font-weight: 600;
+    transition: all 0.2s;
+    display: inline-block;
+  }
+
+  .button.primary {
+    background-color: var(--primary);
+    color: white;
+  }
+
+  .button.primary:hover {
+    background-color: var(--primary-dark);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(99, 102, 241, 0.3);
+  }
+
+  .button.secondary {
+    background-color: transparent;
+    color: var(--primary);
+    border: 2px solid var(--primary);
+  }
+
+  .button.secondary:hover {
+    background-color: var(--primary);
+    color: white;
+    transform: translateY(-2px);
+  }
+
+  .content {
+    max-width: 800px;
+    margin: 0 auto;
+  }
+
+  .content :global(h1) {
+    font-size: 2rem;
+    margin-top: 2rem;
+    margin-bottom: 1rem;
+    color: var(--primary);
+  }
+
+  .content :global(h2) {
+    font-size: 1.5rem;
+    margin-top: 2rem;
+    margin-bottom: 1rem;
+    color: var(--text);
+  }
+
+  .content :global(h3) {
+    font-size: 1.25rem;
+    margin-top: 1.5rem;
+    margin-bottom: 0.75rem;
+    color: var(--text);
+  }
+
+  .content :global(p) {
+    margin-bottom: 1rem;
+  }
+
+  .content :global(code) {
+    background-color: var(--code-bg);
+    padding: 0.2rem 0.4rem;
+    border-radius: 0.25rem;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 0.9em;
+  }
+
+  .content :global(pre) {
+    background-color: var(--code-bg);
+    padding: 1rem;
+    border-radius: 0.5rem;
+    overflow-x: auto;
+    margin: 1rem 0;
+  }
+
+  .content :global(pre code) {
+    background-color: transparent;
+    padding: 0;
+  }
+
+  .content :global(a) {
+    color: var(--primary);
+    text-decoration: none;
+  }
+
+  .content :global(a:hover) {
+    text-decoration: underline;
+  }
+
+  .content :global(img) {
+    max-width: 100%;
+    height: auto;
+    border-radius: 0.5rem;
+    margin: 1rem 0;
+  }
+
+  @media (max-width: 768px) {
+    .hero h1 {
+      font-size: 2rem;
+    }
+
+    .tagline {
+      font-size: 1.2rem;
+    }
+  }
+</style>

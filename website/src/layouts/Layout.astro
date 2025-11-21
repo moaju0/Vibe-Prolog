@@ -1,0 +1,146 @@
+---
+interface Props {
+  title: string;
+  description?: string;
+}
+
+const { title, description = "A Prolog interpreter implementation in Python" } = Astro.props;
+const base = import.meta.env.BASE_URL;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="description" content={description} />
+    <meta name="viewport" content="width=device-width" />
+    <link rel="icon" type="image/svg+xml" href={`${base}favicon.svg`} />
+    <meta name="generator" content={Astro.generator} />
+    <title>{title}</title>
+  </head>
+  <body>
+    <nav>
+      <div class="nav-content">
+        <a href={`${base}/`} class="logo">Vibe Prolog</a>
+        <div class="nav-links">
+          <a href={`${base}/`}>Home</a>
+          <a href={`${base}/features`}>Features</a>
+          <a href={`${base}/docs`}>Documentation</a>
+          <a href={`${base}/development`}>Development</a>
+          <a href="https://github.com/nlothian/Vibe-Prolog" target="_blank" rel="noopener">GitHub</a>
+        </div>
+      </div>
+    </nav>
+    <main>
+      <slot />
+    </main>
+    <footer>
+      <p>Vibe Prolog - Built with Claude Code</p>
+    </footer>
+  </body>
+</html>
+
+<style>
+  :root {
+    --primary: #6366f1;
+    --primary-dark: #4f46e5;
+    --bg: #ffffff;
+    --text: #1f2937;
+    --text-light: #6b7280;
+    --border: #e5e7eb;
+    --code-bg: #f3f4f6;
+  }
+
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  html {
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    background-color: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+  }
+
+  body {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+  }
+
+  nav {
+    background-color: var(--primary);
+    color: white;
+    padding: 1rem 0;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+
+  .nav-content {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 2rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+  }
+
+  .logo {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: white;
+    text-decoration: none;
+  }
+
+  .nav-links {
+    display: flex;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+  }
+
+  .nav-links a {
+    color: white;
+    text-decoration: none;
+    padding: 0.5rem 1rem;
+    border-radius: 0.25rem;
+    transition: background-color 0.2s;
+  }
+
+  .nav-links a:hover {
+    background-color: var(--primary-dark);
+  }
+
+  main {
+    flex: 1;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+    width: 100%;
+  }
+
+  footer {
+    background-color: var(--code-bg);
+    text-align: center;
+    padding: 2rem;
+    color: var(--text-light);
+    border-top: 1px solid var(--border);
+  }
+
+  @media (max-width: 768px) {
+    .nav-content {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+
+    .nav-links {
+      width: 100%;
+    }
+
+    main {
+      padding: 1rem;
+    }
+  }
+</style>
