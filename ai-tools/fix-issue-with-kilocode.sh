@@ -36,7 +36,7 @@ ISSUE_CONTENT="$(
 )"
 
 branch_name="$(
-  printf '%s\n' "$ISSUE_CONTENT" | llm "create a good git branch title for a branch that addresses this issue. It should start with \`fix-kilocode/4-\`"
+  printf '%s\n' "$ISSUE_CONTENT" | llm "create a good git branch title for a branch that addresses this issue. It should start with \`fix-kilocode/$ISSUE_NUMBER-\`"
 )"
 
 git checkout -b "$branch_name"
