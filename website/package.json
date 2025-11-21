@@ -1,0 +1,16 @@
+{
+  "name": "website",
+  "type": "module",
+  "version": "0.0.1",
+  "scripts": {
+    "copy-content": "node scripts/copy-markdown.mjs",
+    "dev": "npm run copy-content && astro dev",
+    "build": "npm run copy-content && astro build",
+    "preview": "astro preview",
+    "astro": "astro"
+  },
+  "dependencies": {
+    "astro": "^5.16.0",
+    "marked": "^17.0.1"
+  }
+}
