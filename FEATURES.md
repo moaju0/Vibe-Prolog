@@ -48,7 +48,7 @@
 ### Arithmetic Evaluation (ISO 9.1)
 - ✅ `is/2` – Arithmetic evaluation
 - ✅ `=:=/2` – Arithmetic equality
-- ❌ `=\=/2` – Arithmetic inequality
+- ✅ `=\=/2` – Arithmetic inequality
 - ✅ `</2` – Arithmetic less than
 - ✅ `=</2` – Arithmetic less than or equal
 - ✅ `>/2` – Arithmetic greater than
