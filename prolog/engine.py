@@ -1036,35 +1036,36 @@ class PrologEngine:
         return None
 
     def _builtin_callable(self, term: any, subst: Substitution) -> Substitution | None:
-        """Built-in callable/1 predicate - succeeds if term is callable (atom or compound)."""
+        """Built-in callable/1 predicate - succeeds if term is callable (atom, compound, or list)."""
         term = deref(term, subst)
-        if isinstance(term, (Atom, Compound)) or (isinstance(term, List) and not term.elements and term.tail is None):
+        if isinstance(term, (Atom, Compound, List)):
             return subst
         return None
 
     def _builtin_ground(self, term: any, subst: Substitution) -> Substitution | None:
         """Built-in ground/1 predicate - succeeds if term contains no variables."""
         term = deref(term, subst)
-        if self._is_ground(term):
+        if self._is_ground(term, subst):
             return subst
         return None
 
-    def _is_ground(self, term: any) -> bool:
+    def _is_ground(self, term: any, subst: Substitution) -> bool:
         """Helper method to check if a term is ground (contains no variables)."""
+        term = deref(term, subst)
         if isinstance(term, Variable):
             return False
         elif isinstance(term, (Atom, Number)):
             return True
         elif isinstance(term, Compound):
-            return all(self._is_ground(arg) for arg in term.args)
+            return all(self._is_ground(arg, subst) for arg in term.args)
         elif isinstance(term, List):
             # Check elements
             for elem in term.elements:
-                if not self._is_ground(elem):
+                if not self._is_ground(elem, subst):
                     return False
             # Check tail
             if term.tail is not None:
-                return self._is_ground(term.tail)
+                return self._is_ground(term.tail, subst)
             return True
         else:
             return True

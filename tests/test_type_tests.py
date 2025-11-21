@@ -69,11 +69,11 @@ class TestCallable:
         assert not prolog.has_solution("callable(42)")
         assert not prolog.has_solution("callable(3.14)")
 
-    def test_callable_lists_fail(self):
-        """Test callable/1 fails for lists."""
+    def test_callable_lists_succeed(self):
+        """Test callable/1 succeeds for lists."""
         prolog = PrologInterpreter()
-        assert not prolog.has_solution("callable([1, 2])")
-        assert not prolog.has_solution("callable([a|b])")
+        assert prolog.has_solution("callable([1, 2])")
+        assert prolog.has_solution("callable([a|b])")
 
     def test_callable_variables_fail(self):
         """Test callable/1 fails for unbound variables."""
@@ -154,3 +154,9 @@ class TestGround:
         prolog = PrologInterpreter()
         assert not prolog.has_solution("X = f(Y), ground(X)")
         assert not prolog.has_solution("X = [1, Y], ground(X)")
+
+    def test_ground_nested_bound_variables(self):
+        """Test ground/1 succeeds when nested variables are bound."""
+        prolog = PrologInterpreter()
+        assert prolog.has_solution("X = 1, Y = f(X), ground(Y)")
+        assert prolog.has_solution("X = 1, Y = [X, 2], ground(Y)")
