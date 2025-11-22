@@ -1419,7 +1419,16 @@ class PrologEngine:
         if isinstance(term, Compound):
             return (3, len(term.args), term.functor, tuple(self._term_sort_key(arg, subst) for arg in term.args))
         if isinstance(term, List):
-            tail_key = self._term_sort_key(term.tail, subst) if term.tail is not None else (4, 0, (), ("[]",))
+            if not term.elements and term.tail is None:
+                # Base case for empty list, used as a sentinel for proper list termination.
+                return (4, 0)
+
+            tail = term.tail
+            # Treat explicit empty list tail `...|[]` the same as an implicit proper list end.
+            if isinstance(tail, List) and not tail.elements and tail.tail is None:
+                tail = None
+
+            tail_key = self._term_sort_key(tail, subst) if tail is not None else (4, 0)
             element_keys = tuple(self._term_sort_key(elem, subst) for elem in term.elements)
             return (4, len(term.elements), element_keys, tail_key)
 
