@@ -118,7 +118,7 @@ class TestDictLikeSyntax:
     def test_swi_dict_syntax_unsupported(self):
         """Test that SWI-style dict syntax tag{a:1} is rejected"""
         parser = PrologParser()
-        with pytest.raises(Exception):
+        with pytest.raises(LarkError):
             parser.parse("test(tag{a:1}).")
 
 
