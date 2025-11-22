@@ -138,8 +138,8 @@
 
 ### Comments
 - ✅ Line comments (`%`)
-- ✅ Block comments (`/* */`)
-- ✅ Nested block comments
+- ❌ Block comments (`/* */`) - not properly implemented in parser
+- ❌ Nested block comments
 
 ### Special Syntax
 - ✅ Curly braces `{Term}` (sugar for `{}(Term)`)
@@ -184,7 +184,10 @@
 ### Parser Limitations
 1. **Hex Character Codes**: `0'\xHH\` syntax not fully supported
 2. **Base Character Arithmetic**: `16'mod'2` syntax not implemented
-3. **Complex Operator Atoms**: Some edge cases in operator parsing
+3. **SWI-Style Dict Syntax**: `tag{a:1}` syntax not supported
+4. **Operator Definition**: `:- op/3` directive rejected (not implemented)
+5. **Block Comments**: `/* */` comments not properly parsed
+6. **Unary Minus Precedence**: In some cases, unary minus may bind differently than expected (e.g., `-X + Y` parses as `-(X + Y)`)
 
 ## Tooling & Tests
 - Use the interpreter as a Python library (`from prolog import PrologInterpreter`) and exercise it via a comprehensive test suite (69+ tests covering ISO core predicates, parser edge cases, and built-in behavior).
