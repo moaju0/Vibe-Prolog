@@ -48,7 +48,7 @@ def find_most_recent_change_file(changes_dir: Path) -> datetime | None:
     return max(dates) if dates else None
 
 
-def get_git_changes(since_date: datetime | None) -> list[dict]:
+def get_git_changes(since_date: datetime | None) -> list[dict] | None:
     """
     Get git changes since the specified date.
 
@@ -56,7 +56,7 @@ def get_git_changes(since_date: datetime | None) -> list[dict]:
         since_date: Date to get changes since, or None for all changes
 
     Returns:
-        List of commit dictionaries with 'hash', 'date', 'author', 'message'
+        List of commit dictionaries with 'hash', 'date', 'author', 'message', or None on failure
     """
     # Build git log command
     cmd = [
@@ -95,10 +95,10 @@ def get_git_changes(since_date: datetime | None) -> list[dict]:
         return commits
     except subprocess.CalledProcessError as e:
         print(f"Error running git log: {e}", file=sys.stderr)
-        return []
+        return None
 
 
-def get_git_stats(since_date: datetime | None) -> dict:
+def get_git_stats(since_date: datetime | None) -> dict | None:
     """
     Get file change statistics since the specified date.
 
@@ -106,7 +106,7 @@ def get_git_stats(since_date: datetime | None) -> dict:
         since_date: Date to get stats since, or None for all changes
 
     Returns:
-        Dictionary with 'files_changed', 'insertions', 'deletions'
+        Dictionary with 'files_changed', 'insertions', 'deletions', or None on failure
     """
     cmd = ['git', 'diff', '--numstat']
 
@@ -155,10 +155,11 @@ def get_git_stats(since_date: datetime | None) -> dict:
 
         return stats
     except subprocess.CalledProcessError:
-        return {'files_changed': 0, 'insertions': 0, 'deletions': 0}
+        print("Error running git diff for stats", file=sys.stderr)
+        return None
 
 
-def get_closed_issues(since_date: datetime | None) -> list[dict]:
+def get_closed_issues(since_date: datetime | None) -> list[dict] | None:
     """
     Get closed GitHub issues since the specified date.
 
@@ -166,7 +167,7 @@ def get_closed_issues(since_date: datetime | None) -> list[dict]:
         since_date: Date to get issues since, or None for all issues
 
     Returns:
-        List of issue dictionaries with 'number', 'title', 'closed_at', 'url'
+        List of issue dictionaries with 'number', 'title', 'closed_at', 'url', or None on failure
     """
     cmd = [
         'gh', 'issue', 'list',
@@ -212,15 +213,15 @@ def get_closed_issues(since_date: datetime | None) -> list[dict]:
             ]
 
     except subprocess.CalledProcessError as e:
-        print(f"Error running gh issue list: {e}")
-        print("Make sure 'gh' CLI is installed and authenticated")
-        return []
+        print(f"Error running gh issue list: {e}", file=sys.stderr)
+        print("Make sure 'gh' CLI is installed and authenticated", file=sys.stderr)
+        return None
     except json.JSONDecodeError as e:
-        print(f"Error parsing issue JSON: {e}")
-        return []
+        print(f"Error parsing issue JSON: {e}", file=sys.stderr)
+        return None
 
 
-def get_closed_prs(since_date: datetime | None) -> list[dict]:
+def get_closed_prs(since_date: datetime | None) -> list[dict] | None:
     """
     Get closed/merged GitHub pull requests since the specified date.
 
@@ -228,7 +229,7 @@ def get_closed_prs(since_date: datetime | None) -> list[dict]:
         since_date: Date to get PRs since, or None for all PRs
 
     Returns:
-        List of PR dictionaries with 'number', 'title', 'merged_at', 'url'
+        List of PR dictionaries with 'number', 'title', 'merged_at', 'url', or None on failure
     """
     # Note: We don't fetch commits field due to GitHub GraphQL limits
     # Instead, we'll match commits to PRs via commit message patterns
@@ -276,14 +277,14 @@ def get_closed_prs(since_date: datetime | None) -> list[dict]:
             ]
 
     except subprocess.CalledProcessError as e:
-        print(f"Error running gh pr list: {e}")
+        print(f"Error running gh pr list: {e}", file=sys.stderr)
         stderr_output = e.stderr if hasattr(e, 'stderr') else 'No stderr available'
-        print(f"Error details: {stderr_output}")
-        print("Make sure 'gh' CLI is installed and authenticated")
-        return []
+        print(f"Error details: {stderr_output}", file=sys.stderr)
+        print("Make sure 'gh' CLI is installed and authenticated", file=sys.stderr)
+        return None
     except json.JSONDecodeError as e:
-        print(f"Error parsing PR JSON: {e}")
-        return []
+        print(f"Error parsing PR JSON: {e}", file=sys.stderr)
+        return None
 
 
 def format_changes_markdown(commits: list[dict], stats: dict, since_date: datetime | None,
@@ -434,17 +435,30 @@ def main():
     # Get git changes
     print("Fetching git changes...")
     commits = get_git_changes(most_recent_date)
+    if commits is None:
+        print("Failed to fetch git changes. Aborting.", file=sys.stderr)
+        sys.exit(1)
+
     stats = get_git_stats(most_recent_date)
+    if stats is None:
+        print("Failed to fetch git stats. Aborting.", file=sys.stderr)
+        sys.exit(1)
 
     print(f"Found {len(commits)} commits")
 
     # Get GitHub issues and PRs
     print("Fetching closed GitHub issues...")
     issues = get_closed_issues(most_recent_date)
+    if issues is None:
+        print("Failed to fetch closed issues from GitHub. Aborting.", file=sys.stderr)
+        sys.exit(1)
     print(f"Found {len(issues)} closed issues")
 
     print("Fetching merged GitHub pull requests...")
     prs = get_closed_prs(most_recent_date)
+    if prs is None:
+        print("Failed to fetch merged pull requests from GitHub. Aborting.", file=sys.stderr)
+        sys.exit(1)
     print(f"Found {len(prs)} merged PRs")
 
     no_recent_activity = (
@@ -453,8 +467,6 @@ def main():
         and not issues
         and not prs
         and stats.get('files_changed', 0) == 0
-        and stats.get('insertions', 0) == 0
-        and stats.get('deletions', 0) == 0
     )
 
     if no_recent_activity:
