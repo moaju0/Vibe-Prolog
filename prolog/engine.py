@@ -17,6 +17,12 @@ class CutException(Exception):
     pass
 
 
+class PrologThrow(Exception):
+    """Exception raised when throw/1 is executed to unwind the call stack."""
+    def __init__(self, term):
+        self.term = term
+
+
 class PrologEngine:
     """Prolog inference engine."""
 
@@ -32,7 +38,11 @@ class PrologEngine:
         Query the knowledge base.
         Yields all substitutions that satisfy the goals.
         """
-        yield from self._solve_goals(goals, Substitution())
+        try:
+            yield from self._solve_goals(goals, Substitution())
+        except PrologThrow:
+            # Unhandled throw - query fails with no solutions
+            return
 
     def _solve_goals(self, goals: list[Compound], subst: Substitution) -> Iterator[Substitution]:
         """Solve a list of goals with backtracking."""
@@ -57,6 +67,9 @@ class PrologEngine:
                         yield from self._solve_goals(remaining_goals, new_subst)
             except CutException:
                 # Re-raise CutException so it propagates to clause selection
+                raise
+            except PrologThrow:
+                # Re-raise PrologThrow so it propagates up to catch/3
                 raise
             return
 
@@ -86,6 +99,9 @@ class PrologEngine:
                 except CutException:
                     # Cut was executed - stop trying alternative clauses
                     cut_executed = True
+                except PrologThrow:
+                    # Re-raise PrologThrow so it propagates up to catch/3
+                    raise
 
     def _try_builtin(self, goal: Compound, subst: Substitution) -> Iterator[Substitution] | None:
         """Try to solve goal as a built-in predicate. Returns None if not a builtin."""
@@ -145,6 +161,7 @@ class PrologEngine:
         self._register_builtin("once", 1, registry, lambda args, subst: self._builtin_once(args[0], subst))
         self._register_builtin("maplist", 2, registry, lambda args, subst: self._builtin_maplist(args[0], args[1], subst))
         self._register_builtin("catch", 3, registry, lambda args, subst: self._builtin_catch(args[0], args[1], args[2], subst))
+        self._register_builtin("throw", 1, registry, lambda args, subst: self._builtin_throw(args[0], subst))
         self._register_builtin("true", 0, registry, lambda _args, subst: subst)
         self._register_builtin("fail", 0, registry, lambda _args, _subst: iter([]))
         self._register_builtin("nl", 0, registry, lambda _args, subst: self._newline_builtin(subst))
@@ -1537,7 +1554,8 @@ class PrologEngine:
             "findall", "bagof", "setof",
             "assert", "asserta", "assertz", "retract", "abolish",
             "maplist",
-            "predicate_property", "current_predicate", "catch"
+            "throw", "catch",
+            "predicate_property", "current_predicate"
         }
 
         # Check if goal is a compound term with a built-in functor
@@ -1588,8 +1606,10 @@ class PrologEngine:
             ("write", 1), ("writeln", 1), ("format", 1), ("format", 2), ("format", 3),
             # Higher-order
             ("maplist", 2),
+            # Exception handling
+            ("throw", 1), ("catch", 3),
             # Reflection
-            ("predicate_property", 2), ("current_predicate", 1), ("catch", 3)
+            ("predicate_property", 2), ("current_predicate", 1)
         ]
 
         for name, arity in builtin_predicates:
@@ -1612,20 +1632,37 @@ class PrologEngine:
             if new_subst is not None:
                 yield new_subst
 
-    def _builtin_catch(self, goal: any, error: any, recovery: any, subst: Substitution) -> Iterator[Substitution]:
-        """Built-in catch/3 - Simple exception handling.
+    def _builtin_throw(self, term: any, subst: Substitution) -> Iterator[Substitution]:
+        """Built-in throw/1 - Throw an exception term."""
+        # Dereference the term to be thrown
+        thrown_term = deref(term, subst)
+        # Raise the PrologThrow exception to unwind the call stack
+        raise PrologThrow(thrown_term)
 
-        catch(Goal, Error, Recovery) - Execute Goal. In this simple implementation,
-        we just execute the goal normally. If it fails, it fails naturally.
-        Full exception handling would require tracking errors, which we don't do yet.
+    def _execute_callable_term(self, goal_term: any, subst: Substitution) -> Iterator[Substitution]:
+        """Executes a term if it is a valid goal (Compound, Atom, or Cut), otherwise fails silently."""
+        if isinstance(goal_term, (Compound, Atom, Cut)):
+            yield from self._solve_goals([goal_term], subst)
+        # No else: non-callable terms yield no results (fails)
+
+    def _builtin_catch(self, goal: any, error: any, recovery: any, subst: Substitution) -> Iterator[Substitution]:
+        """Built-in catch/3 - Exception handling with throw/1 support.
+
+        catch(Goal, Error, Recovery) - Execute Goal. If Goal throws an exception
+        that unifies with Error, execute Recovery in the unified substitution environment.
+        If the thrown term doesn't unify with Error, re-raise the exception.
         """
-        # For now, just execute the goal and yield its results
-        # If the goal fails (no solutions), this will naturally produce no results
         goal = deref(goal, subst)
 
-        # Execute the goal as if it were a regular goal
-        if isinstance(goal, (Compound, Atom, Cut)):
-            yield from self._solve_goals([goal], subst)
-        else:
-            # Can't execute non-goal terms
-            return
+        try:
+            yield from self._execute_callable_term(goal, subst)
+        except PrologThrow as e:
+            # Try to unify the thrown term with the error pattern
+            new_subst = unify(error, e.term, subst)
+            if new_subst is not None:
+                # Unification succeeded - execute recovery goal
+                recovery_goal = deref(recovery, new_subst)
+                yield from self._execute_callable_term(recovery_goal, new_subst)
+            else:
+                # Unification failed - re-raise the exception
+                raise

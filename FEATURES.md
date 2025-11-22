@@ -72,8 +72,8 @@
 - ✅ `once/1` – Call goal, commit to first solution
 
 ### Exception Handling (ISO 7.12)
-- ⚠️ `catch/3` – Exception handling (simplified, no full ISO exception system)
-- ❌ `throw/1` – Throw exception
+- ✅ `catch/3` – Exception handling (intercepts thrown terms from throw/1)
+- ✅ `throw/1` – Throw exception term
 
 ### Input/Output (ISO 8.11-8.12)
 - ✅ `write/1` – Write term
