@@ -105,7 +105,7 @@ def create_commit_from_pr_output(pr_output: str) -> None:
     commit_message = run(
         [
             "llm",
-            "--extract"
+            "--extract",
             "-s",
             "give me a git commit message for changes that address these review comments",
         ],
