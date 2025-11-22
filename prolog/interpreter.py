@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 from typing import Iterator
 from prolog.parser import PrologParser, Compound, Variable
-from prolog.engine import PrologEngine
+from prolog.engine import CutException, PrologEngine
 from prolog.unification import Substitution, deref, apply_substitution
 
 
@@ -77,6 +77,9 @@ class PrologInterpreter:
                     solution[var_name] = self._term_to_python(value)
 
                 solutions.append(solution)
+        except CutException:
+            # Cut can bubble up after yielding committed results; treat it as end-of-search
+            pass
         finally:
             if capture_output:
                 sys.stdout = old_stdout
