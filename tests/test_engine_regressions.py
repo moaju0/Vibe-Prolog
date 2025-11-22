@@ -72,10 +72,10 @@ class TestIfThenStreaming:
 
 
 class TestTermOrdering:
-    """setof/3 ordering must match Prolog term order."""
+    """setof/3 ordering must match Prolog term order (lists after compounds)."""
 
     def test_setof_uses_standard_ordering(self):
-        """setof should sort by variable, number, atom, then compound/list order."""
+        """setof should sort by variable, number, atom, compound, then list order."""
 
         prolog = PrologInterpreter()
 
@@ -84,4 +84,4 @@ class TestTermOrdering:
         )
 
         assert result is not None
-        assert result["Set"] == [1.5, 2, [], "a", "b", ["a"], {"foo": [0]}, {"foo": [1]}]
+        assert result["Set"] == [1.5, 2, "a", "b", {"foo": [0]}, {"foo": [1]}, [], ["a"]]

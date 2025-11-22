@@ -15,6 +15,24 @@ def test_registry_contains_core_builtins():
     assert (";", 2) in registry
 
 
+def test_registry_groups_cover_major_categories():
+    interpreter = PrologInterpreter()
+    interpreter.query("true.")
+
+    registry = interpreter.engine._builtin_registry
+    expected_keys = [
+        (";", 2),  # control
+        ("is", 2),  # arithmetic
+        ("append", 3),  # lists
+        ("clause", 2),  # database
+        ("format", 3),  # IO
+        ("var", 1),  # reflection
+    ]
+
+    for key in expected_keys:
+        assert key in registry
+
+
 def test_negation_and_arithmetic_through_registry():
     interpreter = PrologInterpreter()
 

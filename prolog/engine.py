@@ -24,6 +24,7 @@ class PrologEngine:
         self.clauses = clauses
         self.call_depth = 0
         self.max_depth = 1000  # Prevent infinite recursion
+        self._fresh_var_counter = 0
         self._builtin_registry = self._build_builtin_registry()
 
     def query(self, goals: list[Compound]) -> Iterator[Substitution]:
@@ -118,69 +119,95 @@ class PrologEngine:
         """Create the functor/arity dispatch table for built-in predicates."""
         registry: BuiltinRegistry = {}
 
-        def register(functor: str, arity: int, handler: BuiltinHandler):
-            registry[(functor, arity)] = handler
-
-        register("=", 2, lambda args, subst: unify(args[0], args[1], subst))
-        register(r"\=", 2, lambda args, subst: subst if unify(args[0], args[1], subst) is None else None)
-        register(r"\+", 1, lambda args, subst: self._negation_as_failure(args[0], subst))
-        register("member", 2, lambda args, subst: self._builtin_member(args[0], args[1], subst))
-        register("is", 2, lambda args, subst: self._builtin_is(args[0], args[1], subst))
-        for op in ["=:=", r"=\=", "<", ">", "=<", ">="]:
-            register(
-                op,
-                2,
-                lambda args, subst, op=op: self._builtin_arithmetic_compare(
-                    op, args[0], args[1], subst
-                ),
-            )
-        for op in ["==", r"\==", "@<", "@=<", "@>", "@>="]:
-            register(op, 2, lambda args, subst, op=op: self._builtin_term_compare(op, args[0], args[1], subst))
-        register("format", 3, lambda args, subst: self._builtin_format(args[0], args[1], args[2], subst))
-        register("append", 3, lambda args, subst: self._builtin_append(args[0], args[1], args[2], subst))
-        register("clause", 2, lambda args, subst: self._builtin_clause(args[0], args[1], subst))
-        register("call", 1, lambda args, subst: self._builtin_call(args[0], subst))
-        register("once", 1, lambda args, subst: self._builtin_once(args[0], subst))
-        register("write", 1, lambda args, subst: self._builtin_write(args[0], subst))
-        register("writeln", 1, lambda args, subst: self._builtin_writeln(args[0], subst))
-        register("maplist", 2, lambda args, subst: self._builtin_maplist(args[0], args[1], subst))
-        register("true", 0, lambda _args, subst: subst)
-        register("nl", 0, lambda _args, subst: self._newline_builtin(subst))
-        register(";", 2, lambda args, subst: self._builtin_disjunction(args[0], args[1], subst))
-        register("->", 2, lambda args, subst: self._builtin_if_then(args[0], args[1], subst))
-        register(",", 2, lambda args, subst: self._builtin_conjunction(args[0], args[1], subst))
-        register("format", 2, lambda args, subst: self._builtin_format_stdout(args[0], args[1], subst))
-        register("format", 1, lambda args, subst: self._builtin_format_stdout(args[0], List(()), subst))
-        register("fail", 0, lambda _args, _subst: iter([]))
-        register("atom", 1, lambda args, subst: self._builtin_atom(args[0], subst))
-        register("number", 1, lambda args, subst: self._builtin_number(args[0], subst))
-        register("var", 1, lambda args, subst: self._builtin_var(args[0], subst))
-        register("nonvar", 1, lambda args, subst: self._builtin_nonvar(args[0], subst))
-        register("compound", 1, lambda args, subst: self._builtin_compound(args[0], subst))
-        register("integer", 1, lambda args, subst: self._builtin_integer(args[0], subst))
-        register("float", 1, lambda args, subst: self._builtin_float(args[0], subst))
-        register("atomic", 1, lambda args, subst: self._builtin_atomic(args[0], subst))
-        register("callable", 1, lambda args, subst: self._builtin_callable(args[0], subst))
-        register("ground", 1, lambda args, subst: self._builtin_ground(args[0], subst))
-        register("functor", 3, lambda args, subst: self._builtin_functor(args[0], args[1], args[2], subst))
-        register("arg", 3, lambda args, subst: self._builtin_arg(args[0], args[1], args[2], subst))
-        register("=..", 2, lambda args, subst: self._builtin_univ(args[0], args[1], subst))
-        register("copy_term", 2, lambda args, subst: self._builtin_copy_term(args[0], args[1], subst))
-        register("findall", 3, lambda args, subst: self._builtin_findall(args[0], args[1], args[2], subst))
-        register("bagof", 3, lambda args, subst: self._builtin_bagof(args[0], args[1], args[2], subst))
-        register("setof", 3, lambda args, subst: self._builtin_setof(args[0], args[1], args[2], subst))
-        register("asserta", 1, lambda args, subst: self._builtin_assert(args[0], subst, position="front"))
-        register("assertz", 1, lambda args, subst: self._builtin_assert(args[0], subst, position="back"))
-        register("assert", 1, lambda args, subst: self._builtin_assert(args[0], subst, position="back"))
-        register("retract", 1, lambda args, subst: self._builtin_retract(args[0], subst))
-        register("length", 2, lambda args, subst: self._builtin_length(args[0], args[1], subst))
-        register("reverse", 2, lambda args, subst: self._builtin_reverse(args[0], args[1], subst))
-        register("sort", 2, lambda args, subst: self._builtin_sort(args[0], args[1], subst))
-        register("predicate_property", 2, lambda args, subst: self._builtin_predicate_property(args[0], args[1], subst))
-        register("current_predicate", 1, lambda args, subst: self._builtin_current_predicate(args[0], subst))
-        register("catch", 3, lambda args, subst: self._builtin_catch(args[0], args[1], args[2], subst))
+        for registrar in (
+            self._register_control_builtins,
+            self._register_arithmetic_builtins,
+            self._register_list_builtins,
+            self._register_database_builtins,
+            self._register_io_builtins,
+            self._register_reflection_builtins,
+        ):
+            registrar(registry)
 
         return registry
+
+    def _register_builtin(self, functor: str, arity: int, registry: BuiltinRegistry, handler: BuiltinHandler) -> None:
+        registry[(functor, arity)] = handler
+
+    def _register_control_builtins(self, registry: BuiltinRegistry) -> None:
+        self._register_builtin("=", 2, registry, lambda args, subst: unify(args[0], args[1], subst))
+        self._register_builtin(r"\=", 2, registry, lambda args, subst: subst if unify(args[0], args[1], subst) is None else None)
+        self._register_builtin(r"\+", 1, registry, lambda args, subst: self._negation_as_failure(args[0], subst))
+        self._register_builtin(";", 2, registry, lambda args, subst: self._builtin_disjunction(args[0], args[1], subst))
+        self._register_builtin("->", 2, registry, lambda args, subst: self._builtin_if_then(args[0], args[1], subst))
+        self._register_builtin(",", 2, registry, lambda args, subst: self._builtin_conjunction(args[0], args[1], subst))
+        self._register_builtin("call", 1, registry, lambda args, subst: self._builtin_call(args[0], subst))
+        self._register_builtin("once", 1, registry, lambda args, subst: self._builtin_once(args[0], subst))
+        self._register_builtin("maplist", 2, registry, lambda args, subst: self._builtin_maplist(args[0], args[1], subst))
+        self._register_builtin("catch", 3, registry, lambda args, subst: self._builtin_catch(args[0], args[1], args[2], subst))
+        self._register_builtin("true", 0, registry, lambda _args, subst: subst)
+        self._register_builtin("fail", 0, registry, lambda _args, _subst: iter([]))
+        self._register_builtin("nl", 0, registry, lambda _args, subst: self._newline_builtin(subst))
+
+    def _register_arithmetic_builtins(self, registry: BuiltinRegistry) -> None:
+        self._register_builtin("is", 2, registry, lambda args, subst: self._builtin_is(args[0], args[1], subst))
+        for op in ["=:=", r"=\=", "<", ">", "=<", ">="]:
+            self._register_builtin(
+                op,
+                2,
+                registry,
+                lambda args, subst, op=op: self._builtin_arithmetic_compare(op, args[0], args[1], subst),
+            )
+
+    def _register_list_builtins(self, registry: BuiltinRegistry) -> None:
+        self._register_builtin("member", 2, registry, lambda args, subst: self._builtin_member(args[0], args[1], subst))
+        self._register_builtin("append", 3, registry, lambda args, subst: self._builtin_append(args[0], args[1], args[2], subst))
+        self._register_builtin("length", 2, registry, lambda args, subst: self._builtin_length(args[0], args[1], subst))
+        self._register_builtin("reverse", 2, registry, lambda args, subst: self._builtin_reverse(args[0], args[1], subst))
+        self._register_builtin("sort", 2, registry, lambda args, subst: self._builtin_sort(args[0], args[1], subst))
+
+    def _register_database_builtins(self, registry: BuiltinRegistry) -> None:
+        self._register_builtin("clause", 2, registry, lambda args, subst: self._builtin_clause(args[0], args[1], subst))
+        self._register_builtin("findall", 3, registry, lambda args, subst: self._builtin_findall(args[0], args[1], args[2], subst))
+        self._register_builtin("bagof", 3, registry, lambda args, subst: self._builtin_bagof(args[0], args[1], args[2], subst))
+        self._register_builtin("setof", 3, registry, lambda args, subst: self._builtin_setof(args[0], args[1], args[2], subst))
+        self._register_builtin("asserta", 1, registry, lambda args, subst: self._builtin_assert(args[0], subst, position="front"))
+        self._register_builtin("assertz", 1, registry, lambda args, subst: self._builtin_assert(args[0], subst, position="back"))
+        self._register_builtin("assert", 1, registry, lambda args, subst: self._builtin_assert(args[0], subst, position="back"))
+        self._register_builtin("retract", 1, registry, lambda args, subst: self._builtin_retract(args[0], subst))
+
+    def _register_io_builtins(self, registry: BuiltinRegistry) -> None:
+        self._register_builtin("write", 1, registry, lambda args, subst: self._builtin_write(args[0], subst))
+        self._register_builtin("writeln", 1, registry, lambda args, subst: self._builtin_writeln(args[0], subst))
+        self._register_builtin("format", 3, registry, lambda args, subst: self._builtin_format(args[0], args[1], args[2], subst))
+        self._register_builtin("format", 2, registry, lambda args, subst: self._builtin_format_stdout(args[0], args[1], subst))
+        self._register_builtin("format", 1, registry, lambda args, subst: self._builtin_format_stdout(args[0], List(()), subst))
+
+    def _register_reflection_builtins(self, registry: BuiltinRegistry) -> None:
+        for op in ["==", r"\==", "@<", "@=<", "@>", "@>="]:
+            self._register_builtin(op, 2, registry, lambda args, subst, op=op: self._builtin_term_compare(op, args[0], args[1], subst))
+
+        self._register_builtin("atom", 1, registry, lambda args, subst: self._builtin_atom(args[0], subst))
+        self._register_builtin("number", 1, registry, lambda args, subst: self._builtin_number(args[0], subst))
+        self._register_builtin("var", 1, registry, lambda args, subst: self._builtin_var(args[0], subst))
+        self._register_builtin("nonvar", 1, registry, lambda args, subst: self._builtin_nonvar(args[0], subst))
+        self._register_builtin("compound", 1, registry, lambda args, subst: self._builtin_compound(args[0], subst))
+        self._register_builtin("integer", 1, registry, lambda args, subst: self._builtin_integer(args[0], subst))
+        self._register_builtin("float", 1, registry, lambda args, subst: self._builtin_float(args[0], subst))
+        self._register_builtin("atomic", 1, registry, lambda args, subst: self._builtin_atomic(args[0], subst))
+        self._register_builtin("callable", 1, registry, lambda args, subst: self._builtin_callable(args[0], subst))
+        self._register_builtin("ground", 1, registry, lambda args, subst: self._builtin_ground(args[0], subst))
+        self._register_builtin("functor", 3, registry, lambda args, subst: self._builtin_functor(args[0], args[1], args[2], subst))
+        self._register_builtin("arg", 3, registry, lambda args, subst: self._builtin_arg(args[0], args[1], args[2], subst))
+        self._register_builtin("=..", 2, registry, lambda args, subst: self._builtin_univ(args[0], args[1], subst))
+        self._register_builtin("copy_term", 2, registry, lambda args, subst: self._builtin_copy_term(args[0], args[1], subst))
+        self._register_builtin("predicate_property", 2, registry, lambda args, subst: self._builtin_predicate_property(args[0], args[1], subst))
+        self._register_builtin("current_predicate", 1, registry, lambda args, subst: self._builtin_current_predicate(args[0], subst))
+
+    def _fresh_variable(self, prefix: str = "Var") -> Variable:
+        """Generate a fresh variable with a stable, incrementing suffix."""
+        self._fresh_var_counter += 1
+        return Variable(f"_{prefix}{self._fresh_var_counter}")
 
     def _normalize_builtin_result(self, result: BuiltinResult) -> Iterator[Substitution]:
         """Normalize built-in handler return values to an iterator of substitutions."""
@@ -318,6 +345,87 @@ class PrologEngine:
 
         return None
 
+    def _format_to_string(self, format_term: any, args_term: any, subst: Substitution) -> str | None:
+        """Render a Prolog format/2 or format/3 invocation to a Python string."""
+        format_term = deref(format_term, subst)
+        args_term = deref(args_term, subst)
+
+        if not isinstance(format_term, Atom):
+            return None
+
+        try:
+            format_args = self._list_to_python(args_term, subst)
+        except TypeError:
+            return None
+
+        coerced_args: list[str | int | float] = []
+        for elem in format_args:
+            elem = deref(elem, subst)
+            if isinstance(elem, Number):
+                coerced_args.append(elem.value)
+            elif isinstance(elem, Atom):
+                coerced_args.append(elem.name)
+            elif isinstance(elem, Variable):
+                coerced_args.append(f"_{elem.name}")
+            else:
+                coerced_args.append(str(elem))
+
+        fmt = format_term.name
+        result = ""
+        i = 0
+        arg_index = 0
+
+        while i < len(fmt):
+            if fmt[i] == "~":
+                if i + 1 < len(fmt):
+                    next_char = fmt[i + 1]
+
+                    if next_char == "~":
+                        result += "~"
+                        i += 2
+                    elif next_char == "w":
+                        if arg_index < len(coerced_args):
+                            result += str(coerced_args[arg_index])
+                            arg_index += 1
+                        i += 2
+                    elif next_char == "d":
+                        if arg_index < len(coerced_args):
+                            result += str(int(coerced_args[arg_index]))
+                            arg_index += 1
+                        i += 2
+                    elif next_char.isdigit():
+                        j = i + 1
+                        while j < len(fmt) and fmt[j].isdigit():
+                            j += 1
+                        if j < len(fmt) and fmt[j] == "f":
+                            precision = int(fmt[i + 1 : j])
+                            if arg_index < len(coerced_args):
+                                result += f"{float(coerced_args[arg_index]):.{precision}f}"
+                                arg_index += 1
+                            i = j + 1
+                        else:
+                            result += fmt[i]
+                            i += 1
+                    elif next_char == "f":
+                        if arg_index < len(coerced_args):
+                            result += str(float(coerced_args[arg_index]))
+                            arg_index += 1
+                        i += 2
+                    elif next_char == "n":
+                        result += "\n"
+                        i += 2
+                    else:
+                        result += fmt[i]
+                        i += 1
+                else:
+                    result += fmt[i]
+                    i += 1
+            else:
+                result += fmt[i]
+                i += 1
+
+        return result
+
     def _builtin_format(self, output: any, format_str: any, args_list: any, subst: Substitution) -> Substitution | None:
         """Built-in format/3 predicate for string formatting."""
         # Dereference arguments
@@ -329,97 +437,11 @@ class PrologEngine:
         if not isinstance(output, Compound) or output.functor != "atom" or len(output.args) != 1:
             return None
 
-        output_var = output.args[0]
-
-        # Get format string
-        if isinstance(format_str, Atom):
-            fmt = format_str.name
-        else:
+        rendered = self._format_to_string(format_str, args_list, subst)
+        if rendered is None:
             return None
 
-        # Get arguments list
-        if isinstance(args_list, List):
-            format_args = []
-            for elem in args_list.elements:
-                elem = deref(elem, subst)
-                if isinstance(elem, Number):
-                    format_args.append(elem.value)
-                elif isinstance(elem, Atom):
-                    format_args.append(elem.name)
-                elif isinstance(elem, Variable):
-                    # Unbound variable - use placeholder
-                    format_args.append(f"_{elem.name}")
-                else:
-                    format_args.append(str(elem))
-        else:
-            return None
-
-        # Process format string
-        # Support: ~w (any term), ~d (integer), ~f (float), ~2f (float with 2 decimals), ~~ (literal ~)
-        import re
-
-        result = ""
-        i = 0
-        arg_index = 0
-
-        while i < len(fmt):
-            if fmt[i] == '~':
-                if i + 1 < len(fmt):
-                    next_char = fmt[i + 1]
-
-                    if next_char == '~':
-                        # Literal ~
-                        result += '~'
-                        i += 2
-                    elif next_char == 'w':
-                        # Any term
-                        if arg_index < len(format_args):
-                            result += str(format_args[arg_index])
-                            arg_index += 1
-                        i += 2
-                    elif next_char == 'd':
-                        # Integer
-                        if arg_index < len(format_args):
-                            result += str(int(format_args[arg_index]))
-                            arg_index += 1
-                        i += 2
-                    elif next_char.isdigit():
-                        # Look for format like ~2f
-                        j = i + 1
-                        while j < len(fmt) and fmt[j].isdigit():
-                            j += 1
-                        if j < len(fmt) and fmt[j] == 'f':
-                            precision = int(fmt[i+1:j])
-                            if arg_index < len(format_args):
-                                result += f"{float(format_args[arg_index]):.{precision}f}"
-                                arg_index += 1
-                            i = j + 1
-                        else:
-                            result += fmt[i]
-                            i += 1
-                    elif next_char == 'f':
-                        # Float
-                        if arg_index < len(format_args):
-                            result += str(float(format_args[arg_index]))
-                            arg_index += 1
-                        i += 2
-                    elif next_char == 'n':
-                        # Newline
-                        result += '\n'
-                        i += 2
-                    else:
-                        # Unknown format, just include it
-                        result += fmt[i]
-                        i += 1
-                else:
-                    result += fmt[i]
-                    i += 1
-            else:
-                result += fmt[i]
-                i += 1
-
-        # Unify the result with the output variable
-        return unify(output_var, Atom(result), subst)
+        return unify(output.args[0], Atom(rendered), subst)
 
     def _builtin_append(self, list1: any, list2: any, result: any, subst: Substitution) -> Iterator[Substitution]:
         """Built-in append/3 predicate for list concatenation."""
@@ -471,9 +493,7 @@ class PrologEngine:
 
             # Result should be [H|T3] where append(T1, L2, T3)
             # Create T3 as a fresh variable
-            import time
-            suffix = str(int(time.time() * 1000000) % 1000000)
-            tail3_var = Variable(f"_AppendT3_{suffix}")
+            tail3_var = self._fresh_variable("AppendT3_")
 
             # Result should unify with [H|T3]
             result_list = List((head,), tail3_var)
@@ -486,16 +506,13 @@ class PrologEngine:
         # Generate all possible splits of result into list1 and list2
         elif isinstance(list1, Variable) and isinstance(result, List) and result.elements:
             # Try list1 = [H|T1] where result = [H|T3] and append(T1, L2, T3)
-            import time
-            suffix = str(int(time.time() * 1000000) % 1000000)
-
             # Extract head from result
             head = result.elements[0]
             # Get tail of result
             tail3 = List(result.elements[1:], result.tail) if len(result.elements) > 1 else (result.tail if result.tail is not None else List(tuple(), None))
 
             # Create fresh variable for tail of list1
-            tail1_var = Variable(f"_AppendT1_{suffix}")
+            tail1_var = self._fresh_variable("AppendT1_")
 
             # list1 should be [H|T1]
             list1_val = List((head,), tail1_var)
@@ -702,100 +719,12 @@ class PrologEngine:
 
     def _builtin_format_stdout(self, format_str: any, args_list: any, subst: Substitution) -> Substitution | None:
         """Built-in format/2 predicate for printing formatted strings to stdout."""
-        # Dereference arguments
-        format_str = deref(format_str, subst)
-        args_list = deref(args_list, subst)
-
-        # Get format string
-        if isinstance(format_str, Atom):
-            fmt = format_str.name
-        else:
+        rendered = self._format_to_string(format_str, args_list, subst)
+        if rendered is None:
             return None
 
-        # Get arguments list
-        if isinstance(args_list, List):
-            format_args = []
-            for elem in args_list.elements:
-                elem = deref(elem, subst)
-                if isinstance(elem, Number):
-                    format_args.append(elem.value)
-                elif isinstance(elem, Atom):
-                    format_args.append(elem.name)
-                elif isinstance(elem, Variable):
-                    # Unbound variable - use placeholder
-                    format_args.append(f"_{elem.name}")
-                else:
-                    format_args.append(str(elem))
-        else:
-            return None
+        print(rendered, end="")
 
-        # Process format string (same logic as format/3)
-        import re
-
-        result = ""
-        i = 0
-        arg_index = 0
-
-        while i < len(fmt):
-            if fmt[i] == '~':
-                if i + 1 < len(fmt):
-                    next_char = fmt[i + 1]
-
-                    if next_char == '~':
-                        # Literal ~
-                        result += '~'
-                        i += 2
-                    elif next_char == 'w':
-                        # Any term
-                        if arg_index < len(format_args):
-                            result += str(format_args[arg_index])
-                            arg_index += 1
-                        i += 2
-                    elif next_char == 'd':
-                        # Integer
-                        if arg_index < len(format_args):
-                            result += str(int(format_args[arg_index]))
-                            arg_index += 1
-                        i += 2
-                    elif next_char.isdigit():
-                        # Look for format like ~2f
-                        j = i + 1
-                        while j < len(fmt) and fmt[j].isdigit():
-                            j += 1
-                        if j < len(fmt) and fmt[j] == 'f':
-                            precision = int(fmt[i+1:j])
-                            if arg_index < len(format_args):
-                                result += f"{float(format_args[arg_index]):.{precision}f}"
-                                arg_index += 1
-                            i = j + 1
-                        else:
-                            result += fmt[i]
-                            i += 1
-                    elif next_char == 'f':
-                        # Float
-                        if arg_index < len(format_args):
-                            result += str(float(format_args[arg_index]))
-                            arg_index += 1
-                        i += 2
-                    elif next_char == 'n':
-                        # Newline
-                        result += '\n'
-                        i += 2
-                    else:
-                        # Unknown format, just include it
-                        result += fmt[i]
-                        i += 1
-                else:
-                    result += fmt[i]
-                    i += 1
-            else:
-                result += fmt[i]
-                i += 1
-
-        # Print the result to stdout
-        print(result, end='')
-
-        # format/2 always succeeds
         return subst
 
     def _builtin_atom(self, term: any, subst: Substitution) -> Substitution | None:
@@ -932,9 +861,7 @@ class PrologEngine:
                     yield new_subst
             else:
                 # Create a compound with fresh variables as arguments
-                import time
-                suffix = str(int(time.time() * 1000000) % 1000000)
-                args = tuple(Variable(f"_Arg{i}_{suffix}") for i in range(arity_val))
+                args = tuple(self._fresh_variable(f"Arg{i}_") for i in range(arity_val))
                 compound = Compound(name.name, args)
                 new_subst = unify(term, compound, subst)
                 if new_subst is not None:
@@ -1021,9 +948,7 @@ class PrologEngine:
                 return var_map[term]
             else:
                 # Create a fresh variable
-                import time
-                suffix = str(int(time.time() * 1000000) % 1000000)
-                fresh_var = Variable(f"_Copy{term.name}_{suffix}")
+                fresh_var = self._fresh_variable(f"Copy{term.name}_")
                 var_map[term] = fresh_var
                 return fresh_var
         elif isinstance(term, Compound):
@@ -1244,10 +1169,7 @@ class PrologEngine:
         if length <= 0:
             return List((), None)
 
-        import time
-
-        suffix = str(int(time.time() * 1000000) % 1000000)
-        elements = tuple(Variable(f"_E{i}_{suffix}") for i in range(length))
+        elements = tuple(self._fresh_variable(f"E{i}_") for i in range(length))
         return List(elements, None)
 
     def _match_list_to_length(self, lst: List, target_length: int, subst: Substitution) -> Substitution | None:
@@ -1487,20 +1409,28 @@ class PrologEngine:
         subst = subst or Substitution()
         term = deref(term, subst)
 
-        # Order: Variable < Number < Atom (including []) < Compound/List
+        # Order: Variable < Number < Atom < Compound < List
         if isinstance(term, Variable):
             return (0, term.name)
         if isinstance(term, Number):
             return (1, term.value)
         if isinstance(term, Atom):
             return (2, term.name)
+        if isinstance(term, Compound):
+            return (3, len(term.args), term.functor, tuple(self._term_sort_key(arg, subst) for arg in term.args))
         if isinstance(term, List):
             if not term.elements and term.tail is None:
-                return (2, "[]")
-            compound_form = self._list_to_compound(term, subst)
-            return self._term_sort_key(compound_form, subst)
-        if isinstance(term, Compound):
-            return (3, term.functor, len(term.args), tuple(self._term_sort_key(arg, subst) for arg in term.args))
+                # Base case for empty list, used as a sentinel for proper list termination.
+                return (4, 0)
+
+            tail = term.tail
+            # Treat explicit empty list tail `...|[]` the same as an implicit proper list end.
+            if isinstance(tail, List) and not tail.elements and tail.tail is None:
+                tail = None
+
+            tail_key = self._term_sort_key(tail, subst) if tail is not None else (4, 0)
+            element_keys = tuple(self._term_sort_key(elem, subst) for elem in term.elements)
+            return (4, len(term.elements), element_keys, tail_key)
 
         return (5, str(term))
 
@@ -1528,8 +1458,8 @@ class PrologEngine:
 
     def _rename_variables(self, clause: Clause) -> Clause:
         """Rename all variables in a clause to avoid conflicts."""
-        import time
-        suffix = str(int(time.time() * 1000000) % 1000000)
+        self._fresh_var_counter += 1
+        suffix = str(self._fresh_var_counter)
 
         def rename_term(term):
             if isinstance(term, Variable):
