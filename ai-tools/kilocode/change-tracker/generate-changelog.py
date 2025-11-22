@@ -13,6 +13,7 @@ import subprocess
 from datetime import datetime, timedelta
 from pathlib import Path
 import json
+import sys
 
 
 def find_most_recent_change_file(changes_dir: Path) -> datetime | None:
@@ -445,6 +446,20 @@ def main():
     print("Fetching merged GitHub pull requests...")
     prs = get_closed_prs(most_recent_date)
     print(f"Found {len(prs)} merged PRs")
+
+    no_recent_activity = (
+        most_recent_date is not None
+        and not commits
+        and not issues
+        and not prs
+        and stats.get('files_changed', 0) == 0
+        and stats.get('insertions', 0) == 0
+        and stats.get('deletions', 0) == 0
+    )
+
+    if no_recent_activity:
+        print("No new changes since the last changelog. Skipping file generation.")
+        return
 
     # Format as markdown
     markdown = format_changes_markdown(commits, stats, most_recent_date, issues, prs)
