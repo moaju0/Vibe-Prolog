@@ -364,7 +364,6 @@ def format_changes_markdown(commits: list[dict], stats: dict, since_date: dateti
                 lines.append("")
 
     # Add standalone PRs (not associated with issues)
-    standalone_prs = [pr for pr in prs if pr['number'] not in issue_to_pr.values() or all(issue_to_pr.get(issue['number']) != pr for issue in issues)]
     # Simpler: find PRs not in the issue_to_pr values
     pr_numbers_with_issues = set(pr['number'] for pr in issue_to_pr.values())
     standalone_prs = [pr for pr in prs if pr['number'] not in pr_numbers_with_issues]
