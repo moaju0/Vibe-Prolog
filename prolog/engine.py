@@ -1705,7 +1705,7 @@ class PrologEngine:
             compound_form = self._list_to_compound(term, subst)
             return self._term_sort_key(compound_form, subst)
         if isinstance(term, Compound):
-            return (3, term.functor, len(term.args), tuple(self._term_sort_key(arg, subst) for arg in term.args))
+            return (3, len(term.args), term.functor, tuple(self._term_sort_key(arg, subst) for arg in term.args))
 
         return (5, str(term))
 
