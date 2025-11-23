@@ -36,9 +36,12 @@ Modules should expose a ``register`` static method matching
 
 from __future__ import annotations
 
-from typing import Callable, Protocol
+from typing import TYPE_CHECKING, Callable, Protocol, TypeAlias
 
-from prolog.engine import BuiltinRegistry
+if TYPE_CHECKING:
+    from prolog.engine import BuiltinRegistry
+else:
+    BuiltinRegistry: TypeAlias = dict[tuple[str, int], Callable]
 from prolog.unification import Substitution
 
 
