@@ -13,7 +13,7 @@ class TestOperatorQuoting:
         prolog = PrologInterpreter()
 
         # Test + operator - use =.. to construct the term
-        prolog.consult_string("test_op(Chars) :- Term =.. ['+', 1, 2], write_term_to_chars(Term, [quoted(true)], Chars).")
+        prolog.consult_string("test_op(Chars) :- Term =.. ['+', 1, 2], write_term_to_chars(Term, [quoted(true), ignore_ops(true)], Chars).")
         result = prolog.query_once("test_op(Chars)")
         assert result is not None
         chars = result['Chars']
@@ -21,21 +21,21 @@ class TestOperatorQuoting:
         assert ''.join(chars) == "+(1,2)"
 
         # Test - operator
-        prolog.consult_string("test_minus(Chars) :- Term =.. ['-', 5, 3], write_term_to_chars(Term, [quoted(true)], Chars).")
+        prolog.consult_string("test_minus(Chars) :- Term =.. ['-', 5, 3], write_term_to_chars(Term, [quoted(true), ignore_ops(true)], Chars).")
         result = prolog.query_once("test_minus(Chars)")
         assert result is not None
         chars = result['Chars']
         assert ''.join(chars) == "-(5,3)"
 
         # Test * operator
-        prolog.consult_string("test_mult(Chars) :- Term =.. ['*', 4, 5], write_term_to_chars(Term, [quoted(true)], Chars).")
+        prolog.consult_string("test_mult(Chars) :- Term =.. ['*', 4, 5], write_term_to_chars(Term, [quoted(true), ignore_ops(true)], Chars).")
         result = prolog.query_once("test_mult(Chars)")
         assert result is not None
         chars = result['Chars']
         assert ''.join(chars) == "*(4,5)"
 
         # Test / operator
-        prolog.consult_string("test_div(Chars) :- Term =.. ['/', 10, 2], write_term_to_chars(Term, [quoted(true)], Chars).")
+        prolog.consult_string("test_div(Chars) :- Term =.. ['/', 10, 2], write_term_to_chars(Term, [quoted(true), ignore_ops(true)], Chars).")
         result = prolog.query_once("test_div(Chars)")
         assert result is not None
         chars = result['Chars']
@@ -46,7 +46,7 @@ class TestOperatorQuoting:
         prolog = PrologInterpreter()
 
         # Test = operator
-        prolog.consult_string("test_eq(Chars) :- Term =.. ['=', X, 1], write_term_to_chars(Term, [quoted(true)], Chars).")
+        prolog.consult_string("test_eq(Chars) :- Term =.. ['=', X, 1], write_term_to_chars(Term, [quoted(true), ignore_ops(true)], Chars).")
         result = prolog.query_once("test_eq(Chars)")
         assert result is not None
         chars = ''.join(result['Chars'])
@@ -55,7 +55,7 @@ class TestOperatorQuoting:
         assert not chars.startswith("'='")  # = should not be quoted
 
         # Test < operator
-        prolog.consult_string("test_lt(Chars) :- Term =.. ['<', 1, 2], write_term_to_chars(Term, [quoted(true)], Chars).")
+        prolog.consult_string("test_lt(Chars) :- Term =.. ['<', 1, 2], write_term_to_chars(Term, [quoted(true), ignore_ops(true)], Chars).")
         result = prolog.query_once("test_lt(Chars)")
         assert result is not None
         chars = ''.join(result['Chars'])
@@ -63,7 +63,7 @@ class TestOperatorQuoting:
         assert not chars.startswith("'<'")  # < should not be quoted
 
         # Test > operator
-        prolog.consult_string("test_gt(Chars) :- Term =.. ['>', 2, 1], write_term_to_chars(Term, [quoted(true)], Chars).")
+        prolog.consult_string("test_gt(Chars) :- Term =.. ['>', 2, 1], write_term_to_chars(Term, [quoted(true), ignore_ops(true)], Chars).")
         result = prolog.query_once("test_gt(Chars)")
         assert result is not None
         chars = ''.join(result['Chars'])
@@ -97,21 +97,21 @@ class TestOperatorQuoting:
         prolog = PrologInterpreter()
 
         # Test :- operator
-        prolog.consult_string("test_rule(Chars) :- Term =.. [':-', a, b], write_term_to_chars(Term, [quoted(true)], Chars).")
+        prolog.consult_string("test_rule(Chars) :- Term =.. [':-', a, b], write_term_to_chars(Term, [quoted(true), ignore_ops(true)], Chars).")
         result = prolog.query_once("test_rule(Chars)")
         assert result is not None
         chars = result['Chars']
         assert ''.join(chars) == ":-(a,b)"
 
         # Test -> operator
-        prolog.consult_string("test_if(Chars) :- Term =.. ['->', a, b], write_term_to_chars(Term, [quoted(true)], Chars).")
+        prolog.consult_string("test_if(Chars) :- Term =.. ['->', a, b], write_term_to_chars(Term, [quoted(true), ignore_ops(true)], Chars).")
         result = prolog.query_once("test_if(Chars)")
         assert result is not None
         chars = result['Chars']
         assert ''.join(chars) == "->(a,b)"
 
         # Test =.. operator
-        prolog.consult_string("test_univ(Chars) :- Term =.. ['=..', X, [a, b]], write_term_to_chars(Term, [quoted(true)], Chars).")
+        prolog.consult_string("test_univ(Chars) :- Term =.. ['=..', X, [a, b]], write_term_to_chars(Term, [quoted(true), ignore_ops(true)], Chars).")
         result = prolog.query_once("test_univ(Chars)")
         assert result is not None
         chars = ''.join(result['Chars'])
