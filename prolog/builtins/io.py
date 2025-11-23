@@ -34,6 +34,8 @@ class IOBuiltins:
             ),
         )
         register_builtin(registry, "nl", 0, IOBuiltins._builtin_newline)
+        register_builtin(registry, "current_input", 1, IOBuiltins._builtin_current_input)
+        register_builtin(registry, "current_output", 1, IOBuiltins._builtin_current_output)
 
     @staticmethod
     def _builtin_write(
@@ -90,6 +92,22 @@ class IOBuiltins:
     ) -> Substitution:
         print()
         return subst
+
+    @staticmethod
+    def _builtin_current_input(
+        args: BuiltinArgs, subst: Substitution, _engine: EngineContext | None
+    ) -> Substitution | None:
+        arg = deref(args[0], subst)
+        stream = Atom("user_input")
+        return unify(arg, stream, subst)
+
+    @staticmethod
+    def _builtin_current_output(
+        args: BuiltinArgs, subst: Substitution, _engine: EngineContext | None
+    ) -> Substitution | None:
+        arg = deref(args[0], subst)
+        stream = Atom("user_output")
+        return unify(arg, stream, subst)
 
     @staticmethod
     def _format_to_string(
