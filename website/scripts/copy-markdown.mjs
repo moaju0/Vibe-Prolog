@@ -16,7 +16,7 @@ if (!existsSync(contentDir)) {
 const files = [
   'README.md',
   'FEATURES.md',
-  'CODE_DOCS.md',
+  'ARCHITECTURE.md',
   'AGENTS.md',
 ];
 

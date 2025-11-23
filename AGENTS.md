@@ -16,21 +16,7 @@ This document provides an overview of the project structure and guidelines for d
 
 ## Project Structure
 
-```
-prolog/
-├── prolog/                  # Main source code
-│   ├── __init__.py         # Package initialization, exports PrologInterpreter
-│   ├── interpreter.py      # Main interpreter interface (PrologInterpreter class)
-│   ├── engine.py          # Query engine with backtracking and built-ins
-│   ├── parser.py          # Prolog parser using Lark
-│   └── unification.py     # Unification algorithm
-│
-├── tests/                  # All test files go here
-│   ├── __init__.py
-│   └── test_*.py           #  test files
-│   └── *.pl                # Prolog test fixtures
-│
-```
+See @ARCHITECTURE.md
 
 ## Features
 
@@ -120,20 +106,12 @@ This is standard ISO prolog implementation. The parser should parse standard pro
 
 ### Adding a New Built-in
 
-1. **Implement in `prolog/engine.py`**:
-   - Add handler in `_try_builtin()` method
-   - Implement the built-in as a private method (e.g., `_builtin_append()`)
-
-2. **Write tests in `tests/test_new_builtins.py`** (or create new test file):
-   - Test basic functionality
-   - Test edge cases
-   - Test integration with other predicates
-
-3. **Document in this file** (CLAUDE.md):
-   - Add to the "Built-in Predicates" section
-   - Include description and arity
-
-4. **Run tests**:
+1. **Choose a module in `prolog/builtins/`** that fits (e.g., `arithmetic.py`, `list_ops.py`, `type_tests.py`).
+2. **Implement a static handler** with the signature `(args, subst, engine)` and annotate return types.
+3. **Register the predicate** in the module's `register(registry, engine_ref=None)` using `register_builtin`.
+4. **Write tests in `tests/`** covering success and failure cases.
+5. **Update documentation** (`CLAUDE.md`/`FEATURES.md`) to reflect the new predicate.
+6. **Run tests**:
    ```bash
    uv run pytest tests/test_new_builtins.py -v
    ```

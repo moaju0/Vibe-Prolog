@@ -7,12 +7,14 @@ from collections.abc import Iterator as IteratorABC
 from typing import Callable, Iterator, TypeAlias
 
 from prolog.builtins.exceptions import PrologThrow
-from prolog.parser import Atom, Clause, Compound, Cut, List, Number, Variable
-from prolog.unification import Substitution, apply_substitution, deref, unify
+from prolog.parser import Atom, Clause, Compound, Cut, List, Variable
+from prolog.unification import Substitution, apply_substitution, unify
 from prolog.utils.list_utils import list_to_python, python_to_list
 
 BuiltinResult: TypeAlias = Iterator[Substitution] | Substitution | None
-BuiltinHandler: TypeAlias = Callable[[tuple, Substitution, "PrologEngine | None"], BuiltinResult]
+BuiltinHandler: TypeAlias = Callable[
+    [tuple, Substitution, "PrologEngine | None"], BuiltinResult
+]
 BuiltinRegistry: TypeAlias = dict[tuple[str, int], BuiltinHandler]
 
 
@@ -31,7 +33,9 @@ class PrologEngine:
         self._builtin_registry = self._build_builtin_registry()
 
     # Compatibility wrappers retained for tests and external callers.
-    def _list_to_python(self, prolog_list: List, subst: Substitution | None = None) -> list:
+    def _list_to_python(
+        self, prolog_list: List, subst: Substitution | None = None
+    ) -> list:
         return list_to_python(prolog_list, subst)
 
     def _python_to_list(self, py_list: list) -> List:
@@ -45,7 +49,9 @@ class PrologEngine:
             # Unhandled throw - query fails with no solutions
             return
 
-    def _solve_goals(self, goals: list[Compound], subst: Substitution) -> Iterator[Substitution]:
+    def _solve_goals(
+        self, goals: list[Compound], subst: Substitution
+    ) -> Iterator[Substitution]:
         """Solve a list of goals with backtracking."""
         if not goals:
             yield subst
@@ -96,9 +102,12 @@ class PrologEngine:
                 except PrologThrow:
                     raise
 
-    def _try_builtin(self, goal: Compound, subst: Substitution) -> Iterator[Substitution] | None:
+    def _try_builtin(
+        self, goal: Compound, subst: Substitution
+    ) -> Iterator[Substitution] | None:
         """Try to solve goal as a built-in predicate. Returns None if not a builtin."""
         if isinstance(goal, Cut):
+
             def cut_wrapper():
                 yield subst
                 raise CutException()
@@ -159,7 +168,9 @@ class PrologEngine:
 
         return registry
 
-    def _register_builtin(self, functor: str, arity: int, registry: BuiltinRegistry, handler: Callable) -> None:
+    def _register_builtin(
+        self, functor: str, arity: int, registry: BuiltinRegistry, handler: Callable
+    ) -> None:
         """Compatibility helper for legacy tests registering ad-hoc built-ins."""
         registry[(functor, arity)] = self._wrap_builtin_handler(handler)
 
@@ -168,6 +179,7 @@ class PrologEngine:
         try:
             signature = inspect.signature(handler)
         except (TypeError, ValueError):
+
             def wrapper(args, subst, _engine):
                 return handler(args, subst)
 
@@ -177,7 +189,8 @@ class PrologEngine:
             p
             for p in signature.parameters.values()
             if p.default is inspect.Parameter.empty
-            and p.kind in (
+            and p.kind
+            in (
                 inspect.Parameter.POSITIONAL_ONLY,
                 inspect.Parameter.POSITIONAL_OR_KEYWORD,
             )
@@ -196,7 +209,9 @@ class PrologEngine:
         self._fresh_var_counter += 1
         return Variable(f"_{prefix}{self._fresh_var_counter}")
 
-    def _normalize_builtin_result(self, result: BuiltinResult) -> Iterator[Substitution]:
+    def _normalize_builtin_result(
+        self, result: BuiltinResult
+    ) -> Iterator[Substitution]:
         """Normalize built-in handler return values to an iterator of substitutions."""
         if result is None:
             return iter([])
@@ -250,4 +265,11 @@ class PrologEngine:
         return IOBuiltins._format_to_string(format_term, args_term, subst)
 
 
-__all__ = ["PrologEngine", "CutException", "PrologThrow", "BuiltinRegistry", "BuiltinHandler", "BuiltinResult"]
+__all__ = [
+    "PrologEngine",
+    "CutException",
+    "PrologThrow",
+    "BuiltinRegistry",
+    "BuiltinHandler",
+    "BuiltinResult",
+]

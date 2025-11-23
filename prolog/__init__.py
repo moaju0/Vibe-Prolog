@@ -2,4 +2,4 @@
 
 from prolog.interpreter import PrologInterpreter
 
-__all__ = ['PrologInterpreter']
+__all__ = ["PrologInterpreter"]

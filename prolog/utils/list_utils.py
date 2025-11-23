@@ -1,14 +1,30 @@
-"""Utility functions for working with Prolog list terms."""
+"""
+List utility functions for Prolog list operations.
 
-from typing import Callable
+Provides conversion between Prolog List structures and Python lists,
+plus helper functions for list length operations and matching.
+"""
+
+from typing import Any, Callable
 
 from prolog.parser import Atom, List, Variable
 from prolog.unification import Substitution, apply_substitution, deref, unify
 from prolog.utils.term_utils import term_to_string
 
 
-def list_to_python(prolog_list: List, subst: Substitution | None = None) -> list:
-    """Convert a proper Prolog list to a Python list using the active substitution."""
+def list_to_python(prolog_list: List, subst: Substitution | None = None) -> list[Any]:
+    """Convert a proper Prolog list to a Python list using the active substitution.
+
+    Args:
+        prolog_list: The list term to convert.
+        subst: Substitution to apply before conversion.
+
+    Raises:
+        TypeError: If the list is improper or has an open tail.
+
+    Returns:
+        A Python ``list`` containing substituted elements.
+    """
     subst = subst or Substitution()
     result = []
     current = deref(prolog_list, subst)
@@ -33,7 +49,7 @@ def list_to_python(prolog_list: List, subst: Substitution | None = None) -> list
     )
 
 
-def python_to_list(py_list: list) -> List:
+def python_to_list(py_list: list[Any]) -> List:
     """Convert a Python list to a Prolog list."""
     if not py_list:
         return List(tuple(), None)
@@ -44,7 +60,12 @@ def compute_list_length(lst: List, subst: Substitution) -> int | None:
     """
     Recursively compute the length of a proper list.
 
-    Returns ``None`` if the tail is uninstantiated or improper.
+    Args:
+        lst: List term to inspect.
+        subst: Substitution used for dereferencing.
+
+    Returns:
+        The length of the list, or ``None`` if the tail is uninstantiated or improper.
     """
     count = len(lst.elements)
 
@@ -71,8 +92,18 @@ def compute_list_length(lst: List, subst: Substitution) -> int | None:
     return None
 
 
-def fresh_list_of_length(length: int, fresh_variable: Callable[[str], Variable]) -> List:
-    """Create a list of the requested length populated with fresh variables."""
+def fresh_list_of_length(
+    length: int, fresh_variable: Callable[[str], Variable]
+) -> List:
+    """Create a list of the requested length populated with fresh variables.
+
+    Args:
+        length: Desired list length.
+        fresh_variable: Callable that yields unique :class:`Variable` instances.
+
+    Returns:
+        A Prolog list populated with fresh variables.
+    """
     if length <= 0:
         return List((), None)
 
@@ -87,7 +118,17 @@ def match_list_to_length(
     *,
     fresh_variable: Callable[[str], Variable],
 ) -> Substitution | None:
-    """Ensure a possibly open list can have the requested length."""
+    """Ensure a possibly open list can have the requested length.
+
+    Args:
+        lst: Possibly open list term to constrain.
+        target_length: Desired length of the list.
+        subst: Current substitution.
+        fresh_variable: Generator used to create fresh tail variables when needed.
+
+    Returns:
+        A substitution if the list can match the length, otherwise ``None``.
+    """
     remaining = target_length
     current = lst
 

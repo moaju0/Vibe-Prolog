@@ -1,13 +1,11 @@
-# Vibe Prolog Website
-
-This is the static website for Vibe Prolog, built with [Astro](https://astro.build) and deployed to GitHub Pages.
+# Vibe Prolog Websitex
 
 ## Overview
 
 The website automatically pulls content from the project's markdown files:
 - `README.md` → Home page
 - `FEATURES.md` → Features page
-- `CODE_DOCS.md` → Documentation page
+- `ARCHITECTURE.md` → Documentation page
 - `AGENTS.md` → Development page
 
 Images from the parent `images/` directory are also copied to the website during the build process.

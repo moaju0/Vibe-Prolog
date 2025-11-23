@@ -1,4 +1,13 @@
-"""Utility functions for working with general Prolog terms."""
+"""
+Term utility functions for Prolog term manipulation.
+
+This module provides standalone utility functions for working with Prolog terms:
+- term_to_string: Convert terms to string representation
+- terms_equal: Structural equality checking
+- term_sort_key: Generate sort keys for term ordering
+
+These utilities are used throughout the engine and built-in predicates.
+"""
 
 from typing import Any
 
@@ -7,7 +16,14 @@ from prolog.unification import Substitution, deref
 
 
 def term_to_string(term: Any) -> str:
-    """Convert a Prolog term to a printable string."""
+    """Convert a Prolog term to a printable string.
+
+    Args:
+        term: The term to render.
+
+    Returns:
+        A readable string representation of the term, preserving list syntax.
+    """
     if isinstance(term, Atom):
         return term.name
     if isinstance(term, Number):
@@ -18,7 +34,9 @@ def term_to_string(term: Any) -> str:
         if not term.elements and term.tail is None:
             return "[]"
         elements_str = ", ".join(term_to_string(e) for e in term.elements)
-        if term.tail is not None and not (isinstance(term.tail, List) and not term.tail.elements):
+        if term.tail is not None and not (
+            isinstance(term.tail, List) and not term.tail.elements
+        ):
             return f"[{elements_str}|{term_to_string(term.tail)}]"
         return f"[{elements_str}]"
     if isinstance(term, Compound):
@@ -30,7 +48,15 @@ def term_to_string(term: Any) -> str:
 
 
 def terms_equal(term1: Any, term2: Any) -> bool:
-    """Check if two terms are structurally equal."""
+    """Check if two terms are structurally equal.
+
+    Args:
+        term1: First term to compare.
+        term2: Second term to compare.
+
+    Returns:
+        ``True`` if the terms match structurally; otherwise ``False``.
+    """
     if type(term1) is not type(term2):
         return False
 
@@ -62,7 +88,15 @@ def terms_equal(term1: Any, term2: Any) -> bool:
 
 
 def term_sort_key(term: Any, subst: Substitution | None = None) -> tuple:
-    """Generate a deterministic sort key for a term."""
+    """Generate a deterministic sort key for a term.
+
+    Args:
+        term: The term to normalize.
+        subst: Optional substitution used for dereferencing before ordering.
+
+    Returns:
+        A tuple that can be used as a sort key for deterministic ordering.
+    """
     subst = subst or Substitution()
     term = deref(term, subst)
 
@@ -74,7 +108,12 @@ def term_sort_key(term: Any, subst: Substitution | None = None) -> tuple:
     if isinstance(term, Atom):
         return (2, term.name)
     if isinstance(term, Compound):
-        return (3, len(term.args), term.functor, tuple(term_sort_key(arg, subst) for arg in term.args))
+        return (
+            3,
+            len(term.args),
+            term.functor,
+            tuple(term_sort_key(arg, subst) for arg in term.args),
+        )
     if isinstance(term, List):
         normalized_elements = list(term.elements)
         tail = term.tail
@@ -88,11 +127,15 @@ def term_sort_key(term: Any, subst: Substitution | None = None) -> tuple:
                 and not current_tail.tail.elements
                 and current_tail.tail.tail is None
             ):
-                element_keys = tuple(term_sort_key(elem, subst) for elem in normalized_elements)
+                element_keys = tuple(
+                    term_sort_key(elem, subst) for elem in normalized_elements
+                )
                 return (4, len(normalized_elements), element_keys, (4, 0))
             current_tail = deref(current_tail.tail, subst)
 
-        tail_key = term_sort_key(current_tail, subst) if current_tail is not None else (4, 0)
+        tail_key = (
+            term_sort_key(current_tail, subst) if current_tail is not None else (4, 0)
+        )
         element_keys = tuple(term_sort_key(elem, subst) for elem in normalized_elements)
         return (4, len(normalized_elements), element_keys, tail_key)
 

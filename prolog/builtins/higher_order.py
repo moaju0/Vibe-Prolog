@@ -1,10 +1,14 @@
-"""Higher-order built-ins (maplist/2)."""
+"""Higher-order built-ins (maplist/2).
+
+Provides higher-order predicates such as ``maplist/2``.
+"""
 
 from __future__ import annotations
 
-from typing import Any, Iterator
+from typing import Iterator
 
-from prolog.builtins import register_builtin
+from prolog.builtins import BuiltinRegistry, register_builtin
+from prolog.builtins.common import BuiltinArgs, EngineContext
 from prolog.parser import Atom, Compound, List
 from prolog.unification import Substitution, deref
 from prolog.utils.list_utils import list_to_python
@@ -14,11 +18,14 @@ class HigherOrderBuiltins:
     """Built-ins for higher-order predicates."""
 
     @staticmethod
-    def register(registry, _engine) -> None:
+    def register(registry: BuiltinRegistry, _engine: EngineContext | None) -> None:
+        """Register higher-order predicate handlers."""
         register_builtin(registry, "maplist", 2, HigherOrderBuiltins._builtin_maplist)
 
     @staticmethod
-    def _builtin_maplist(args: tuple[Any, ...], subst: Substitution, engine) -> Iterator[Substitution]:
+    def _builtin_maplist(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext
+    ) -> Iterator[Substitution]:
         goal_template, lst = args
         goal_template = deref(goal_template, subst)
         lst = deref(lst, subst)
@@ -31,7 +38,9 @@ class HigherOrderBuiltins:
         except TypeError:
             return
 
-        def apply_goal(index: int, current_subst: Substitution) -> Iterator[Substitution]:
+        def apply_goal(
+            index: int, current_subst: Substitution
+        ) -> Iterator[Substitution]:
             if index >= len(elements):
                 yield current_subst
                 return

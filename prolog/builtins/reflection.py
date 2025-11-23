@@ -1,10 +1,14 @@
-"""Reflection built-ins (predicate_property/2, current_predicate/1)."""
+"""Reflection built-ins (predicate_property/2, current_predicate/1).
+
+Expose predicate metadata such as presence in the database or built-in registry.
+"""
 
 from __future__ import annotations
 
-from typing import Any, Iterator
+from typing import Iterator
 
-from prolog.builtins import register_builtin
+from prolog.builtins import BuiltinRegistry, register_builtin
+from prolog.builtins.common import BuiltinArgs, EngineContext
 from prolog.parser import Atom, Compound, Number
 from prolog.unification import Substitution, deref, unify
 
@@ -13,12 +17,25 @@ class ReflectionBuiltins:
     """Built-ins that expose predicate metadata."""
 
     @staticmethod
-    def register(registry, _engine) -> None:
-        register_builtin(registry, "predicate_property", 2, ReflectionBuiltins._builtin_predicate_property)
-        register_builtin(registry, "current_predicate", 1, ReflectionBuiltins._builtin_current_predicate)
+    def register(registry: BuiltinRegistry, _engine: EngineContext | None) -> None:
+        """Register reflection predicate handlers."""
+        register_builtin(
+            registry,
+            "predicate_property",
+            2,
+            ReflectionBuiltins._builtin_predicate_property,
+        )
+        register_builtin(
+            registry,
+            "current_predicate",
+            1,
+            ReflectionBuiltins._builtin_current_predicate,
+        )
 
     @staticmethod
-    def _builtin_predicate_property(args: tuple[Any, ...], subst: Substitution, engine) -> Substitution | None:
+    def _builtin_predicate_property(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext
+    ) -> Substitution | None:
         goal_term, property_term = args
         goal_term = deref(goal_term, subst)
         property_term = deref(property_term, subst)
@@ -37,7 +54,9 @@ class ReflectionBuiltins:
         return None
 
     @staticmethod
-    def _builtin_current_predicate(args: tuple[Any, ...], subst: Substitution, engine) -> Iterator[Substitution]:
+    def _builtin_current_predicate(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext
+    ) -> Iterator[Substitution]:
         indicator = deref(args[0], subst)
 
         predicates = set(engine._builtin_registry.keys())

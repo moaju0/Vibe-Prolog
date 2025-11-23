@@ -1,28 +1,40 @@
-"""All-solutions built-ins (findall/3, bagof/3, setof/3)."""
+"""All-solutions built-ins (findall/3, bagof/3, setof/3).
+
+Implements ISO-style predicates that collect all solutions to a query while
+respecting free and existential variables.
+"""
 
 from __future__ import annotations
 
 from collections import OrderedDict
 from typing import Any, Callable, Iterator
 
-from prolog.builtins import register_builtin
+from prolog.builtins import BuiltinRegistry, register_builtin
+from prolog.builtins.common import BuiltinArgs, EngineContext
 from prolog.parser import List, Variable
 from prolog.unification import Substitution, apply_substitution, deref, unify
 from prolog.utils.term_utils import term_sort_key
-from prolog.utils.variable_utils import collect_vars, collect_vars_in_order, strip_existentials
+from prolog.utils.variable_utils import (
+    collect_vars,
+    collect_vars_in_order,
+    strip_existentials,
+)
 
 
 class AllSolutionsBuiltins:
     """Built-ins that gather all solutions for a query."""
 
     @staticmethod
-    def register(registry, _engine) -> None:
+    def register(registry: BuiltinRegistry, _engine: EngineContext | None) -> None:
+        """Register all-solutions predicate handlers into the registry."""
         register_builtin(registry, "findall", 3, AllSolutionsBuiltins._builtin_findall)
         register_builtin(registry, "bagof", 3, AllSolutionsBuiltins._builtin_bagof)
         register_builtin(registry, "setof", 3, AllSolutionsBuiltins._builtin_setof)
 
     @staticmethod
-    def _builtin_findall(args: tuple[Any, ...], subst: Substitution, engine) -> Substitution | None:
+    def _builtin_findall(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext
+    ) -> Substitution | None:
         template, goal, result = args
         solutions = []
         for solution_subst in engine._solve_goals([goal], subst):
@@ -33,9 +45,13 @@ class AllSolutionsBuiltins:
         return unify(result, result_list, subst)
 
     @staticmethod
-    def _builtin_bagof(args: tuple[Any, ...], subst: Substitution, engine) -> Iterator[Substitution] | None:
+    def _builtin_bagof(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext
+    ) -> Iterator[Substitution] | None:
         template, goal, result = args
-        free_vars, groups = AllSolutionsBuiltins._collect_bagof_groups(template, goal, subst, engine)
+        free_vars, groups = AllSolutionsBuiltins._collect_bagof_groups(
+            template, goal, subst, engine
+        )
         if not groups:
             return None
         return AllSolutionsBuiltins._yield_grouped_results(
@@ -43,13 +59,21 @@ class AllSolutionsBuiltins:
         )
 
     @staticmethod
-    def _builtin_setof(args: tuple[Any, ...], subst: Substitution, engine) -> Iterator[Substitution] | None:
+    def _builtin_setof(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext
+    ) -> Iterator[Substitution] | None:
         template, goal, result = args
-        free_vars, groups = AllSolutionsBuiltins._collect_bagof_groups(template, goal, subst, engine)
+        free_vars, groups = AllSolutionsBuiltins._collect_bagof_groups(
+            template, goal, subst, engine
+        )
         if not groups:
             return None
         return AllSolutionsBuiltins._yield_grouped_results(
-            free_vars, groups, result, subst, AllSolutionsBuiltins._unique_and_sort_solutions
+            free_vars,
+            groups,
+            result,
+            subst,
+            AllSolutionsBuiltins._unique_and_sort_solutions,
         )
 
     @staticmethod
@@ -89,7 +113,7 @@ class AllSolutionsBuiltins:
 
     @staticmethod
     def _collect_bagof_groups(
-        template: Any, goal: Any, subst: Substitution, engine
+        template: Any, goal: Any, subst: Substitution, engine: EngineContext
     ) -> tuple[list[str], OrderedDict]:
         template = deref(template, subst)
         goal = deref(goal, subst)
@@ -110,7 +134,9 @@ class AllSolutionsBuiltins:
         groups: OrderedDict[tuple, list] = OrderedDict()
         for solution_subst in engine._solve_goals([goal], subst):
             instantiated = apply_substitution(template, solution_subst)
-            key = tuple(apply_substitution(Variable(var), solution_subst) for var in free_vars)
+            key = tuple(
+                apply_substitution(Variable(var), solution_subst) for var in free_vars
+            )
             groups.setdefault(key, []).append(instantiated)
 
         return free_vars, groups

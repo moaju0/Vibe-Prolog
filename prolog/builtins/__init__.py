@@ -59,7 +59,9 @@ class BuiltinPredicate(Protocol):
         ...
 
 
-def register_builtin(registry: BuiltinRegistry, functor: str, arity: int, handler: Callable) -> None:
+def register_builtin(
+    registry: BuiltinRegistry, functor: str, arity: int, handler: Callable
+) -> None:
     """Helper to register a built-in predicate handler."""
     registry[(functor, arity)] = handler
 
@@ -81,4 +83,9 @@ def adapt_old_handler(old_handler: Callable[[tuple, Substitution], object]) -> C
     return wrapper
 
 
-__all__ = ["BuiltinPredicate", "register_builtin", "adapt_old_handler"]
+__all__ = [
+    "BuiltinPredicate",
+    "BuiltinRegistry",
+    "register_builtin",
+    "adapt_old_handler",
+]

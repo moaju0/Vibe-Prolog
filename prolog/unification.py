@@ -10,7 +10,7 @@ class Substitution:
     def __init__(self, bindings: dict[str, Any] | None = None):
         self.bindings = bindings or {}
 
-    def bind(self, var: str, value: Any) -> 'Substitution':
+    def bind(self, var: str, value: Any) -> "Substitution":
         """Create new substitution with additional binding."""
         new_bindings = self.bindings.copy()
         new_bindings[var] = value
@@ -23,7 +23,7 @@ class Substitution:
     def __repr__(self):
         return f"Substitution({self.bindings})"
 
-    def copy(self) -> 'Substitution':
+    def copy(self) -> "Substitution":
         """Create a copy of this substitution."""
         return Substitution(self.bindings.copy())
 
@@ -72,10 +72,10 @@ def unify(term1: Any, term2: Any, subst: Substitution) -> Substitution | None:
 
     # ISO Prolog: Empty list [] unifies with atom '[]'
     if isinstance(term1, List) and isinstance(term2, Atom):
-        if not term1.elements and term1.tail is None and term2.name == '[]':
+        if not term1.elements and term1.tail is None and term2.name == "[]":
             return subst
     if isinstance(term1, Atom) and isinstance(term2, List):
-        if not term2.elements and term2.tail is None and term1.name == '[]':
+        if not term2.elements and term2.tail is None and term1.name == "[]":
             return subst
 
     # Variable unification
@@ -112,7 +112,12 @@ def unify(term1: Any, term2: Any, subst: Substitution) -> Substitution | None:
     # List unification
     if isinstance(term1, List) and isinstance(term2, List):
         # Empty lists
-        if not term1.elements and not term2.elements and term1.tail is None and term2.tail is None:
+        if (
+            not term1.elements
+            and not term2.elements
+            and term1.tail is None
+            and term2.tail is None
+        ):
             return subst
 
         # Handle the case where one or both lists have explicit tails [H|T]
@@ -175,13 +180,17 @@ def apply_substitution(term: Any, subst: Substitution) -> Any:
 
     if isinstance(term, List):
         new_elements = tuple(apply_substitution(elem, subst) for elem in term.elements)
-        new_tail = apply_substitution(term.tail, subst) if term.tail is not None else None
+        new_tail = (
+            apply_substitution(term.tail, subst) if term.tail is not None else None
+        )
         return List(new_elements, new_tail)
 
     return term
 
+
 def vars(term: Any) -> set[Variable]:
     """Collect all variables in a term."""
+
     def _walk(term: Any):
         """Recursively walk the term and yield variables."""
         if isinstance(term, Variable):

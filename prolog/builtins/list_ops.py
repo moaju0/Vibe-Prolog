@@ -1,11 +1,16 @@
-"""List operation built-ins (member/2, append/3, length/2, reverse/2, sort/2)."""
+"""List operation built-ins (member/2, append/3, length/2, reverse/2, sort/2).
+
+Implements ISO-style list predicates including membership, concatenation,
+length calculation, reversal, and sorting with duplicate removal.
+"""
 
 from __future__ import annotations
 
-from typing import Any, Iterator
+from typing import Iterator
 
-from prolog.builtins import register_builtin
-from prolog.parser import Atom, List, Number, Variable
+from prolog.builtins import BuiltinRegistry, register_builtin
+from prolog.builtins.common import BuiltinArgs, EngineContext
+from prolog.parser import List, Number, Variable
 from prolog.unification import Substitution, deref, unify
 from prolog.utils.list_utils import (
     compute_list_length,
@@ -21,15 +26,20 @@ class ListOperationsBuiltins:
     """Built-ins for working with lists."""
 
     @staticmethod
-    def register(registry, _engine) -> None:
+    def register(registry: BuiltinRegistry, _engine: EngineContext | None) -> None:
+        """Register list predicate handlers into the registry."""
         register_builtin(registry, "member", 2, ListOperationsBuiltins._builtin_member)
         register_builtin(registry, "append", 3, ListOperationsBuiltins._builtin_append)
         register_builtin(registry, "length", 2, ListOperationsBuiltins._builtin_length)
-        register_builtin(registry, "reverse", 2, ListOperationsBuiltins._builtin_reverse)
+        register_builtin(
+            registry, "reverse", 2, ListOperationsBuiltins._builtin_reverse
+        )
         register_builtin(registry, "sort", 2, ListOperationsBuiltins._builtin_sort)
 
     @staticmethod
-    def _builtin_member(args: tuple[Any, ...], subst: Substitution, engine) -> Iterator[Substitution]:
+    def _builtin_member(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext
+    ) -> Iterator[Substitution]:
         elem, lst = args
         lst = deref(lst, subst)
 
@@ -40,16 +50,24 @@ class ListOperationsBuiltins:
                     yield new_subst
 
             if lst.tail is not None:
-                yield from ListOperationsBuiltins._builtin_member((elem, lst.tail), subst, engine)
+                yield from ListOperationsBuiltins._builtin_member(
+                    (elem, lst.tail), subst, engine
+                )
 
     @staticmethod
-    def _builtin_append(args: tuple[Any, ...], subst: Substitution, engine) -> Iterator[Substitution]:
+    def _builtin_append(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext
+    ) -> Iterator[Substitution]:
         list1, list2, result = args
         list1 = deref(list1, subst)
         list2 = deref(list2, subst)
         result = deref(result, subst)
 
-        if isinstance(list1, List) and not isinstance(list1, Variable) and isinstance(list2, List):
+        if (
+            isinstance(list1, List)
+            and not isinstance(list1, Variable)
+            and isinstance(list2, List)
+        ):
             try:
                 py_list1 = list_to_python(list1, subst)
                 py_list2 = list_to_python(list2, subst)
@@ -81,8 +99,12 @@ class ListOperationsBuiltins:
             result_list = List((head,), tail3_var)
             subst1 = unify(result, result_list, subst)
             if subst1 is not None:
-                yield from ListOperationsBuiltins._builtin_append((tail1, list2, tail3_var), subst1, engine)
-        elif isinstance(list1, Variable) and isinstance(result, List) and result.elements:
+                yield from ListOperationsBuiltins._builtin_append(
+                    (tail1, list2, tail3_var), subst1, engine
+                )
+        elif (
+            isinstance(list1, Variable) and isinstance(result, List) and result.elements
+        ):
             head = result.elements[0]
             tail3 = (
                 List(result.elements[1:], result.tail)
@@ -93,10 +115,14 @@ class ListOperationsBuiltins:
             list1_val = List((head,), tail1_var)
             subst1 = unify(list1, list1_val, subst)
             if subst1 is not None:
-                yield from ListOperationsBuiltins._builtin_append((tail1_var, list2, tail3), subst1, engine)
+                yield from ListOperationsBuiltins._builtin_append(
+                    (tail1_var, list2, tail3), subst1, engine
+                )
 
     @staticmethod
-    def _builtin_length(args: tuple[Any, ...], subst: Substitution, engine) -> Iterator[Substitution]:
+    def _builtin_length(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext
+    ) -> Iterator[Substitution]:
         lst, length = args
         lst = deref(lst, subst)
         length = deref(length, subst)
@@ -107,7 +133,9 @@ class ListOperationsBuiltins:
                 return
 
             if isinstance(lst, List):
-                new_subst = match_list_to_length(lst, n, subst, fresh_variable=engine._fresh_variable)
+                new_subst = match_list_to_length(
+                    lst, n, subst, fresh_variable=engine._fresh_variable
+                )
                 if new_subst is not None:
                     yield new_subst
             else:
@@ -127,7 +155,9 @@ class ListOperationsBuiltins:
                 yield new_subst
 
     @staticmethod
-    def _builtin_reverse(args: tuple[Any, ...], subst: Substitution, engine) -> Iterator[Substitution]:
+    def _builtin_reverse(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext
+    ) -> Iterator[Substitution]:
         lst, reversed_lst = args
         lst = deref(lst, subst)
         reversed_lst = deref(reversed_lst, subst)
@@ -156,7 +186,9 @@ class ListOperationsBuiltins:
                     yield new_subst
 
     @staticmethod
-    def _builtin_sort(args: tuple[Any, ...], subst: Substitution, engine) -> Substitution | None:
+    def _builtin_sort(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext
+    ) -> Substitution | None:
         lst, sorted_lst = args
         lst = deref(lst, subst)
 

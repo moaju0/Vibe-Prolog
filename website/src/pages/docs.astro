@@ -4,12 +4,12 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import { marked } from 'marked';
 
-const docsPath = join(process.cwd(), 'src', 'content', 'CODE_DOCS.md');
+const docsPath = join(process.cwd(), 'src', 'content', 'ARCHITECTURE.md');
 let docsContent = '';
 try {
   docsContent = readFileSync(docsPath, 'utf-8');
 } catch (e) {
-  console.error('Error reading CODE_DOCS.md:', e);
+  console.error('Error reading ARCHITECTURE.md:', e);
 }
 
 const htmlContent = marked.parse(docsContent) as string;

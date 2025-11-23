@@ -3,10 +3,10 @@
 import io
 import sys
 from pathlib import Path
-from typing import Iterator
-from prolog.parser import PrologParser, Compound, Variable
+
 from prolog.engine import CutException, PrologEngine
-from prolog.unification import Substitution, deref, apply_substitution
+from prolog.parser import Compound, PrologParser, Variable
+from prolog.unification import apply_substitution
 
 
 class PrologInterpreter:
@@ -20,7 +20,7 @@ class PrologInterpreter:
     def consult(self, filepath: str | Path):
         """Load Prolog clauses from a file."""
         filepath = Path(filepath)
-        with open(filepath, 'r') as f:
+        with open(filepath, "r") as f:
             content = f.read()
 
         clauses = self.parser.parse(content)
@@ -33,7 +33,9 @@ class PrologInterpreter:
         self.clauses.extend(clauses)
         self.engine = PrologEngine(self.clauses)
 
-    def query(self, query_str: str, limit: int | None = None, capture_output: bool = False) -> list[dict[str, any]] | tuple[list[dict[str, any]], bool]:
+    def query(
+        self, query_str: str, limit: int | None = None, capture_output: bool = False
+    ) -> list[dict[str, any]] | tuple[list[dict[str, any]], bool]:
         """
         Execute a Prolog query and return all solutions.
 
@@ -87,13 +89,15 @@ class PrologInterpreter:
                 had_output = len(output_text) > 0
                 # Print the captured output
                 if had_output:
-                    print(output_text, end='')
+                    print(output_text, end="")
 
         if capture_output:
             return solutions, had_output
         return solutions
 
-    def query_once(self, query_str: str, capture_output: bool = False) -> dict[str, any] | None | tuple[dict[str, any] | None, bool]:
+    def query_once(
+        self, query_str: str, capture_output: bool = False
+    ) -> dict[str, any] | None | tuple[dict[str, any] | None, bool]:
         """
         Execute a Prolog query and return first solution.
 
@@ -120,8 +124,8 @@ class PrologInterpreter:
     def _parse_query(self, query_str: str) -> list[Compound]:
         """Parse a query string into a list of goals."""
         # Add ?- and . to make it a valid query
-        if not query_str.strip().endswith('.'):
-            query_str = query_str.strip() + '.'
+        if not query_str.strip().endswith("."):
+            query_str = query_str.strip() + "."
 
         # Parse as a fact and extract the goals
         # We'll use a dummy rule structure
@@ -153,11 +157,12 @@ class PrologInterpreter:
     def _collect_variables(self, goals: list) -> set[str]:
         """Collect all variable names from goals."""
         from prolog.parser import List
+
         variables = set()
 
         def collect_from_term(term):
             if isinstance(term, Variable):
-                if not term.name.startswith('_'):  # Skip anonymous variables
+                if not term.name.startswith("_"):  # Skip anonymous variables
                     variables.add(term.name)
             elif isinstance(term, Compound):
                 for arg in term.args:
@@ -189,13 +194,15 @@ class PrologInterpreter:
         elif isinstance(term, List):
             # Convert list to Python list
             result = [self._term_to_python(elem) for elem in term.elements]
-            if term.tail is not None and not (isinstance(term.tail, List) and not term.tail.elements):
+            if term.tail is not None and not (
+                isinstance(term.tail, List) and not term.tail.elements
+            ):
                 # List with tail
                 tail_val = self._term_to_python(term.tail)
                 if isinstance(tail_val, list):
                     result.extend(tail_val)
                 else:
-                    result.append(('|', tail_val))
+                    result.append(("|", tail_val))
             return result
         elif isinstance(term, Compound):
             # Convert compound to tuple or dict

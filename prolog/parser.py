@@ -9,6 +9,7 @@ from typing import Any
 @dataclass(frozen=True)
 class Atom:
     """An atom (constant)."""
+
     name: str
 
     def __repr__(self):
@@ -18,6 +19,7 @@ class Atom:
 @dataclass(frozen=True)
 class Variable:
     """A variable."""
+
     name: str
 
     def __repr__(self):
@@ -27,6 +29,7 @@ class Variable:
 @dataclass(frozen=True)
 class Number:
     """A number."""
+
     value: int | float
 
     def __repr__(self):
@@ -36,19 +39,21 @@ class Number:
 @dataclass(frozen=True)
 class Compound:
     """A compound term (functor with arguments)."""
+
     functor: str
     args: tuple[Any, ...]
 
     def __repr__(self):
         if not self.args:
             return self.functor
-        args_str = ', '.join(str(arg) for arg in self.args)
+        args_str = ", ".join(str(arg) for arg in self.args)
         return f"{self.functor}({args_str})"
 
 
 @dataclass(frozen=True)
 class List:
     """A list."""
+
     elements: tuple[Any, ...]
     tail: Any = None  # For [H|T] syntax
 
@@ -56,9 +61,9 @@ class List:
         if not self.elements and self.tail is None:
             return "[]"
         if self.tail is not None:
-            elements_str = ', '.join(str(e) for e in self.elements)
+            elements_str = ", ".join(str(e) for e in self.elements)
             return f"[{elements_str}|{self.tail}]"
-        elements_str = ', '.join(str(e) for e in self.elements)
+        elements_str = ", ".join(str(e) for e in self.elements)
         return f"[{elements_str}]"
 
 
@@ -73,6 +78,7 @@ class Cut:
 @dataclass
 class Clause:
     """A Prolog clause (fact or rule)."""
+
     head: Compound
     body: list[Compound] | None = None  # None for facts
 
@@ -211,14 +217,14 @@ class PrologTransformer(Transformer):
         # Build right-associative tree for disjunction
         result = items[-1]
         for i in range(len(items) - 2, -1, -1):
-            result = Compound(';', (items[i], result))
+            result = Compound(";", (items[i], result))
         return result
 
     def if_then_term(self, items):
         if len(items) == 1:
             return items[0]
         # items[0] -> items[1]
-        return Compound('->', (items[0], items[1]))
+        return Compound("->", (items[0], items[1]))
 
     def and_term(self, items):
         if len(items) == 1:
@@ -226,7 +232,7 @@ class PrologTransformer(Transformer):
         # Build right-associative tree for conjunction
         result = items[-1]
         for i in range(len(items) - 2, -1, -1):
-            result = Compound(',', (items[i], result))
+            result = Compound(",", (items[i], result))
         return result
 
     def comparison_term(self, items):
@@ -275,7 +281,7 @@ class PrologTransformer(Transformer):
         result = items[-1]
         for i in range(len(items) - 2, -1, -2):
             if i > 0:
-                result = Compound(str(items[i]), (items[i-1], result))
+                result = Compound(str(items[i]), (items[i - 1], result))
         if len(items) % 2 == 0:
             # If even number of items, first item hasn't been added yet
             result = Compound(str(items[1]), (items[0], result))
@@ -334,7 +340,7 @@ class PrologTransformer(Transformer):
         # Now handle other escape sequences
         replacements = {
             r"\'": "'",
-            r'\"': '"',
+            r"\"": '"',
             r"\n": "\n",
             r"\t": "\t",
             r"\r": "\r",
@@ -362,16 +368,16 @@ class PrologTransformer(Transformer):
     def number(self, items):
         value = str(items[0])
         # Handle hex, octal, binary
-        if value.startswith(('-0x', '0x')) or value.startswith(('-0X', '0X')):
+        if value.startswith(("-0x", "0x")) or value.startswith(("-0X", "0X")):
             # Hex number
             return Number(int(value, 16))
-        elif value.startswith(('-0o', '0o')) or value.startswith(('-0O', '0O')):
+        elif value.startswith(("-0o", "0o")) or value.startswith(("-0O", "0O")):
             # Octal number
             return Number(int(value, 8))
-        elif value.startswith(('-0b', '0b')) or value.startswith(('-0B', '0B')):
+        elif value.startswith(("-0b", "0b")) or value.startswith(("-0B", "0B")):
             # Binary number
             return Number(int(value, 2))
-        elif 'e' in value.lower() or '.' in value:
+        elif "e" in value.lower() or "." in value:
             # Scientific notation or float
             return Number(float(value))
         else:
@@ -387,7 +393,7 @@ class PrologTransformer(Transformer):
             # This is base'char format - extract just the character
             parts = code_str.split("'")
             if len(parts) >= 2:
-                char = parts[1][0] if parts[1] else ''
+                char = parts[1][0] if parts[1] else ""
                 return Number(ord(char))
 
         # Standard 0'X format
@@ -399,17 +405,17 @@ class PrologTransformer(Transformer):
                 return Number(ord("'"))
 
             # Handle backslash escape sequences
-            if char_part.startswith('\\'):
-                if char_part.startswith('\\x'):
+            if char_part.startswith("\\"):
+                if char_part.startswith("\\x"):
                     # Hex escape: \x41\ or just \x41
-                    if char_part.endswith('\\'):
+                    if char_part.endswith("\\"):
                         hex_part = char_part[2:-1]  # Remove \x and trailing \
                     else:
                         hex_part = char_part[2:]  # Just remove \x
                     return Number(int(hex_part, 16))
-                elif char_part == '\\\\':
+                elif char_part == "\\\\":
                     # Escaped backslash
-                    return Number(ord('\\'))
+                    return Number(ord("\\"))
                 elif char_part == "\\'":
                     # Escaped single quote
                     return Number(ord("'"))
@@ -425,7 +431,7 @@ class PrologTransformer(Transformer):
 
     def curly_braces(self, items):
         """Handle curly braces {X} which is syntax sugar for {}(X)"""
-        return Compound('{}', (items[0],))
+        return Compound("{}", (items[0],))
 
     def cut(self, items):
         return Cut()
@@ -435,7 +441,9 @@ class PrologParser:
     """Parse Prolog source code."""
 
     def __init__(self):
-        self.parser = Lark(PROLOG_GRAMMAR, parser='lalr', transformer=PrologTransformer())
+        self.parser = Lark(
+            PROLOG_GRAMMAR, parser="lalr", transformer=PrologTransformer()
+        )
 
     def parse(self, text: str) -> list[Clause]:
         """Parse Prolog source code and return list of clauses."""

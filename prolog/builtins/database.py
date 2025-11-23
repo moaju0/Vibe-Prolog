@@ -1,11 +1,15 @@
-"""Database built-ins (clause/2, assert*/1, retract/1, abolish/1)."""
+"""Database built-ins (clause/2, assert*/1, retract/1, abolish/1).
+
+Provides ISO-style dynamic database manipulation predicates.
+"""
 
 from __future__ import annotations
 
-from typing import Any, Iterator
+from typing import Iterator
 
-from prolog.builtins import register_builtin
-from prolog.parser import Atom, Clause, Compound, List, Number
+from prolog.builtins import BuiltinRegistry, register_builtin
+from prolog.builtins.common import BuiltinArgs, EngineContext
+from prolog.parser import Atom, Clause, Compound, Number
 from prolog.unification import Substitution, apply_substitution, deref, unify
 
 
@@ -13,7 +17,8 @@ class DatabaseBuiltins:
     """Built-ins for interacting with the clause database."""
 
     @staticmethod
-    def register(registry, _engine) -> None:
+    def register(registry: BuiltinRegistry, _engine: EngineContext | None) -> None:
+        """Register database predicates into the registry."""
         register_builtin(registry, "clause", 2, DatabaseBuiltins._builtin_clause)
         register_builtin(registry, "asserta", 1, DatabaseBuiltins._builtin_asserta)
         register_builtin(registry, "assertz", 1, DatabaseBuiltins._builtin_assertz)
@@ -22,7 +27,9 @@ class DatabaseBuiltins:
         register_builtin(registry, "abolish", 1, DatabaseBuiltins._builtin_abolish)
 
     @staticmethod
-    def _builtin_clause(args: tuple[Any, ...], subst: Substitution, engine) -> Iterator[Substitution]:
+    def _builtin_clause(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext
+    ) -> Iterator[Substitution]:
         head, body = args
         head = deref(head, subst)
 
@@ -45,15 +52,21 @@ class DatabaseBuiltins:
                     yield final_subst
 
     @staticmethod
-    def _builtin_asserta(args: tuple[Any, ...], subst: Substitution, engine) -> Substitution | None:
+    def _builtin_asserta(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext
+    ) -> Substitution | None:
         return DatabaseBuiltins._builtin_assert(args, subst, engine, position="front")
 
     @staticmethod
-    def _builtin_assertz(args: tuple[Any, ...], subst: Substitution, engine) -> Substitution | None:
+    def _builtin_assertz(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext
+    ) -> Substitution | None:
         return DatabaseBuiltins._builtin_assert(args, subst, engine, position="back")
 
     @staticmethod
-    def _builtin_assert(args: tuple[Any, ...], subst: Substitution, engine, position: str) -> Substitution | None:
+    def _builtin_assert(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext, position: str
+    ) -> Substitution | None:
         clause_term = deref(args[0], subst)
         clause_term = apply_substitution(clause_term, subst)
 
@@ -77,7 +90,9 @@ class DatabaseBuiltins:
         return subst
 
     @staticmethod
-    def _builtin_retract(args: tuple[Any, ...], subst: Substitution, engine) -> Iterator[Substitution]:
+    def _builtin_retract(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext
+    ) -> Iterator[Substitution]:
         clause_term = deref(args[0], subst)
         matches = []
         for i, clause in enumerate(engine.clauses):
@@ -103,10 +118,16 @@ class DatabaseBuiltins:
             yield new_subst
 
     @staticmethod
-    def _builtin_abolish(args: tuple[Any, ...], subst: Substitution, engine) -> Substitution | None:
+    def _builtin_abolish(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext
+    ) -> Substitution | None:
         indicator = deref(args[0], subst)
 
-        if not isinstance(indicator, Compound) or indicator.functor != "/" or len(indicator.args) != 2:
+        if (
+            not isinstance(indicator, Compound)
+            or indicator.functor != "/"
+            or len(indicator.args) != 2
+        ):
             return None
 
         name_term, arity_term = indicator.args
@@ -115,7 +136,11 @@ class DatabaseBuiltins:
 
         if not isinstance(name_term, Atom):
             return None
-        if not isinstance(arity_term, Number) or not isinstance(arity_term.value, int) or arity_term.value < 0:
+        if (
+            not isinstance(arity_term, Number)
+            or not isinstance(arity_term.value, int)
+            or arity_term.value < 0
+        ):
             return None
         arity = arity_term.value
         name = name_term.name

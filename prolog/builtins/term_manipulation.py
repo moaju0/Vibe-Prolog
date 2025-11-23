@@ -1,10 +1,14 @@
-"""Term manipulation built-ins (functor/3, arg/3, =../2, copy_term/2, term comparisons)."""
+"""Term manipulation built-ins (functor/3, arg/3, =../2, copy_term/2, term comparisons).
+
+Implements ISO-style predicates for deconstructing and constructing terms.
+"""
 
 from __future__ import annotations
 
-from typing import Any, Iterator
+from typing import Iterator
 
-from prolog.builtins import register_builtin
+from prolog.builtins import BuiltinRegistry, register_builtin
+from prolog.builtins.common import BuiltinArgs, EngineContext
 from prolog.parser import Atom, Compound, List, Number, Variable
 from prolog.unification import Substitution, deref, unify
 from prolog.utils.term_utils import term_sort_key, terms_equal
@@ -15,22 +19,32 @@ class TermManipulationBuiltins:
     """Built-ins for inspecting and constructing terms."""
 
     @staticmethod
-    def register(registry, _engine) -> None:
+    def register(registry: BuiltinRegistry, _engine: EngineContext | None) -> None:
+        """Register term manipulation predicate handlers."""
         for op in ["==", r"\==", "@<", "@=<", "@>", "@>="]:
             register_builtin(
                 registry,
                 op,
                 2,
-                lambda args, subst, engine, op=op: TermManipulationBuiltins._builtin_term_compare(op, args, subst, engine),
+                lambda args,
+                subst,
+                engine,
+                op=op: TermManipulationBuiltins._builtin_term_compare(
+                    op, args, subst, engine
+                ),
             )
-        register_builtin(registry, "functor", 3, TermManipulationBuiltins._builtin_functor)
+        register_builtin(
+            registry, "functor", 3, TermManipulationBuiltins._builtin_functor
+        )
         register_builtin(registry, "arg", 3, TermManipulationBuiltins._builtin_arg)
         register_builtin(registry, "=..", 2, TermManipulationBuiltins._builtin_univ)
-        register_builtin(registry, "copy_term", 2, TermManipulationBuiltins._builtin_copy_term)
+        register_builtin(
+            registry, "copy_term", 2, TermManipulationBuiltins._builtin_copy_term
+        )
 
     @staticmethod
     def _builtin_term_compare(
-        op: str, args: tuple[Any, ...], subst: Substitution, _engine
+        op: str, args: BuiltinArgs, subst: Substitution, _engine: EngineContext | None
     ) -> Substitution | None:
         left_term = deref(args[0], subst)
         right_term = deref(args[1], subst)
@@ -57,7 +71,9 @@ class TermManipulationBuiltins:
         return None
 
     @staticmethod
-    def _builtin_functor(args: tuple[Any, ...], subst: Substitution, engine) -> Iterator[Substitution]:
+    def _builtin_functor(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext
+    ) -> Iterator[Substitution]:
         term, name, arity = args
         term = deref(term, subst)
         name = deref(name, subst)
@@ -92,14 +108,18 @@ class TermManipulationBuiltins:
                 if new_subst is not None:
                     yield new_subst
             else:
-                args_vals = tuple(engine._fresh_variable(f"Arg{i}_") for i in range(arity_val))
+                args_vals = tuple(
+                    engine._fresh_variable(f"Arg{i}_") for i in range(arity_val)
+                )
                 compound = Compound(name.name, args_vals)
                 new_subst = unify(term, compound, subst)
                 if new_subst is not None:
                     yield new_subst
 
     @staticmethod
-    def _builtin_arg(args: tuple[Any, ...], subst: Substitution, _engine) -> Substitution | None:
+    def _builtin_arg(
+        args: BuiltinArgs, subst: Substitution, _engine: EngineContext | None
+    ) -> Substitution | None:
         n, term, arg = args
         n = deref(n, subst)
         term = deref(term, subst)
@@ -118,7 +138,9 @@ class TermManipulationBuiltins:
         return unify(arg, selected_arg, subst)
 
     @staticmethod
-    def _builtin_univ(args: tuple[Any, ...], subst: Substitution, _engine) -> Substitution | None:
+    def _builtin_univ(
+        args: BuiltinArgs, subst: Substitution, _engine: EngineContext | None
+    ) -> Substitution | None:
         term, lst = args
         term = deref(term, subst)
         lst = deref(lst, subst)
@@ -149,7 +171,9 @@ class TermManipulationBuiltins:
         return None
 
     @staticmethod
-    def _builtin_copy_term(args: tuple[Any, ...], subst: Substitution, engine) -> Substitution | None:
+    def _builtin_copy_term(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext
+    ) -> Substitution | None:
         source, copy = args
         source = deref(source, subst)
         var_map: dict[Variable, Variable] = {}
