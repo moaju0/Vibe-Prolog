@@ -1,7 +1,8 @@
 # Simple Prolog Interpreter Architecture & Usage
 
-A minimal yet capable Prolog interpreter in Python. This document combines usage
-guides, architecture notes, and contributor guidance.
+A minimal yet capable Prolog interpreter in Python. This document combines
+usage guides, architecture notes, testing guidance, and contributor-focused
+context so you can reason about the system in one place.
 
 ## Project Structure
 
@@ -21,10 +22,12 @@ prolog/
     └── variable_utils.py
 ```
 
-## Features
+## Features & ISO Coverage
 
-See `FEATURES.md` for the full checklist. Core capabilities include ISO-style
-parsing, unification, backtracking execution, and a broad set of built-ins.
+See `FEATURES.md` for the full checklist of ISO predicates and syntax features.
+At the moment 102 entries in that matrix are marked ✅, covering ISO-style
+parsing, unification, backtracking execution, and a broad set of built-ins. Use
+that document to understand missing directives, error terms, and parser gaps.
 
 ## Usage
 
@@ -42,6 +45,8 @@ uv run pytest -v     # verbose
 uv run pytest tests/test_builtins.py
 uv run pytest tests/test_parser.py
 ```
+
+See the "Tooling & Tests" section for additional harness info.
 
 ### Using as a Library
 
@@ -80,12 +85,17 @@ results = prolog.query("my_query(X)")
 The interpreter consists of four main components:
 
 1. **Parser** (`prolog/parser.py`) - Uses Lark to parse Prolog syntax with full
-   operator precedence and modern atom/number handling.
-2. **Unification** (`prolog/unification.py`) - Robinson-style unification.
+   operator precedence, multi-base numeric literals, quoted atoms/strings,
+   escapes, and ISO character code forms (except for a handful of noted edge
+   cases).
+2. **Unification** (`prolog/unification.py`) - Robinson-style unification with
+   occurs-check by default so cyclic structures are prevented.
 3. **Engine** (`prolog/engine.py`) - Backtracking search with built-in
-   predicates, proper cut semantics, and dynamic predicate support.
+   predicates, cut semantics, dynamic predicate assertion/retraction, and the
+   dispatcher that resolves functor/arity to handlers.
 4. **Interpreter** (`prolog/interpreter.py`) - Public API for loading and
-   querying programs.
+   querying programs, plus helpers for consulting strings/files and capturing
+   output streams.
 
 ## Built-in Registry
 
@@ -130,6 +140,20 @@ non-deterministic predicates.
 4. **Add tests** in `tests/test_*.py`.
 5. **Update FEATURES.md** to mark the predicate as implemented.
 
+## Tooling & Tests
+
+- Exercise the system primarily through the Python API (`from prolog import
+  PrologInterpreter`) and the pytest suite (800+ tests covering ISO core,
+  parser pathologies, and built-in behaviors).
+- `PrologInterpreter` exposes `consult/consult_string`, `query`, `query_once`,
+  and `has_solution`, plus optional stdout capture so predicates like `write`
+  and `format` can be observed while still returning substitutions.
+- Built-in predicates are dispatched through the registry in
+  `prolog/engine.py`. To add one, register a handler that either yields
+  substitutions or returns `None`. Helpers such as `_format_to_string`,
+  `_list_to_python` (respects active substitutions), and `_fresh_variable`
+  centralize tricky behavior so new built-ins stay consistent.
+
 ## Utility Modules
 
 Shared helpers for the AST live in `prolog/utils/`:
@@ -139,8 +163,8 @@ Shared helpers for the AST live in `prolog/utils/`:
   lists.
 - `variable_utils.py`: Variable collection, copying, and existential stripping.
 
-These modules are imported by `prolog/engine.py` and can be tested independently
-via the unit tests in `tests/utils/`.
+These modules are imported by `prolog/engine.py` and have focused coverage in
+`tests/utils/`.
 
 ## Examples
 
@@ -178,16 +202,25 @@ job(bob, engineer).
 
 ## Limitations
 
-- File I/O predicates (`see/1`, `seen/0`, `read/1` from files) are not
-  supported.
-- No DCG, modules/namespaces, CLP, or tail-call optimization.
-- Some obscure parser edge cases (e.g., certain hex escapes, base-notation in
-  arithmetic) may not parse.
-- Occurs check is not performed by default (standard Prolog behavior).
-- Very deep recursion can hit Python's stack limit.
+This interpreter intentionally focuses on ISO core features. Significant gaps
+you should be aware of:
+
+- File/stream I/O predicates (`see/1`, `read/1`, `open/3`, etc.) and character
+  I/O helpers are stubbed or missing.
+- Directive handling (`dynamic/1`, `multifile/1`, `op/3`, etc.) is not
+  implemented, so programs that rely on dynamic declarations or custom
+  operators are rejected.
+- ISO error term infrastructure (`error(ErrorType, Context)` along with
+  `instantiation_error`, `type_error`, etc.) still needs work; most built-ins
+  fail silently instead of raising structured errors.
+- A handful of parser edge cases remain unimplemented (block comments,
+  `0'\\xHH\\` hex escapes, and `16'mod'2` syntax).
+- No DCG, module system, CLP libraries, or tail-call optimization. Very deep
+  recursion can still overflow Python's stack in pathological cases.
 
 ## Test Coverage Snapshot
 
-ISO core suite currently reports ~91% (69/76) passing; remaining failures are
-parser edge cases. Core functionality (unification, type checks, arithmetic,
-lists, control flow, meta-predicates) passes.
+As of 2025-11-23 the pytest suite reports `878 passed, 4 skipped` (out of 882
+collected) via `uv run pytest`. The skips are parser stress cases that require
+future ISO syntax additions; everything else (unification, type checks,
+arithmetic, lists, control flow, meta-predicates) currently passes.
