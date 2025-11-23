@@ -30,6 +30,16 @@ uv run pytest tests/test_builtins.py
 uv run pytest tests/test_parser.py
 ```
 
+## Utility Modules
+
+Shared helper functions for working with the Prolog AST now live in `prolog/utils/`:
+
+- `term_utils.py` contains formatting, comparison, and sorting helpers for terms.
+- `list_utils.py` converts between Python and Prolog list forms and manipulates list shapes.
+- `variable_utils.py` provides variable collection, copying, and existential stripping helpers.
+
+These modules are imported by `prolog/engine.py` and can be tested independently via the new unit tests in `tests/utils/`.
+
 See [tests/README.md](tests/README.md) for detailed test documentation.
 
 ### Using as a Library

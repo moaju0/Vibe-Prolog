@@ -4,7 +4,21 @@ from typing import Callable, Iterator, TypeAlias
 from collections import OrderedDict
 from collections.abc import Iterator as IteratorABC
 from prolog.parser import Compound, Atom, Variable, Number, List, Clause, Cut
-from prolog.unification import Substitution, unify, deref, apply_substitution
+from prolog.unification import Substitution, apply_substitution, deref, unify
+from prolog.utils.list_utils import (
+    compute_list_length,
+    fresh_list_of_length,
+    list_to_python,
+    match_list_to_length,
+    python_to_list,
+)
+from prolog.utils.term_utils import term_sort_key, term_to_string, terms_equal
+from prolog.utils.variable_utils import (
+    collect_vars,
+    collect_vars_in_order,
+    copy_term_recursive,
+    strip_existentials,
+)
 
 
 BuiltinResult: TypeAlias = Iterator[Substitution] | Substitution | None
@@ -32,6 +46,13 @@ class PrologEngine:
         self.max_depth = 1000  # Prevent infinite recursion
         self._fresh_var_counter = 0
         self._builtin_registry = self._build_builtin_registry()
+
+    # Compatibility wrappers retained for tests and external callers.
+    def _list_to_python(self, prolog_list: List, subst: Substitution | None = None) -> list:
+        return list_to_python(prolog_list, subst)
+
+    def _python_to_list(self, py_list: list) -> List:
+        return python_to_list(py_list)
 
     def query(self, goals: list[Compound]) -> Iterator[Substitution]:
         """
@@ -314,16 +335,16 @@ class PrologEngine:
 
         if op == "==":
             # Term identity (structural equality)
-            if self._terms_equal(left_term, right_term):
+            if terms_equal(left_term, right_term):
                 return subst
         elif op == "\\==":
             # Term non-identity
-            if not self._terms_equal(left_term, right_term):
+            if not terms_equal(left_term, right_term):
                 return subst
         else:
             # Ordering comparisons: @<, @=<, @>, @>=
-            left_key = self._term_sort_key(left_term)
-            right_key = self._term_sort_key(right_term)
+            left_key = term_sort_key(left_term)
+            right_key = term_sort_key(right_term)
 
             if op == "@<" and left_key < right_key:
                 return subst
@@ -388,7 +409,7 @@ class PrologEngine:
             return None
 
         try:
-            format_args = self._list_to_python(args_term, subst)
+            format_args = list_to_python(args_term, subst)
         except TypeError:
             return None
 
@@ -487,8 +508,8 @@ class PrologEngine:
         if isinstance(list1, List) and not isinstance(list1, Variable) and isinstance(list2, List):
             try:
                 # Convert both lists to Python lists
-                py_list1 = self._list_to_python(list1, subst)
-                py_list2 = self._list_to_python(list2, subst)
+                py_list1 = list_to_python(list1, subst)
+                py_list2 = list_to_python(list2, subst)
             except TypeError:
                 # Not proper lists; fall back to relational definition.
                 pass
@@ -497,7 +518,7 @@ class PrologEngine:
                 concatenated = py_list1 + py_list2
 
                 # Convert back to Prolog list
-                result_list = self._python_to_list(concatenated)
+                result_list = python_to_list(concatenated)
 
                 # Unify with result
                 new_subst = unify(result, result_list, subst)
@@ -554,37 +575,6 @@ class PrologEngine:
             if subst1 is not None:
                 # Recursively solve append(T1, L2, T3)
                 yield from self._builtin_append(tail1_var, list2, tail3, subst1)
-
-    def _list_to_python(self, prolog_list: List, subst: Substitution | None = None) -> list:
-        """Convert a proper Prolog list to a Python list using the active substitution."""
-        subst = subst or Substitution()
-        result = []
-        current = deref(prolog_list, subst)
-
-        while isinstance(current, List):
-            result.extend(apply_substitution(elem, subst) for elem in current.elements)
-
-            if current.tail is None:
-                # Proper list terminated without an explicit tail.
-                return result
-
-            current = deref(current.tail, subst)
-
-        # Allow explicit [] as a terminator.
-        if isinstance(current, Atom) and current.name == "[]":
-            return result
-
-        # Otherwise, the list was not proper (improper tail or open variable).
-        raise TypeError(
-            "Cannot convert non-proper Prolog list with tail "
-            f"'{self._term_to_string(current)}' to a Python list."
-        )
-
-    def _python_to_list(self, py_list: list) -> List:
-        """Convert a Python list to a Prolog list."""
-        if not py_list:
-            return List(tuple(), None)
-        return List(tuple(py_list), None)
 
     def _builtin_clause(self, head: any, body: any, subst: Substitution) -> Iterator[Substitution]:
         """Built-in clause/2 predicate to retrieve clause bodies."""
@@ -645,7 +635,7 @@ class PrologEngine:
         term = deref(term, subst)
 
         # Convert term to string and print it
-        output = self._term_to_string(term)
+        output = term_to_string(term)
         print(output, end='')
 
         # write always succeeds
@@ -656,7 +646,7 @@ class PrologEngine:
         term = deref(term, subst)
 
         # Convert term to string and print it
-        output = self._term_to_string(term)
+        output = term_to_string(term)
         print(output)
 
         # writeln always succeeds
@@ -671,7 +661,7 @@ class PrologEngine:
             return
 
         try:
-            elements = self._list_to_python(lst, subst)
+            elements = list_to_python(lst, subst)
         except TypeError:
             return
 
@@ -693,29 +683,6 @@ class PrologEngine:
                 yield from apply_goal(index + 1, solution)
 
         yield from apply_goal(0, subst)
-
-    def _term_to_string(self, term: any) -> str:
-        """Convert a Prolog term to a string for printing."""
-        if isinstance(term, Atom):
-            return term.name
-        elif isinstance(term, Number):
-            return str(term.value)
-        elif isinstance(term, Variable):
-            return f"_{term.name}"
-        elif isinstance(term, List):
-            if not term.elements and term.tail is None:
-                return "[]"
-            elements_str = ", ".join(self._term_to_string(e) for e in term.elements)
-            if term.tail is not None and not (isinstance(term.tail, List) and not term.tail.elements):
-                return f"[{elements_str}|{self._term_to_string(term.tail)}]"
-            return f"[{elements_str}]"
-        elif isinstance(term, Compound):
-            if not term.args:
-                return term.functor
-            args_str = ", ".join(self._term_to_string(arg) for arg in term.args)
-            return f"{term.functor}({args_str})"
-        else:
-            return str(term)
 
     def _builtin_disjunction(self, left: any, right: any, subst: Substitution) -> Iterator[Substitution]:
         """Built-in ;/2 predicate for disjunction (or)."""
@@ -969,34 +936,10 @@ class PrologEngine:
 
         # Create a copy with fresh variables
         var_map = {}  # Map from original variables to fresh variables
-        copied_term = self._copy_term_recursive(source, var_map)
+        copied_term = copy_term_recursive(source, var_map, self._fresh_variable)
 
         # Unify the copied term with the copy argument
         return unify(copy, copied_term, subst)
-
-    def _copy_term_recursive(self, term: any, var_map: dict) -> any:
-        """Recursively copy a term, creating fresh variables and maintaining consistency."""
-        if isinstance(term, Variable):
-            # If we've seen this variable before, use the same fresh variable
-            if term in var_map:
-                return var_map[term]
-            else:
-                # Create a fresh variable
-                fresh_var = self._fresh_variable(f"Copy{term.name}_")
-                var_map[term] = fresh_var
-                return fresh_var
-        elif isinstance(term, Compound):
-            # Copy compound term recursively
-            new_args = tuple(self._copy_term_recursive(arg, var_map) for arg in term.args)
-            return Compound(term.functor, new_args)
-        elif isinstance(term, List):
-            # Copy list recursively
-            new_elements = tuple(self._copy_term_recursive(elem, var_map) for elem in term.elements)
-            new_tail = self._copy_term_recursive(term.tail, var_map) if term.tail is not None else None
-            return List(new_elements, new_tail)
-        else:
-            # Atoms, numbers, etc. - return as is
-            return term
 
     def _builtin_findall(self, template: any, goal: any, result: any, subst: Substitution) -> Substitution | None:
         """Built-in findall/3 predicate - Collect all solutions."""
@@ -1066,7 +1009,7 @@ class PrologEngine:
         """Remove duplicates while preserving order, then sort if comparable."""
         unique_solutions = list(OrderedDict.fromkeys(solutions))
         try:
-            return sorted(unique_solutions, key=lambda x: self._term_sort_key(x))
+            return sorted(unique_solutions, key=lambda x: term_sort_key(x))
         except TypeError:
             return unique_solutions
 
@@ -1183,11 +1126,11 @@ class PrologEngine:
                 return
 
             if isinstance(lst, List):
-                new_subst = self._match_list_to_length(lst, n, subst)
+                new_subst = match_list_to_length(lst, n, subst, fresh_variable=self._fresh_variable)
                 if new_subst is not None:
                     yield new_subst
             else:
-                result_list = self._fresh_list_of_length(n)
+                result_list = fresh_list_of_length(n, self._fresh_variable)
                 new_subst = unify(lst, result_list, subst)
                 if new_subst is not None:
                     yield new_subst
@@ -1196,7 +1139,7 @@ class PrologEngine:
         # Mode 2: list is bound, compute length
         if isinstance(lst, List):
             # Recursively compute length, checking for proper list
-            count = self._compute_list_length(lst, subst)
+            count = compute_list_length(lst, subst)
             if count is None:
                 # Not a proper list (has uninstantiated tail or improper tail)
                 return
@@ -1204,81 +1147,6 @@ class PrologEngine:
             new_subst = unify(length, Number(count), subst)
             if new_subst is not None:
                 yield new_subst
-
-    def _compute_list_length(self, lst: List, subst: Substitution) -> int | None:
-        """
-        Recursively compute the length of a proper list.
-
-        Returns None if:
-        - The tail is an uninstantiated variable
-        - The tail is not a proper list (not [] or another List)
-
-        Returns the count if it's a proper list.
-        """
-        count = len(lst.elements)
-
-        if lst.tail is None:
-            # Proper list ending with implicit []
-            return count
-
-        tail = deref(lst.tail, subst)
-
-        if isinstance(tail, List):
-            if len(tail.elements) == 0 and tail.tail is None:
-                # Explicit empty list []
-                return count
-            # Recursively compute tail length
-            tail_length = self._compute_list_length(tail, subst)
-            if tail_length is None:
-                return None
-            return count + tail_length
-        elif isinstance(tail, Variable):
-            # Uninstantiated variable tail - not a proper list
-            return None
-        else:
-            # Improper list (tail is atom, number, or compound term)
-            return None
-
-    def _fresh_list_of_length(self, length: int) -> List:
-        """Create a list of the requested length populated with fresh variables."""
-        if length <= 0:
-            return List((), None)
-
-        elements = tuple(self._fresh_variable(f"E{i}_") for i in range(length))
-        return List(elements, None)
-
-    def _match_list_to_length(self, lst: List, target_length: int, subst: Substitution) -> Substitution | None:
-        """
-        Ensure the given (possibly open) list can have the requested length.
-
-        When open tails are encountered, they are instantiated with fresh variables
-        (or []) so the entire structure has exactly target_length elements.
-        """
-        remaining = target_length
-        current = lst
-
-        while True:
-            element_count = len(current.elements)
-            if element_count > remaining:
-                return None
-
-            remaining -= element_count
-
-            if current.tail is None:
-                return subst if remaining == 0 else None
-
-            tail = deref(current.tail, subst)
-
-            if isinstance(tail, List):
-                current = tail
-                continue
-
-            if isinstance(tail, Variable):
-                tail_list = self._fresh_list_of_length(remaining)
-                return unify(tail, tail_list, subst)
-
-            # Tail is neither a list nor a variable – improper structure
-            return None
 
     def _builtin_reverse(self, lst: any, reversed_lst: any, subst: Substitution) -> Iterator[Substitution]:
         """Built-in reverse/2 predicate - Reverse a list (bidirectional)."""
@@ -1289,12 +1157,12 @@ class PrologEngine:
         if isinstance(lst, List):
             # Convert to Python list, reverse, and convert back
             try:
-                py_list = self._list_to_python(lst, subst)
+                py_list = list_to_python(lst, subst)
             except TypeError:
                 pass
             else:
                 reversed_py = list(reversed(py_list))
-                result = self._python_to_list(reversed_py)
+                result = python_to_list(reversed_py)
 
                 new_subst = unify(reversed_lst, result, subst)
                 if new_subst is not None:
@@ -1303,12 +1171,12 @@ class PrologEngine:
         elif isinstance(reversed_lst, List):
             # Convert to Python list, reverse, and convert back
             try:
-                py_list = self._list_to_python(reversed_lst, subst)
+                py_list = list_to_python(reversed_lst, subst)
             except TypeError:
                 pass
             else:
                 reversed_py = list(reversed(py_list))
-                result = self._python_to_list(reversed_py)
+                result = python_to_list(reversed_py)
 
                 new_subst = unify(lst, result, subst)
                 if new_subst is not None:
@@ -1323,7 +1191,7 @@ class PrologEngine:
 
         # Convert to Python list
         try:
-            py_list = self._list_to_python(lst, subst)
+                py_list = list_to_python(lst, subst)
         except TypeError:
             return None
 
@@ -1333,7 +1201,7 @@ class PrologEngine:
         for item in py_list:
             is_duplicate = False
             for seen_item in seen:
-                if self._terms_equal(item, seen_item):
+                if terms_equal(item, seen_item):
                     is_duplicate = True
                     break
             if not is_duplicate:
@@ -1342,12 +1210,12 @@ class PrologEngine:
 
         # Sort
         try:
-            sorted_py = sorted(unique, key=lambda x: self._term_sort_key(x))
+            sorted_py = sorted(unique, key=lambda x: term_sort_key(x))
         except:
             # If sorting fails, just return unique
             sorted_py = unique
 
-        result = self._python_to_list(sorted_py)
+        result = python_to_list(sorted_py)
         return unify(sorted_lst, result, subst)
 
     def _collect_bagof_groups(self, template: any, goal: any, subst: Substitution) -> tuple[list[str], OrderedDict]:
@@ -1355,10 +1223,10 @@ class PrologEngine:
         template = deref(template, subst)
         goal = deref(goal, subst)
 
-        goal, existential_vars = self._strip_existentials(goal, subst)
+        goal, existential_vars = strip_existentials(goal, subst)
 
-        template_vars = self._collect_vars(template, subst)
-        goal_vars_in_order = self._collect_vars_in_order(goal, subst)
+        template_vars = collect_vars(template, subst)
+        goal_vars_in_order = collect_vars_in_order(goal, subst)
 
         seen: set[str] = set()
         free_vars: list[str] = []
@@ -1375,139 +1243,6 @@ class PrologEngine:
             groups.setdefault(key, []).append(instantiated)
 
         return free_vars, groups
-
-    def _strip_existentials(self, goal: any, subst: Substitution) -> tuple[any, set[str]]:
-        """Peel off existential quantifiers (Var^Goal) and collect bound variables."""
-        existential_vars: set[str] = set()
-        while isinstance(goal, Compound) and goal.functor == "^" and len(goal.args) == 2:
-            var_part = goal.args[0]
-            existential_vars |= self._collect_vars(var_part, subst)
-            goal = goal.args[1]
-        return goal, existential_vars
-
-    def _collect_vars(self, term: any, subst: Substitution) -> set[str]:
-        """Collect variable names from a term, following dereferences."""
-        term = deref(term, subst)
-        vars_found: set[str] = set()
-
-        if isinstance(term, Variable):
-            vars_found.add(term.name)
-        elif isinstance(term, Compound):
-            for arg in term.args:
-                vars_found |= self._collect_vars(arg, subst)
-        elif isinstance(term, List):
-            for elem in term.elements:
-                vars_found |= self._collect_vars(elem, subst)
-            if term.tail is not None:
-                vars_found |= self._collect_vars(term.tail, subst)
-        elif isinstance(term, list):
-            # Clause bodies and goal lists are represented as Python lists internally.
-            for item in term:
-                vars_found |= self._collect_vars(item, subst)
-
-        return vars_found
-
-    def _collect_vars_in_order(self, term: any, subst: Substitution, seen: set[str] | None = None) -> list[str]:
-        """Collect variable names in first-seen order from a term."""
-        if seen is None:
-            seen = set()
-
-        term = deref(term, subst)
-
-        if isinstance(term, Variable):
-            if term.name not in seen:
-                seen.add(term.name)
-                return [term.name]
-            return []
-
-        vars_found: list[str] = []
-        if isinstance(term, Compound):
-            for arg in term.args:
-                vars_found.extend(self._collect_vars_in_order(arg, subst, seen))
-        elif isinstance(term, List):
-            for elem in term.elements:
-                vars_found.extend(self._collect_vars_in_order(elem, subst, seen))
-            if term.tail is not None:
-                vars_found.extend(self._collect_vars_in_order(term.tail, subst, seen))
-        elif isinstance(term, list):
-            for item in term:
-                vars_found.extend(self._collect_vars_in_order(item, subst, seen))
-
-        return vars_found
-
-    def _terms_equal(self, term1: any, term2: any) -> bool:
-        """Check if two terms are structurally equal."""
-        if type(term1) != type(term2):
-            return False
-
-        if isinstance(term1, Atom):
-            return term1.name == term2.name
-        elif isinstance(term1, Number):
-            return term1.value == term2.value
-        elif isinstance(term1, Variable):
-            return term1.name == term2.name
-        elif isinstance(term1, List):
-            if len(term1.elements) != len(term2.elements):
-                return False
-            for e1, e2 in zip(term1.elements, term2.elements):
-                if not self._terms_equal(e1, e2):
-                    return False
-            # Check tails
-            if term1.tail is None and term2.tail is None:
-                return True
-            if term1.tail is None or term2.tail is None:
-                return False
-            return self._terms_equal(term1.tail, term2.tail)
-        elif isinstance(term1, Compound):
-            if term1.functor != term2.functor:
-                return False
-            if len(term1.args) != len(term2.args):
-                return False
-            for a1, a2 in zip(term1.args, term2.args):
-                if not self._terms_equal(a1, a2):
-                    return False
-            return True
-
-        return False
-
-    def _list_to_compound(self, lst: List, subst: Substitution) -> any:
-        """Convert a List structure into nested '.' compounds for ordering."""
-        tail_term = deref(lst.tail, subst) if lst.tail is not None else Atom("[]")
-
-        for elem in reversed(lst.elements):
-            tail_term = Compound(".", (elem, tail_term))
-
-        return tail_term
-
-    def _term_sort_key(self, term: any, subst: Substitution | None = None) -> tuple:
-        """Generate a sort key for a term."""
-        subst = subst or Substitution()
-        term = deref(term, subst)
-
-        # Order: Variable < Number < Atom < Compound < List
-        if isinstance(term, Variable):
-            return (0, term.name)
-        if isinstance(term, Number):
-            return (1, term.value)
-        if isinstance(term, Atom):
-            return (2, term.name)
-        if isinstance(term, Compound):
-            return (3, len(term.args), term.functor, tuple(self._term_sort_key(arg, subst) for arg in term.args))
-        if isinstance(term, List):
-            if not term.elements and term.tail is None:
-                # Base case for empty list, used as a sentinel for proper list termination.
-                return (4, 0)
-
-            tail = term.tail
-            # Treat explicit empty list tail `...|[]` the same as an implicit proper list end.
-            if isinstance(tail, List) and not tail.elements and tail.tail is None:
-                tail = None
-
-            tail_key = self._term_sort_key(tail, subst) if tail is not None else (4, 0)
-            element_keys = tuple(self._term_sort_key(elem, subst) for elem in term.elements)
-            return (4, len(term.elements), element_keys, tail_key)
-
-        return (5, str(term))
 
     def _flatten_body(self, body: list) -> list:
         """Flatten conjunction in clause body into a list of goals."""
