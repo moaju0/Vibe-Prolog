@@ -1211,7 +1211,7 @@ class PrologEngine:
         # Sort
         try:
             sorted_py = sorted(unique, key=lambda x: term_sort_key(x))
-        except:
+        except TypeError:
             # If sorting fails, just return unique
             sorted_py = unique
 
