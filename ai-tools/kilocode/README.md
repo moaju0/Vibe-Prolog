@@ -1,7 +1,8 @@
-# Kilocode automations
+# AI Tool Automations
 
-This directory contains small tools that automate GitHub workflows using the
-`kilocode` CLI and the `llm` CLI.
+This directory contains small tools that automate GitHub workflows using AI coding assistants and the `llm` CLI.
+
+## Kilocode Tools
 
 - `fix-issue-with-kilocode`: start from a GitHub issue, create a branch, run
   `kilocode`, commit, push, and open a PR.
@@ -9,18 +10,28 @@ This directory contains small tools that automate GitHub workflows using the
   switch to the PR branch, run `kilocode` against the review comments, commit,
   and push.
 
-Both tools share common helpers in the `kilocode_autocoder_utils` package and
+## Claude Tools
+
+- `fix-issue-with-claude`: start from a GitHub issue, create a branch, run
+  `claude`, commit, push, and open a PR.
+
+All tools share common helpers in the `autocoder_utils` package (located in `../autocoder_utils`) and
 can be installed as a `uv` tool or run directly from this directory.
 
-## Requirements (both tools)
+## Requirements
 
 You need the following tools installed and available on your `PATH`:
 
 - `uv` (for installing and running this tool)
 - `git`
 - `gh` (GitHub CLI, authenticated against the repo you are working in)
-- `kilocode`
 - `llm`
+
+For Kilocode tools:
+- `kilocode`
+
+For Claude tools:
+- `claude`
 
 Environment:
 
@@ -81,7 +92,7 @@ This tool helps you address review comments on an existing pull request using
 
 Given a GitHub pull request number, the tool:
 
-1. Detects the current repository’s GitHub `owner` and `repo` from
+1. Detects the current repository's GitHub `owner` and `repo` from
    `remote.origin.url`.
 2. Verifies that the PR exists via `gh pr view --json` and reads the
    `headRefName` (the PR branch).
@@ -105,3 +116,27 @@ Usage from the repository root:
 ```
 
 Where `456` is the pull request number in the current repository.
+
+## `fix-issue-with-claude`
+
+This tool automates fixing a GitHub issue using the `claude` CLI, similar to
+`fix-issue-with-kilocode` but using Claude instead of Kilocode.
+
+Given a GitHub issue number, the tool:
+
+1. Fetches the issue content (title, description, comments) using `gh issue view`.
+2. Uses `llm` to generate a suitable branch name starting with `fix-claude/<issue-number>-`.
+3. Creates and checks out the new branch.
+4. Runs `claude` with the issue content piped to stdin.
+5. Stages all changes (`git add -A`).
+6. If there are staged changes, uses `llm` to generate a commit message from the diff.
+7. Pushes the branch to `origin` with upstream tracking.
+8. Uses `llm` to generate a PR title and body from the git log, then creates the PR with `gh pr create`.
+
+Usage:
+
+```bash
+./ai-tools/kilocode/fix-issue-with-claude 123
+```
+
+This will create a branch like `fix-claude/123-some-description`, apply Claude's changes, commit, push, and open a PR.

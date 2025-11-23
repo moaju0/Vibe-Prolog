@@ -1,13 +1,10 @@
 [project]
-name = "kilocode-autocoder-utils"
+name = "ai-tools-automation"
 version = "0.1.0"
-description = "Automate fixing a GitHub issue with kilocode and opening a PR."
+description = "AI-powered GitHub workflow automation tools."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = []
-
-[project.scripts]
-fix-issue-with-kilocode = "kilocode_autocoder_utils:main"
 
 [build-system]
 requires = ["hatchling"]
