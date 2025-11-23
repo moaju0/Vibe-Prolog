@@ -72,7 +72,7 @@ def adapt_old_handler(old_handler: Callable[[tuple, Substitution], object]) -> C
         argument so it can be used in the new dispatch path.
     """
 
-    def wrapper(args, subst, engine):  # pragma: no cover - trivial passthrough
+    def wrapper(args, subst, _engine):  # pragma: no cover - trivial passthrough
         return old_handler(args, subst)
 
     return wrapper
