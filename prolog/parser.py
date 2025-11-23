@@ -1,8 +1,11 @@
 """Prolog parser using Lark."""
 
 from lark import Lark, Transformer
+from lark.exceptions import LarkError
 from dataclasses import dataclass
 from typing import Any
+
+from prolog.exceptions import PrologError, PrologThrow
 
 
 # Prolog AST nodes
@@ -451,14 +454,24 @@ class PrologParser:
 
     def parse(self, text: str) -> list[Clause]:
         """Parse Prolog source code and return list of clauses."""
-        return self.parser.parse(text)
+        try:
+            return self.parser.parse(text)
+        except LarkError as e:
+            # Convert Lark parse error to Prolog syntax_error
+            error_term = PrologError.syntax_error(str(e))
+            raise PrologThrow(error_term)
 
     def parse_term(self, text: str) -> Any:
         """Parse a single Prolog term."""
-        # Add a period to make it a valid clause
-        result = self.parser.parse(f"dummy({text}).")
-        if result and isinstance(result[0], Clause):
-            compound = result[0].head
-            if isinstance(compound, Compound) and compound.args:
-                return compound.args[0]
-        raise ValueError(f"Failed to parse term: {text}")
+        try:
+            # Add a period to make it a valid clause
+            result = self.parser.parse(f"dummy({text}).")
+            if result and isinstance(result[0], Clause):
+                compound = result[0].head
+                if isinstance(compound, Compound) and compound.args:
+                    return compound.args[0]
+            raise ValueError(f"Failed to parse term: {text}")
+        except LarkError as e:
+            # Convert Lark parse error to Prolog syntax_error
+            error_term = PrologError.syntax_error(str(e))
+            raise PrologThrow(error_term)

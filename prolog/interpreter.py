@@ -4,10 +4,8 @@ import io
 import sys
 from pathlib import Path
 
-from lark.exceptions import LarkError
-
+from prolog.exceptions import PrologThrow
 from prolog.engine import CutException, PrologEngine
-from prolog.errors import raise_syntax_error
 from prolog.parser import Compound, PrologParser, Variable
 from prolog.unification import apply_substitution
 
@@ -28,8 +26,9 @@ class PrologInterpreter:
 
         try:
             clauses = self.parser.parse(content)
-        except (ValueError, LarkError) as exc:
-            raise_syntax_error("consult/1", exc)
+        except PrologThrow as e:
+            # Re-raise as Python exception with readable message
+            raise ValueError(f"Syntax error: {e.term}")
         self.clauses.extend(clauses)
         self.engine = PrologEngine(self.clauses)
 
@@ -37,8 +36,9 @@ class PrologInterpreter:
         """Load Prolog clauses from a string."""
         try:
             clauses = self.parser.parse(prolog_code)
-        except (ValueError, LarkError) as exc:
-            raise_syntax_error("consult/1", exc)
+        except PrologThrow as e:
+            # Re-raise as Python exception with readable message
+            raise ValueError(f"Syntax error: {e.term}")
         self.clauses.extend(clauses)
         self.engine = PrologEngine(self.clauses)
 
@@ -141,8 +141,9 @@ class PrologInterpreter:
         prolog_code = f"dummy :- {query_str}"
         try:
             clauses = self.parser.parse(prolog_code)
-        except (ValueError, LarkError) as exc:
-            raise_syntax_error("query/1", exc)
+        except PrologThrow as e:
+            # Re-raise as Python exception with readable message
+            raise ValueError(f"Syntax error: {e.term}")
 
         if clauses and clauses[0].body:
             # Flatten conjunction into list of goals
@@ -152,8 +153,9 @@ class PrologInterpreter:
         prolog_code = query_str
         try:
             clauses = self.parser.parse(prolog_code)
-        except (ValueError, LarkError) as exc:
-            raise_syntax_error("query/1", exc)
+        except PrologThrow as e:
+            # Re-raise as Python exception with readable message
+            raise ValueError(f"Syntax error: {e.term}")
         if clauses:
             return [clauses[0].head]
 

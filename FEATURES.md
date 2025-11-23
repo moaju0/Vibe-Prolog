@@ -74,13 +74,13 @@
 - ✅ `call_cleanup/2` – Execute goal with cleanup
 
 ### Exception Handling (ISO 7.12)
-- ⚠️ `catch/3` – Exception handling (basic mechanism works, but built-ins don't throw ISO-structured errors)
+- ✅ `catch/3` – Exception handling with ISO error terms
 - ✅ `throw/1` – Throw exception term
-- ❌ ISO error term structure (`error(ErrorType, Context)`)
-- ❌ `instantiation_error` – Not raised by built-ins when required arguments are unbound
-- ❌ `type_error(Type, Culprit)` – Not raised by built-ins when arguments have wrong types
-- ❌ `domain_error(Domain, Culprit)` – Not raised by built-ins when values are outside valid domains
-- ⚠️ `syntax_error(Description)` – `read_from_chars/2`, the interpreter's query interface, and `consult/1` now throw ISO `error(syntax_error(_), _)` terms; other parser entry points (e.g., future `read/1`) still raise Python exceptions
+- ✅ ISO error term structure: `error(ErrorType, context(Predicate))`
+- ✅ `instantiation_error` – Raised by built-ins when required arguments are unbound
+- ✅ `type_error(Type, Culprit)` – Raised by built-ins when arguments have wrong types
+- ✅ `domain_error(Domain, Culprit)` – Raised by built-ins when values are outside valid domains
+- ✅ `syntax_error(Description)` – Parser throws ISO `error(syntax_error(_), _)` terms
 - ❌ `existence_error(ObjectType, Culprit)` – Not implemented
 
 ### Input/Output (ISO 8.11-8.12)
@@ -176,6 +176,14 @@
 - ✅ List conversions honor active substitutions when traversing open list tails (e.g., append/sort/reverse)
 - ✅ Python conversions reject improper or partially instantiated lists instead of silently truncating
 
+## Error Handling
+- ✅ ISO-style structured error terms (error(ErrorType, Context))
+- ✅ Instantiation errors for unbound required arguments
+- ✅ Type errors for incorrect argument types
+- ✅ Domain errors for values outside valid domains
+- ✅ Syntax errors for parse failures
+- ✅ Error context with predicate information
+
 ## Data Types
 - ✅ Atoms
 - ✅ Integers (arbitrary precision via Python)
@@ -189,13 +197,13 @@
 ## High-Priority Gaps and Deviations
 
 ### Critical Missing Features
-1. **ISO Error Term System**: Structured error terms (`error(ErrorType, Context)`) and systematic error reporting in built-ins (instantiation_error, type_error, domain_error, syntax_error, existence_error)
-2. **File I/O**: Essential for practical Prolog programs
-3. **Dynamic Declarations**: `dynamic/1`, `multifile/1` for module system
-4. **Operator Definition**: `op/3` for custom operators
+1. **File I/O**: Essential for practical Prolog programs
+2. **Dynamic Declarations**: `dynamic/1`, `multifile/1` for module system
+3. **Operator Definition**: `op/3` for custom operators
+4. **Existence Errors**: `existence_error(ObjectType, Culprit)` not implemented
 
 ### Significant Deviations
-1. **Error Reporting**: Built-in predicates fail silently (return `None`) instead of throwing ISO-structured errors when given invalid arguments; parser raises Python exceptions instead of Prolog `syntax_error` terms; no error context (predicate name/arity) in error messages
+1. **Error Reporting**: Now fully ISO-compliant with structured error terms and systematic error reporting in built-ins
 2. **Character Code Syntax**: Some advanced character code forms not supported
 
 ### Parser Limitations

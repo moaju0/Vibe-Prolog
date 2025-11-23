@@ -9,6 +9,7 @@ from typing import Iterator
 
 from prolog.builtins import BuiltinRegistry, register_builtin
 from prolog.builtins.common import BuiltinArgs, EngineContext
+from prolog.exceptions import PrologError, PrologThrow
 from prolog.parser import Atom, Compound, List, Number, Variable
 from prolog.unification import Substitution, deref, unify
 from prolog.utils.term_utils import term_sort_key, terms_equal
@@ -118,23 +119,39 @@ class TermManipulationBuiltins:
 
     @staticmethod
     def _builtin_arg(
-        args: BuiltinArgs, subst: Substitution, _engine: EngineContext | None
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext
     ) -> Substitution | None:
         n, term, arg = args
-        n = deref(n, subst)
-        term = deref(term, subst)
 
-        if not isinstance(n, Number):
-            return None
+        # Check N is instantiated
+        engine._check_instantiated(n, subst, 'arg/3')
 
-        if not isinstance(term, Compound):
-            return None
+        # Check Term is instantiated
+        engine._check_instantiated(term, subst, 'arg/3')
 
-        n_val = int(n.value)
-        if n_val < 1 or n_val > len(term.args):
-            return None
+        n_deref = deref(n, subst)
+        term_deref = deref(term, subst)
 
-        selected_arg = term.args[n_val - 1]
+        # Check N is an integer
+        engine._check_type(n_deref, Number, 'integer', subst, 'arg/3')
+        if not isinstance(n_deref.value, int):
+            error_term = PrologError.type_error('integer', n_deref, 'arg/3')
+            raise PrologThrow(error_term)
+
+        # Check Term is a compound
+        engine._check_type(term_deref, Compound, 'compound', subst, 'arg/3')
+
+        n_val = int(n_deref.value)
+
+        # Check N is in valid range (domain error)
+        engine._check_domain(n_val, lambda x: x >= 1, 'not_less_than_one', 'arg/3')
+        engine._check_domain(n_val, lambda x: x <= len(term_deref.args),
+                          'arg_index_in_range', 'arg/3')
+
+        # Get the argument (convert to 0-based index)
+        selected_arg = term_deref.args[n_val - 1]
+
+        # Unify with the third argument
         return unify(arg, selected_arg, subst)
 
     @staticmethod

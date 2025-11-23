@@ -9,12 +9,11 @@ from lark.exceptions import (
     UnexpectedToken,
 )
 
-from prolog.builtins.exceptions import PrologThrow
-from prolog.parser import Atom, Compound
-
 
 def raise_syntax_error(context: str, exc: Exception | None = None) -> None:
     """Raise a PrologThrow carrying error(syntax_error(_), Context)."""
+    from prolog.engine import PrologThrow
+    from prolog.parser import Atom, Compound
 
     reason_atom = _syntax_error_reason(exc)
     syntax_error_term = Compound("syntax_error", (reason_atom,))
@@ -22,8 +21,9 @@ def raise_syntax_error(context: str, exc: Exception | None = None) -> None:
     raise PrologThrow(Compound("error", (syntax_error_term, context_atom)))
 
 
-def _syntax_error_reason(exc: Exception | None) -> Atom:
+def _syntax_error_reason(exc: Exception | None) -> "Atom":
     """Map parser exceptions to ISO syntax_error/1 reasons."""
+    from prolog.parser import Atom
 
     if exc is None:
         return Atom("syntax_error")

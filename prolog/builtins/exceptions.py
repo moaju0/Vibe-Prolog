@@ -9,15 +9,9 @@ from typing import Any, Iterator
 
 from prolog.builtins import BuiltinRegistry, register_builtin
 from prolog.builtins.common import BuiltinArgs, EngineContext
+from prolog.engine import PrologThrow
 from prolog.parser import Atom, Compound, Cut
 from prolog.unification import Substitution, deref, unify
-
-
-class PrologThrow(Exception):
-    """Exception raised when throw/1 is executed to unwind the call stack."""
-
-    def __init__(self, term: Any):
-        self.term = term
 
 
 class ExceptionBuiltins:
