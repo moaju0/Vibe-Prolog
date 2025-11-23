@@ -4,7 +4,7 @@ import pytest
 
 from prolog import PrologInterpreter
 from prolog.builtins.exceptions import PrologThrow
-from prolog.parser import Atom, Compound
+from prolog.terms import Atom, Compound
 
 
 class TestParserErrorHandling:

@@ -9,7 +9,7 @@ from typing import Iterator
 
 from prolog.builtins import BuiltinRegistry, register_builtin
 from prolog.builtins.common import BuiltinArgs, EngineContext
-from prolog.parser import Atom, Compound, Number
+from prolog.terms import Atom, Compound, Number
 from prolog.unification import Substitution, deref, unify
 
 

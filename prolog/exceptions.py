@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from prolog.terms import Atom, Compound
+
 
 class PrologThrow(Exception):
     """Exception raised when throw/1 is executed to unwind the call stack."""
@@ -25,7 +27,6 @@ class PrologError:
         Returns:
             error(instantiation_error, context(Predicate))
         """
-        from prolog.parser import Atom, Compound
         error_term = Atom('instantiation_error')
         if context:
             context_term = Compound('context', (Atom(context),))
@@ -44,7 +45,6 @@ class PrologError:
         Returns:
             error(type_error(ExpectedType, Culprit), context(Predicate))
         """
-        from prolog.parser import Atom, Compound
         error_term = Compound('type_error', (Atom(expected_type), culprit))
         if context:
             context_term = Compound('context', (Atom(context),))
@@ -63,7 +63,6 @@ class PrologError:
         Returns:
             error(domain_error(ValidDomain, Culprit), context(Predicate))
         """
-        from prolog.parser import Atom, Compound
         error_term = Compound('domain_error', (Atom(valid_domain), culprit))
         if context:
             context_term = Compound('context', (Atom(context),))
@@ -80,7 +79,6 @@ class PrologError:
         Returns:
             error(syntax_error(Description))
         """
-        from prolog.parser import Atom, Compound
         error_term = Compound('syntax_error', (Atom(description),))
         return Compound('error', (error_term,))
 
@@ -96,7 +94,6 @@ class PrologError:
         Returns:
             error(existence_error(ObjectType, Culprit), context(Predicate))
         """
-        from prolog.parser import Atom, Compound
         error_term = Compound('existence_error', (Atom(object_type), culprit))
         if context:
             context_term = Compound('context', (Atom(context),))

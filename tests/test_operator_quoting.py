@@ -1,7 +1,7 @@
 """Tests for operator quoting in write_term_to_chars."""
 
 from prolog import PrologInterpreter
-from prolog.parser import Compound, Atom, Variable, Number
+from prolog.terms import Compound, Atom, Variable, Number
 from prolog.utils.list_utils import python_to_list
 
 

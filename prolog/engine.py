@@ -7,7 +7,8 @@ from collections.abc import Iterator as IteratorABC
 from typing import Any, Callable, Iterator, TypeAlias
 
 from prolog.exceptions import PrologError, PrologThrow
-from prolog.parser import Atom, Clause, Compound, Cut, List, Number, Variable
+from prolog.parser import Clause, Cut, List
+from prolog.terms import Atom, Compound, Number, Variable
 from prolog.unification import Substitution, apply_substitution, deref, unify
 from prolog.utils.list_utils import list_to_python, python_to_list
 

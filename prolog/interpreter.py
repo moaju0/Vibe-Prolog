@@ -6,7 +6,8 @@ from pathlib import Path
 
 from prolog.exceptions import PrologThrow
 from prolog.engine import CutException, PrologEngine
-from prolog.parser import Compound, PrologParser, Variable
+from prolog.parser import PrologParser
+from prolog.terms import Compound, Variable
 from prolog.unification import apply_substitution
 
 
@@ -27,8 +28,7 @@ class PrologInterpreter:
         try:
             clauses = self.parser.parse(content)
         except PrologThrow as e:
-            # Re-raise as Python exception with readable message
-            raise ValueError(f"Syntax error: {e.term}")
+            raise e
         self.clauses.extend(clauses)
         self.engine = PrologEngine(self.clauses)
 
@@ -37,8 +37,7 @@ class PrologInterpreter:
         try:
             clauses = self.parser.parse(prolog_code)
         except PrologThrow as e:
-            # Re-raise as Python exception with readable message
-            raise ValueError(f"Syntax error: {e.term}")
+            raise e
         self.clauses.extend(clauses)
         self.engine = PrologEngine(self.clauses)
 
@@ -142,8 +141,7 @@ class PrologInterpreter:
         try:
             clauses = self.parser.parse(prolog_code)
         except PrologThrow as e:
-            # Re-raise as Python exception with readable message
-            raise ValueError(f"Syntax error: {e.term}")
+            raise e
 
         if clauses and clauses[0].body:
             # Flatten conjunction into list of goals
@@ -154,8 +152,7 @@ class PrologInterpreter:
         try:
             clauses = self.parser.parse(prolog_code)
         except PrologThrow as e:
-            # Re-raise as Python exception with readable message
-            raise ValueError(f"Syntax error: {e.term}")
+            raise e
         if clauses:
             return [clauses[0].head]
 
@@ -200,7 +197,8 @@ class PrologInterpreter:
 
     def _term_to_python(self, term) -> any:
         """Convert a Prolog term to a Python value."""
-        from prolog.parser import Atom, Number, List, Compound, Variable
+        from prolog.parser import List
+        from prolog.terms import Atom, Number, Compound, Variable
 
         if isinstance(term, Atom):
             return term.name

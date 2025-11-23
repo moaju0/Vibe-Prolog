@@ -6,51 +6,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from prolog.exceptions import PrologError, PrologThrow
-
-
-# Prolog AST nodes
-@dataclass(frozen=True)
-class Atom:
-    """An atom (constant)."""
-
-    name: str
-
-    def __repr__(self):
-        return self.name
-
-
-@dataclass(frozen=True)
-class Variable:
-    """A variable."""
-
-    name: str
-
-    def __repr__(self):
-        return self.name
-
-
-@dataclass(frozen=True)
-class Number:
-    """A number."""
-
-    value: int | float
-
-    def __repr__(self):
-        return str(self.value)
-
-
-@dataclass(frozen=True)
-class Compound:
-    """A compound term (functor with arguments)."""
-
-    functor: str
-    args: tuple[Any, ...]
-
-    def __repr__(self):
-        if not self.args:
-            return self.functor
-        args_str = ", ".join(str(arg) for arg in self.args)
-        return f"{self.functor}({args_str})"
+from prolog.terms import Atom, Variable, Number, Compound
 
 
 @dataclass(frozen=True)

@@ -13,7 +13,8 @@ from lark.exceptions import LarkError
 from prolog.builtins import BuiltinRegistry, register_builtin
 from prolog.builtins.common import BuiltinArgs, EngineContext
 from prolog.errors import raise_syntax_error
-from prolog.parser import Atom, Compound, List, Number, Variable, PrologParser
+from prolog.parser import List, PrologParser
+from prolog.terms import Atom, Compound, Number, Variable
 from prolog.unification import Substitution, deref, unify
 from prolog.utils.list_utils import list_to_python, python_to_list
 from prolog.utils.term_utils import term_to_string
@@ -289,8 +290,11 @@ class IOBuiltins:
 
             parsed_term = parser.parse_term(input_str)
             return unify(term_var, parsed_term, subst)
-        except (ValueError, LarkError) as exc:
-            raise_syntax_error("read_from_chars/2", exc)
+        except (ValueError, LarkError, PrologThrow) as exc:
+            if isinstance(exc, PrologThrow):
+                raise exc
+            else:
+                raise_syntax_error("read_from_chars/2", exc)
 
     @staticmethod
     def _builtin_write_term_to_chars(
