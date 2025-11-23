@@ -68,7 +68,7 @@ def test_term_sort_key_handles_nested_lists():
     list1 = List((Number(1), Number(2)), None)
     list2 = List((Number(1),), List((Number(2),), None))
 
-    assert term_sort_key(list1, subst)[1:] == term_sort_key(list2, subst)[1:]
+    assert term_sort_key(list1, subst) == term_sort_key(list2, subst)
 
 
 @pytest.mark.parametrize(
