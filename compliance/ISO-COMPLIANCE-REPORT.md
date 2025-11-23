@@ -54,9 +54,9 @@ The following predicates were implemented to support ISO conformity testing:
 
 The following syntax features are not supported by the parser, preventing many ISO tests from running:
 
-1. **Hex escape sequences in atoms**: `'\x41\'` (character code in hex)
+1. **Hex escape sequences in atoms**: `'\\x41\\'` (character code in hex)
 2. **Parenthesized operators**: `(-)` (minus operator as a term)
-3. **Character code arithmetic**: `0'\x41\` (hex character codes)
+3. **Character code arithmetic**: `0'\\x41\\` (hex character codes)
 4. **Directive syntax**: `:- initialization(goal)` directive not parsed
 5. **Complex operator expressions**: Some edge cases with operator precedence
 
@@ -106,7 +106,7 @@ The current `write_term_to_chars/3` implementation has these limitations:
 
 ### Medium Term (for better test coverage)
 
-1. **Fix parser to support hex escapes**: `'\x41\'` syntax
+1. **Fix parser to support hex escapes**: `'\\x41\\'` syntax
 2. **Fix parser to support parenthesized operators**: `(-)` as a term
 3. **Implement directive parsing**: `:- initialization/1`, `:- op/3`, etc.
 4. **Enhance `write_term_to_chars/3`** with proper operator handling

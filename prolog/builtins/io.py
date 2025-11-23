@@ -360,40 +360,22 @@ class IOBuiltins:
             return f"[{','.join(elements_str)}]"
 
         if isinstance(term, Compound):
-            if ignore_ops:
-                # Canonical form: always use functor(args)
-                if not term.args:
-                    if quoted and IOBuiltins._needs_quoting(term.functor):
-                        escaped = term.functor.replace('\\', '\\\\').replace("'", "\\'")
-                        return f"'{escaped}'"
-                    return term.functor
-                args_str = ','.join(
-                    IOBuiltins._term_to_chars_string(arg, subst, ignore_ops, numbervars, quoted)
-                    for arg in term.args
-                )
-                functor = term.functor
-                if quoted and IOBuiltins._needs_quoting(functor):
-                    escaped = functor.replace('\\', '\\\\').replace("'", "\\'")
-                    functor = f"'{escaped}'"
-                return f"{functor}({args_str})"
-            else:
-                # Regular form: use operators when appropriate
-                # For now, use canonical form (operator handling is complex)
-                # TODO: Implement proper operator precedence and spacing
-                if not term.args:
-                    if quoted and IOBuiltins._needs_quoting(term.functor):
-                        escaped = term.functor.replace('\\', '\\\\').replace("'", "\\'")
-                        return f"'{escaped}'"
-                    return term.functor
-                args_str = ','.join(
-                    IOBuiltins._term_to_chars_string(arg, subst, ignore_ops, numbervars, quoted)
-                    for arg in term.args
-                )
-                functor = term.functor
-                if quoted and IOBuiltins._needs_quoting(functor):
-                    escaped = functor.replace('\\', '\\\\').replace("'", "\\'")
-                    functor = f"'{escaped}'"
-                return f"{functor}({args_str})"
+            # TODO: Implement proper operator precedence and spacing for ignore_ops=False
+            # For now, always use canonical form: functor(args)
+            if not term.args:
+                if quoted and IOBuiltins._needs_quoting(term.functor):
+                    escaped = term.functor.replace('\\', '\\\\').replace("'", "\\'")
+                    return f"'{escaped}'"
+                return term.functor
+            args_str = ','.join(
+                IOBuiltins._term_to_chars_string(arg, subst, ignore_ops, numbervars, quoted)
+                for arg in term.args
+            )
+            functor = term.functor
+            if quoted and IOBuiltins._needs_quoting(functor):
+                escaped = functor.replace('\\', '\\\\').replace("'", "\\'")
+                functor = f"'{escaped}'"
+            return f"{functor}({args_str})"
 
         return str(term)
 
