@@ -1,6 +1,7 @@
 """Tests for ISO Prolog error reporting."""
 
 from prolog import PrologInterpreter
+from prolog.exceptions import PrologThrow
 import pytest
 
 
@@ -78,6 +79,6 @@ class TestSyntaxErrors:
     def test_parser_syntax_error(self):
         """Parser should throw syntax_error for invalid syntax."""
         prolog = PrologInterpreter()
-        # This should raise a ValueError wrapping a syntax_error
+        # Parser raises PrologThrow with syntax_error term
         with pytest.raises(PrologThrow):
             prolog.consult_string("foo(")

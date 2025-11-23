@@ -26,7 +26,7 @@ class PrologInterpreter:
             content = f.read()
 
         try:
-            clauses = self.parser.parse(content)
+            clauses = self.parser.parse(content, "consult/1")
         except PrologThrow as e:
             raise e
         self.clauses.extend(clauses)
@@ -35,7 +35,7 @@ class PrologInterpreter:
     def consult_string(self, prolog_code: str):
         """Load Prolog clauses from a string."""
         try:
-            clauses = self.parser.parse(prolog_code)
+            clauses = self.parser.parse(prolog_code, "consult/1")
         except PrologThrow as e:
             raise e
         self.clauses.extend(clauses)
@@ -139,7 +139,7 @@ class PrologInterpreter:
         # We'll use a dummy rule structure
         prolog_code = f"dummy :- {query_str}"
         try:
-            clauses = self.parser.parse(prolog_code)
+            clauses = self.parser.parse(prolog_code, "query/1")
         except PrologThrow as e:
             raise e
 
@@ -150,7 +150,7 @@ class PrologInterpreter:
         # Single goal case
         prolog_code = query_str
         try:
-            clauses = self.parser.parse(prolog_code)
+            clauses = self.parser.parse(prolog_code, "query/1")
         except PrologThrow as e:
             raise e
         if clauses:

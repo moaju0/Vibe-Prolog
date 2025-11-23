@@ -56,22 +56,6 @@ prolog = PrologInterpreter()
 prolog.query_once("catch(arg(1, _, _), error(E, _), true), write(E)")
 ```
 
-Vibe-Prolog implements ISO Prolog error reporting with structured error terms:
-
-- **Instantiation errors**: Raised when required arguments are unbound
-- **Type errors**: Raised when arguments have wrong types
-- **Domain errors**: Raised when values are outside valid domains
-- **Syntax errors**: Raised for parse failures
-
-Example:
-```python
-from prolog import PrologInterpreter
-
-prolog = PrologInterpreter()
-# This will throw an instantiation error, which is caught by catch/3
-result = prolog.query_once("catch(arg(N, foo(a), X), error(E, _), true).")
-print(result['E'])  # instantiation_error
-```
 
 ## The Rules 📜
 

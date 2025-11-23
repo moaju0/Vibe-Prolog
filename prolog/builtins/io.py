@@ -13,6 +13,7 @@ from lark.exceptions import LarkError
 from prolog.builtins import BuiltinRegistry, register_builtin
 from prolog.builtins.common import BuiltinArgs, EngineContext
 from prolog.errors import raise_syntax_error
+from prolog.exceptions import PrologThrow
 from prolog.parser import List, PrologParser
 from prolog.terms import Atom, Compound, Number, Variable
 from prolog.unification import Substitution, deref, unify
@@ -288,7 +289,7 @@ class IOBuiltins:
             if input_str.endswith('.'):
                 input_str = input_str[:-1].strip()
 
-            parsed_term = parser.parse_term(input_str)
+            parsed_term = parser.parse_term(input_str, "read_from_chars/2")
             return unify(term_var, parsed_term, subst)
         except (ValueError, LarkError, PrologThrow) as exc:
             if isinstance(exc, PrologThrow):

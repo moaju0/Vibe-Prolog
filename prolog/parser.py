@@ -408,16 +408,16 @@ class PrologParser:
             PROLOG_GRAMMAR, parser="lalr", transformer=PrologTransformer()
         )
 
-    def parse(self, text: str) -> list[Clause]:
+    def parse(self, text: str, context: str = "parse/1") -> list[Clause]:
         """Parse Prolog source code and return list of clauses."""
         try:
             return self.parser.parse(text)
         except LarkError as e:
             # Convert Lark parse error to Prolog syntax_error
-            error_term = PrologError.syntax_error(str(e))
+            error_term = PrologError.syntax_error(str(e), context)
             raise PrologThrow(error_term)
 
-    def parse_term(self, text: str) -> Any:
+    def parse_term(self, text: str, context: str = "parse_term/1") -> Any:
         """Parse a single Prolog term."""
         try:
             # Add a period to make it a valid clause
@@ -429,5 +429,5 @@ class PrologParser:
             raise ValueError(f"Failed to parse term: {text}")
         except LarkError as e:
             # Convert Lark parse error to Prolog syntax_error
-            error_term = PrologError.syntax_error(str(e))
+            error_term = PrologError.syntax_error(str(e), context)
             raise PrologThrow(error_term)

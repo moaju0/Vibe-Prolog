@@ -384,7 +384,7 @@ class TestReadFromChars:
             assert 'syntax_error' in syntax_descriptor
         else:
             assert syntax_descriptor == 'syntax_error'
-        assert error_term['error'][1] == 'read_from_chars/2'
+        assert error_term['error'][1]['context'][0] == 'read_from_chars/2'
 
 
 class TestEdgeCases:
