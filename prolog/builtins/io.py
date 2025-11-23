@@ -14,6 +14,8 @@ from prolog.unification import Substitution, deref, unify
 from prolog.utils.list_utils import list_to_python
 from prolog.utils.term_utils import term_to_string
 
+USER_INPUT_STREAM = Atom("user_input")
+USER_OUTPUT_STREAM = Atom("user_output")
 
 class IOBuiltins:
     """Built-ins for standard output and formatting."""
@@ -34,6 +36,8 @@ class IOBuiltins:
             ),
         )
         register_builtin(registry, "nl", 0, IOBuiltins._builtin_newline)
+        register_builtin(registry, "current_input", 1, IOBuiltins._builtin_current_input)
+        register_builtin(registry, "current_output", 1, IOBuiltins._builtin_current_output)
 
     @staticmethod
     def _builtin_write(
@@ -90,6 +94,20 @@ class IOBuiltins:
     ) -> Substitution:
         print()
         return subst
+
+    @staticmethod
+    def _builtin_current_input(
+        args: BuiltinArgs, subst: Substitution, _engine: EngineContext | None
+    ) -> Substitution | None:
+        arg = deref(args[0], subst)
+        return unify(arg, USER_INPUT_STREAM, subst)
+
+    @staticmethod
+    def _builtin_current_output(
+        args: BuiltinArgs, subst: Substitution, _engine: EngineContext | None
+    ) -> Substitution | None:
+        arg = deref(args[0], subst)
+        return unify(arg, USER_OUTPUT_STREAM, subst)
 
     @staticmethod
     def _format_to_string(

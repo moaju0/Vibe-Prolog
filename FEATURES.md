@@ -91,8 +91,8 @@
 - ❌ `put_char/1` – Write character to output
 - ❌ `open/3` – Open file stream
 - ❌ `close/1` – Close stream
-- ❌ `current_input/1` – Get current input stream
-- ❌ `current_output/1` – Get current output stream
+- ✅ `current_input/1` – Get current input stream
+- ✅ `current_output/1` – Get current output stream
 
 ### Predicate Inspection (ISO 8.8)
 - ⚠️ `predicate_property/2` – Query predicate properties (limited to built-in detection)
