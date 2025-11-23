@@ -70,6 +70,8 @@
 ### Meta-Logical Predicates (ISO 7.8)
 - ✅ `call/1` – Call goal dynamically
 - ✅ `once/1` – Call goal, commit to first solution
+- ✅ `setup_call_cleanup/3` – Execute goal with setup and cleanup
+- ✅ `call_cleanup/2` – Execute goal with cleanup
 
 ### Exception Handling (ISO 7.12)
 - ⚠️ `catch/3` – Exception handling (basic mechanism works, but built-ins don't throw ISO-structured errors)
@@ -78,7 +80,7 @@
 - ❌ `instantiation_error` – Not raised by built-ins when required arguments are unbound
 - ❌ `type_error(Type, Culprit)` – Not raised by built-ins when arguments have wrong types
 - ❌ `domain_error(Domain, Culprit)` – Not raised by built-ins when values are outside valid domains
-- ❌ `syntax_error(Description)` – Parser throws Python exceptions instead of Prolog syntax_error terms
+- ⚠️ `syntax_error(Description)` – `read_from_chars/2`, the interpreter's query interface, and `consult/1` now throw ISO `error(syntax_error(_), _)` terms; other parser entry points (e.g., future `read/1`) still raise Python exceptions
 - ❌ `existence_error(ObjectType, Culprit)` – Not implemented
 
 ### Input/Output (ISO 8.11-8.12)
@@ -86,13 +88,15 @@
 - ✅ `writeln/1` – Write term with newline
 - ✅ `nl/0` – Write newline
 - ✅ `format/2`, `format/3` – Formatted output
+- ✅ `read_from_chars/2` – Parse term from character list/string
+- ⚠️ `write_term_to_chars/3` – Write term to character list with options (basic implementation, operator handling incomplete)
 - ❌ `read/1` – Read term from input
 - ❌ `get_char/1` – Read character from input
 - ❌ `put_char/1` – Write character to output
 - ❌ `open/3` – Open file stream
 - ❌ `close/1` – Close stream
-- ❌ `current_input/1` – Get current input stream
-- ❌ `current_output/1` – Get current output stream
+- ✅ `current_input/1` – Get current input stream
+- ✅ `current_output/1` – Get current output stream
 
 ### Predicate Inspection (ISO 8.8)
 - ⚠️ `predicate_property/2` – Query predicate properties (limited to built-in detection)
@@ -108,6 +112,10 @@
 ### Higher-Order Operations (Common Extensions)
 - ✅ `maplist/2` – Apply goal to list elements (SWI-Prolog extension, not ISO)
   - Streams goal solutions per element to preserve backtracking semantics
+
+### System Predicates
+- ❌ `argv/1` – Access command-line arguments as list
+- ❌ `current_prolog_flag(argv, Args)` – ISO-style access to command-line arguments
 
 ## Directives (ISO 7.4)
 

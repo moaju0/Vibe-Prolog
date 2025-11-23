@@ -30,6 +30,12 @@ class ControlBuiltins:
         register_builtin(registry, "once", 1, ControlBuiltins._builtin_once)
         register_builtin(registry, "true", 0, ControlBuiltins._builtin_true)
         register_builtin(registry, "fail", 0, ControlBuiltins._builtin_fail)
+        register_builtin(
+            registry, "setup_call_cleanup", 3, ControlBuiltins._builtin_setup_call_cleanup
+        )
+        register_builtin(
+            registry, "call_cleanup", 2, ControlBuiltins._builtin_call_cleanup
+        )
 
     @staticmethod
     def _builtin_unify(
@@ -115,6 +121,60 @@ class ControlBuiltins:
         _args: BuiltinArgs, _subst: Substitution, _engine: EngineContext | None
     ) -> Iterator[Substitution]:
         return iter_empty()
+
+    @staticmethod
+    def _builtin_setup_call_cleanup(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext
+    ) -> Iterator[Substitution]:
+        """setup_call_cleanup/3 - Execute goal with setup and cleanup.
+
+        setup_call_cleanup(+Setup, +Goal, +Cleanup)
+        Calls Setup once, then calls Goal (possibly multiple times via backtracking),
+        and always calls Cleanup after Goal completes (whether it succeeds or fails).
+        """
+        setup_goal, goal, cleanup_goal = args
+
+        # First, execute setup once. If it fails, the loop is not entered.
+        for setup_subst in engine._solve_goals([deref(setup_goal, subst)], subst):
+            last_subst = setup_subst
+            try:
+                # Yield all solutions from the goal.
+                goal_d = deref(goal, setup_subst)
+                for solution_subst in engine._solve_goals([goal_d], setup_subst):
+                    last_subst = solution_subst
+                    yield solution_subst
+            finally:
+                # Always call cleanup after goal completes, fails, or is interrupted.
+                cleanup_goal_d = deref(cleanup_goal, last_subst)
+                for _ in engine._solve_goals([cleanup_goal_d], last_subst):
+                    break  # Just call cleanup once, ignore its result
+            # Only run setup once.
+            break
+
+    @staticmethod
+    def _builtin_call_cleanup(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext
+    ) -> Iterator[Substitution]:
+        """call_cleanup/2 - Execute goal with cleanup.
+
+        call_cleanup(+Goal, +Cleanup)
+        Calls Goal (possibly multiple times via backtracking),
+        and always calls Cleanup after Goal completes (whether it succeeds or fails).
+        """
+        goal, cleanup_goal = args
+        last_subst = subst
+
+        try:
+            # Yield all solutions from the goal.
+            goal_d = deref(goal, subst)
+            for solution_subst in engine._solve_goals([goal_d], subst):
+                last_subst = solution_subst
+                yield solution_subst
+        finally:
+            # Always call cleanup after goal completes, fails, or is interrupted.
+            cleanup_goal_d = deref(cleanup_goal, last_subst)
+            for _ in engine._solve_goals([cleanup_goal_d], last_subst):
+                break  # Just call cleanup once, ignore its result
 
 
 __all__ = ["ControlBuiltins"]

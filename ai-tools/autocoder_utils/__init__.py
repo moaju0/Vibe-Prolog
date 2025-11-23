@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-import runpy
 import shutil
 import subprocess
 import sys
@@ -9,11 +8,11 @@ from pathlib import Path
 from typing import Iterable
 
 
-REQUIRED_COMMANDS = ["kilocode", "gh", "llm"]
+DEFAULT_REQUIRED_COMMANDS = ["gh", "llm"]
 
 
 def check_commands_available(required: Iterable[str] | None = None) -> None:
-    commands = list(required) if required is not None else REQUIRED_COMMANDS
+    commands = list(required) if required is not None else DEFAULT_REQUIRED_COMMANDS
     missing = [cmd for cmd in commands if shutil.which(cmd) is None]
     if missing:
         missing_str = ", ".join(missing)
@@ -93,22 +92,3 @@ def get_owner_repo() -> tuple[str, str]:
         raise SystemExit(f"Unrecognised owner/repo in URL: {url!r}")
 
     return owner, repo
-
-
-def run_fix_issue_tool() -> None:
-    """
-    Entry point for the `fix-issue-with-kilocode` uv tool.
-
-    This delegates to the existing `fix-issue-with-kilocode` script so that
-    the script can continue to be used directly while also being exposed as a
-    uv-installed tool.
-    """
-    script_path = Path(__file__).resolve().parent.parent / "fix-issue-with-kilocode"
-    if not script_path.is_file():
-        raise SystemExit(f"Unable to locate script at {script_path}")
-
-    # Preserve argv as if the script was invoked directly
-    sys.argv[0] = str(script_path)
-    runpy.run_path(str(script_path), run_name="__main__")
-
-

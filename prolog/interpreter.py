@@ -4,7 +4,10 @@ import io
 import sys
 from pathlib import Path
 
+from lark.exceptions import LarkError
+
 from prolog.engine import CutException, PrologEngine
+from prolog.errors import raise_syntax_error
 from prolog.parser import Compound, PrologParser, Variable
 from prolog.unification import apply_substitution
 
@@ -23,13 +26,19 @@ class PrologInterpreter:
         with open(filepath, "r") as f:
             content = f.read()
 
-        clauses = self.parser.parse(content)
+        try:
+            clauses = self.parser.parse(content)
+        except (ValueError, LarkError) as exc:
+            raise_syntax_error("consult/1", exc)
         self.clauses.extend(clauses)
         self.engine = PrologEngine(self.clauses)
 
     def consult_string(self, prolog_code: str):
         """Load Prolog clauses from a string."""
-        clauses = self.parser.parse(prolog_code)
+        try:
+            clauses = self.parser.parse(prolog_code)
+        except (ValueError, LarkError) as exc:
+            raise_syntax_error("consult/1", exc)
         self.clauses.extend(clauses)
         self.engine = PrologEngine(self.clauses)
 
@@ -130,7 +139,10 @@ class PrologInterpreter:
         # Parse as a fact and extract the goals
         # We'll use a dummy rule structure
         prolog_code = f"dummy :- {query_str}"
-        clauses = self.parser.parse(prolog_code)
+        try:
+            clauses = self.parser.parse(prolog_code)
+        except (ValueError, LarkError) as exc:
+            raise_syntax_error("query/1", exc)
 
         if clauses and clauses[0].body:
             # Flatten conjunction into list of goals
@@ -138,7 +150,10 @@ class PrologInterpreter:
 
         # Single goal case
         prolog_code = query_str
-        clauses = self.parser.parse(prolog_code)
+        try:
+            clauses = self.parser.parse(prolog_code)
+        except (ValueError, LarkError) as exc:
+            raise_syntax_error("query/1", exc)
         if clauses:
             return [clauses[0].head]
 

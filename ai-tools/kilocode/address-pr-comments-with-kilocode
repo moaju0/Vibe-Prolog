@@ -11,7 +11,10 @@ import subprocess
 import sys
 from pathlib import Path
 
-from kilocode_autocoder_utils import (
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from autocoder_utils import (
     check_commands_available,
     ensure_env,
     get_owner_repo,
@@ -121,7 +124,7 @@ def push_current_branch() -> None:
 
 
 def main(argv: list[str]) -> None:
-    check_commands_available()
+    check_commands_available(["kilocode", "gh", "llm"])
     ensure_env()
 
     if len(argv) < 2 or argv[1] in {"-h", "--help"}:
