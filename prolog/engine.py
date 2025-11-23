@@ -86,19 +86,32 @@ class PrologEngine:
             # Try to unify goal with clause head
             new_subst = unify(goal, renamed_clause.head, subst)
             if new_subst is not None:
+                # Determine if this clause's body contains a cut. We need this
+                # to know whether to consume a CutException here (cut belongs
+                # to this predicate) or let it propagate to the caller (cut
+                # occurred in a deeper predicate).
+                body_goals: list[Compound | Atom | Cut]
+                if renamed_clause.is_fact():
+                    body_goals = []
+                else:
+                    body_goals = self._flatten_body(renamed_clause.body)
+                clause_has_cut = any(isinstance(g, Cut) for g in body_goals)
                 try:
                     if renamed_clause.is_fact():
                         # It's a fact - continue with remaining goals
                         yield from self._solve_goals(remaining_goals, new_subst)
                     else:
                         # It's a rule - add body goals before remaining goals
-                        # Flatten conjunction if needed
-                        body_goals = self._flatten_body(renamed_clause.body)
                         new_goals = body_goals + remaining_goals
                         yield from self._solve_goals(new_goals, new_subst)
                 except CutException:
-                    # Cut was executed - stop trying alternative clauses
-                    cut_executed = True
+                    # If the cut belonged to this clause, consume it here and
+                    # prevent backtracking to alternative clauses. Otherwise,
+                    # propagate so an ancestor predicate can handle the cut.
+                    if clause_has_cut:
+                        cut_executed = True
+                    else:
+                        raise
                 except PrologThrow:
                     # Re-raise PrologThrow so it propagates up to catch/3
                     raise
@@ -346,20 +359,23 @@ class PrologEngine:
                 if left is None or right is None:
                     return None
 
-                if expr.functor == "+":
-                    return left + right
-                elif expr.functor == "-":
-                    return left - right
-                elif expr.functor == "*":
-                    return left * right
-                elif expr.functor == "/":
-                    return left / right
-                elif expr.functor == "//":
-                    return left // right
-                elif expr.functor == "mod":
-                    return left % right
-                elif expr.functor == "**":
-                    return left ** right
+                try:
+                    if expr.functor == "+":
+                        return left + right
+                    elif expr.functor == "-":
+                        return left - right
+                    elif expr.functor == "*":
+                        return left * right
+                    elif expr.functor == "/":
+                        return left / right
+                    elif expr.functor == "//":
+                        return left // right
+                    elif expr.functor == "mod":
+                        return left % right
+                    elif expr.functor == "**":
+                        return left ** right
+                except ZeroDivisionError:
+                    return None
 
         return None
 

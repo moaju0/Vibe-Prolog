@@ -57,14 +57,53 @@ class TestISOUnification:
         assert prolog.has_solution("[a, b, c] = [a, b, c]")
         assert not prolog.has_solution("[a, b] = [a, b, c]")
 
-    @pytest.mark.skip(reason="Occurs check not implemented (would cause infinite recursion)")
     def test_occurs_check(self):
-        """X = f(X) should succeed (we don't do occurs check)"""
+        """X = f(X) should fail due to occurs check"""
         # Conformity: N/A - occurs check not tested in conformity tests
         prolog = PrologInterpreter()
-        # Most Prolog implementations don't do occurs check by default
+        # Occurs check prevents infinite structures
         result = prolog.query_once("X = f(X)")
-        assert result is not None  # Should succeed without occurs check
+        assert result is None  # Occurs check prevents infinite structure
+
+
+class TestOccursCheck:
+    """Comprehensive occurs-check tests"""
+
+    def test_direct_cycle(self):
+        """X = f(X) should fail due to occurs check"""
+        prolog = PrologInterpreter()
+        assert not prolog.has_solution("X = f(X)")
+
+    def test_indirect_cycle(self):
+        """X = f(Y), Y = g(X) should fail"""
+        prolog = PrologInterpreter()
+        assert not prolog.has_solution("X = f(Y), Y = g(X)")
+
+    def test_occurs_in_list(self):
+        """X = [X] should fail"""
+        prolog = PrologInterpreter()
+        assert not prolog.has_solution("X = [X]")
+
+    def test_occurs_deep_structure(self):
+        """X = f(g(h(X))) should fail"""
+        prolog = PrologInterpreter()
+        assert not prolog.has_solution("X = f(g(h(X)))")
+
+    def test_occurs_in_compound_arg(self):
+        """X = f(a, X) should fail"""
+        prolog = PrologInterpreter()
+        assert not prolog.has_solution("X = f(a, X)")
+
+    def test_occurs_multiple_vars(self):
+        """X = f(Y), Y = g(Z), Z = h(X) should fail"""
+        prolog = PrologInterpreter()
+        assert not prolog.has_solution("X = f(Y), Y = g(Z), Z = h(X)")
+
+    def test_no_occurs_check_success(self):
+        """Valid unification should still work"""
+        prolog = PrologInterpreter()
+        assert prolog.has_solution("X = f(Y)")
+        assert prolog.has_solution("X = [a, b, c]")
 
 
 class TestISONotUnifiable:
@@ -384,6 +423,34 @@ class TestISOArithmetic:
         assert result['X'] == 14  # Multiplication has higher precedence
 
 
+class TestArithmeticErrors:
+    """Tests for arithmetic error handling"""
+
+    def test_division_by_zero(self):
+        prolog = PrologInterpreter()
+        # Should fail or raise error
+        assert not prolog.has_solution("X is 1 / 0")
+
+    def test_uninstantiated_variable_in_arithmetic(self):
+        prolog = PrologInterpreter()
+        # Y is not bound, should fail
+        assert not prolog.has_solution("X is Y + 1")
+
+    def test_non_number_in_arithmetic(self):
+        prolog = PrologInterpreter()
+        # Can't do arithmetic on atoms
+        assert not prolog.has_solution("X is atom + 1")
+
+    def test_modulo_by_zero(self):
+        prolog = PrologInterpreter()
+        assert not prolog.has_solution("X is 5 mod 0")
+
+    def test_arithmetic_with_invalid_expression(self):
+        prolog = PrologInterpreter()
+        # Invalid arithmetic expression
+        assert not prolog.has_solution("X is f(1) + 2")
+
+
 class TestISOArithmeticComparison:
     """ISO 9.3 - Arithmetic comparison
 
@@ -465,6 +532,80 @@ class TestISOControl:
         result = prolog.query_once("(2 < 1 -> X = yes ; X = no)")
         assert result is not None
         assert result['X'] == 'no'
+
+
+class TestIfThenElseSemantics:
+    """Tests for ISO-compliant if-then-else and disjunction behavior"""
+
+    def test_if_then_commits_to_first_solution(self):
+        """-> should commit to first solution of condition"""
+        prolog = PrologInterpreter()
+        prolog.consult_string("""
+            p(1).
+            p(2).
+            p(3).
+        """)
+        # Condition p(X) has 3 solutions, but -> commits to first
+        result = prolog.query_once("(p(X) -> Y = X ; Y = none)")
+        assert result['X'] == 1  # First solution only
+        assert result['Y'] == 1
+
+    def test_disjunction_tries_both_branches(self):
+        """Simple ; should try both branches on backtracking"""
+        prolog = PrologInterpreter()
+        results = list(prolog.query("(X = a ; X = b)"))
+        assert len(results) == 2
+        assert {r['X'] for r in results} == {'a', 'b'}
+
+    def test_nested_if_then_else(self):
+        """Nested (A -> B ; C) -> D ; E should work correctly"""
+        prolog = PrologInterpreter()
+        result = prolog.query_once("((1 < 2 -> X = a ; X = b) -> Y = yes ; Y = no)")
+        assert result['X'] == 'a'
+        assert result['Y'] == 'yes'
+
+
+class TestNegationAsFailure:
+    """Tests for ISO-compliant negation-as-failure (\+) semantics"""
+
+    def test_negation_with_unbound_variable(self):
+        """\+ should not bind variables"""
+        prolog = PrologInterpreter()
+        prolog.consult_string("p(1). p(2).")
+        # \+(p(X)) should fail (p(X) has solutions)
+        # But X should remain unbound
+        assert not prolog.has_solution("\\+(p(X))")
+
+    def test_double_negation(self):
+        """\\+(\\+(Goal)) should behave like Goal (classical logic)"""
+        prolog = PrologInterpreter()
+        prolog.consult_string("p(a).")
+        # But in Prolog, variables don't escape double negation
+        assert prolog.has_solution("\\+(\\+(p(a)))")
+
+    def test_negation_fails_with_any_solution(self):
+        """\+ fails if goal has even one solution"""
+        prolog = PrologInterpreter()
+        prolog.consult_string("""
+            p(1).
+            p(2).
+            p(3).
+        """)
+        # Even though p(X) has 3 solutions, \+(p(X)) just fails once
+        assert not prolog.has_solution("\\+(p(X))")
+
+    def test_negation_succeeds_when_goal_fails(self):
+        """\+ succeeds when goal has no solutions"""
+        prolog = PrologInterpreter()
+        assert prolog.has_solution("\\+(fail)")
+        assert prolog.has_solution("\\+(1 = 2)")
+
+    def test_negation_with_conjunction(self):
+        """\+ should work with conjunctions"""
+        prolog = PrologInterpreter()
+        prolog.consult_string("p(1). q(2).")
+        # \+(p(X), q(X)) should succeed because no X satisfies both
+        assert prolog.has_solution("\\+(p(X), q(X))")
 
 
 class TestISOLists:
@@ -560,6 +701,45 @@ class TestISOCut:
         result = prolog.query_once("max(3, 5, M)")
         assert result is not None
         assert result['M'] == 5
+
+    def test_cut_in_nested_conjunction(self):
+        """Cut should not affect goals before it"""
+        prolog = PrologInterpreter()
+        prolog.consult_string("""
+            p(X) :- q(X), !, r(X).
+            q(1).
+            q(2).
+            r(1).
+            r(2).
+        """)
+        # Should get both q(1) and q(2) tried, but cut after first q success
+        results = list(prolog.query("p(X)"))
+        assert len(results) == 1
+        assert results[0]['X'] == 1
+
+    def test_cut_scope_limited_to_clause(self):
+        """Cut should prune alternative clauses for the same predicate"""
+        prolog = PrologInterpreter()
+        prolog.consult_string("""
+            a(X) :- b(X), !.
+            a(3).
+            b(1).
+            b(2).
+        """)
+        results = list(prolog.query("a(X)"))
+        # The cut `!` in the first clause of `a/1` prunes the choice point
+        # for the second clause `a(3).`, so only one solution should be found.
+        assert len(results) == 1
+        assert results[0]['X'] == 1
+
+    def test_cut_in_if_then_else(self):
+        """Cut in condition of -> should work correctly"""
+        prolog = PrologInterpreter()
+        prolog.consult_string("""
+            test(X, Y) :- (X > 0, ! -> Y = positive ; Y = negative).
+        """)
+        result = prolog.query_once("test(5, Y)")
+        assert result['Y'] == 'positive'
 
 
 class TestISOCall:
