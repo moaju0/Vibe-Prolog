@@ -205,8 +205,3 @@
 4. **Operator Definition**: `:- op/3` directive rejected (not implemented)
 5. **Block Comments**: `/* */` comments not properly parsed
 6. **Unary Minus Precedence**: In some cases, unary minus may bind differently than expected (e.g., `-X + Y` parses as `-(X + Y)`)
-
-## Tooling & Tests
-- Use the interpreter as a Python library (`from prolog import PrologInterpreter`) and exercise it via a comprehensive test suite (69+ tests covering ISO core predicates, parser edge cases, and built-in behavior).
--`PrologInterpreter` exposes `consult/consult_string`, `query`, `query_once`, and `has_solution` helpers, plus optional stdout capture for capturing `write`/`format` output while still returning solution bindings.
-- Built-in predicates are dispatched through a functor/arity registry in `prolog/engine.py` rather than a nested conditional chain. Registry entries are grouped by helper methods for control, arithmetic, list operations, database predicates, I/O, and reflection/type inspection. To add a new built-in, register a handler in the appropriate helper and return either a substitution, an iterator of substitutions, or `None` to signal failure. Shared helpers such as `_format_to_string`, `_list_to_python` (which honors the active substitution), and `_fresh_variable` keep common behaviors consistent between built-ins.

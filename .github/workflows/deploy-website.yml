@@ -7,7 +7,7 @@ on:
       - 'website/**'
       - 'README.md'
       - 'FEATURES.md'
-      - 'CODE_DOCS.md'
+      - 'ARCHITECTURE.md'
       - 'AGENTS.md'
       - '.github/workflows/deploy-website.yml'
   workflow_dispatch:
