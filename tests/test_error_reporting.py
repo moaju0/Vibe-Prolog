@@ -13,8 +13,8 @@ class TestInstantiationErrors:
         prolog = PrologInterpreter()
         result = prolog.query_once("catch(arg(N, foo(a,b), X), E, true).")
         assert result is not None
-        # E should be error(instantiation_error, context(arg/3))
-        assert 'error' in result['E']
+        expected_error = {'error': ['instantiation_error', {'context': ['arg/3']}]}
+        assert result['E'] == expected_error
 
     def test_arg_instantiation_error_term(self):
         """arg/3 should throw instantiation_error if Term is unbound."""

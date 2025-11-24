@@ -22,7 +22,7 @@ class PrologError:
         if context:
             context_term = Compound('context', (Atom(context),))
             return Compound('error', (error_term, context_term))
-        return Compound('error', (error_term,))
+        return Compound('error', (error_term, Atom('unknown')))
 
     @staticmethod
     def instantiation_error(context: str | None = None) -> "Compound":
