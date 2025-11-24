@@ -1,53 +1,12 @@
 """Prolog parser using Lark."""
 
 from lark import Lark, Transformer
+from lark.exceptions import LarkError
 from dataclasses import dataclass
 from typing import Any
 
-
-# Prolog AST nodes
-@dataclass(frozen=True)
-class Atom:
-    """An atom (constant)."""
-
-    name: str
-
-    def __repr__(self):
-        return self.name
-
-
-@dataclass(frozen=True)
-class Variable:
-    """A variable."""
-
-    name: str
-
-    def __repr__(self):
-        return self.name
-
-
-@dataclass(frozen=True)
-class Number:
-    """A number."""
-
-    value: int | float
-
-    def __repr__(self):
-        return str(self.value)
-
-
-@dataclass(frozen=True)
-class Compound:
-    """A compound term (functor with arguments)."""
-
-    functor: str
-    args: tuple[Any, ...]
-
-    def __repr__(self):
-        if not self.args:
-            return self.functor
-        args_str = ", ".join(str(arg) for arg in self.args)
-        return f"{self.functor}({args_str})"
+from prolog.exceptions import PrologError, PrologThrow
+from prolog.terms import Atom, Variable, Number, Compound
 
 
 @dataclass(frozen=True)
@@ -449,16 +408,26 @@ class PrologParser:
             PROLOG_GRAMMAR, parser="lalr", transformer=PrologTransformer()
         )
 
-    def parse(self, text: str) -> list[Clause]:
+    def parse(self, text: str, context: str = "parse/1") -> list[Clause]:
         """Parse Prolog source code and return list of clauses."""
-        return self.parser.parse(text)
+        try:
+            return self.parser.parse(text)
+        except LarkError as e:
+            # Convert Lark parse error to Prolog syntax_error
+            error_term = PrologError.syntax_error(str(e), context)
+            raise PrologThrow(error_term)
 
-    def parse_term(self, text: str) -> Any:
+    def parse_term(self, text: str, context: str = "parse_term/1") -> Any:
         """Parse a single Prolog term."""
-        # Add a period to make it a valid clause
-        result = self.parser.parse(f"dummy({text}).")
-        if result and isinstance(result[0], Clause):
-            compound = result[0].head
-            if isinstance(compound, Compound) and compound.args:
-                return compound.args[0]
-        raise ValueError(f"Failed to parse term: {text}")
+        try:
+            # Add a period to make it a valid clause
+            result = self.parser.parse(f"dummy({text}).")
+            if result and isinstance(result[0], Clause):
+                compound = result[0].head
+                if isinstance(compound, Compound) and compound.args:
+                    return compound.args[0]
+            raise ValueError(f"Failed to parse term: {text}")
+        except LarkError as e:
+            # Convert Lark parse error to Prolog syntax_error
+            error_term = PrologError.syntax_error(str(e), context)
+            raise PrologThrow(error_term)

@@ -6,9 +6,11 @@ from pathlib import Path
 
 from lark.exceptions import LarkError
 
-from prolog.engine import CutException, PrologEngine
 from prolog.errors import raise_syntax_error
-from prolog.parser import Compound, PrologParser, Variable
+from prolog.exceptions import PrologThrow
+from prolog.engine import CutException, PrologEngine
+from prolog.parser import PrologParser
+from prolog.terms import Compound, Variable
 from prolog.unification import apply_substitution
 
 
@@ -27,7 +29,7 @@ class PrologInterpreter:
             content = f.read()
 
         try:
-            clauses = self.parser.parse(content)
+            clauses = self.parser.parse(content, "consult/1")
         except (ValueError, LarkError) as exc:
             raise_syntax_error("consult/1", exc)
         self.clauses.extend(clauses)
@@ -36,7 +38,7 @@ class PrologInterpreter:
     def consult_string(self, prolog_code: str):
         """Load Prolog clauses from a string."""
         try:
-            clauses = self.parser.parse(prolog_code)
+            clauses = self.parser.parse(prolog_code, "consult/1")
         except (ValueError, LarkError) as exc:
             raise_syntax_error("consult/1", exc)
         self.clauses.extend(clauses)
@@ -140,7 +142,7 @@ class PrologInterpreter:
         # We'll use a dummy rule structure
         prolog_code = f"dummy :- {query_str}"
         try:
-            clauses = self.parser.parse(prolog_code)
+            clauses = self.parser.parse(prolog_code, "query/1")
         except (ValueError, LarkError) as exc:
             raise_syntax_error("query/1", exc)
 
@@ -151,7 +153,7 @@ class PrologInterpreter:
         # Single goal case
         prolog_code = query_str
         try:
-            clauses = self.parser.parse(prolog_code)
+            clauses = self.parser.parse(prolog_code, "query/1")
         except (ValueError, LarkError) as exc:
             raise_syntax_error("query/1", exc)
         if clauses:
@@ -198,7 +200,8 @@ class PrologInterpreter:
 
     def _term_to_python(self, term) -> any:
         """Convert a Prolog term to a Python value."""
-        from prolog.parser import Atom, Number, List, Compound, Variable
+        from prolog.parser import List
+        from prolog.terms import Atom, Number, Compound, Variable
 
         if isinstance(term, Atom):
             return term.name

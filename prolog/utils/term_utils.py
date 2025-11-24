@@ -11,7 +11,8 @@ These utilities are used throughout the engine and built-in predicates.
 
 from typing import Any
 
-from prolog.parser import Atom, Compound, List, Number, Variable
+from prolog.parser import List
+from prolog.terms import Atom, Compound, Number, Variable
 from prolog.unification import Substitution, deref
 
 

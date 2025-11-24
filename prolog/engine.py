@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import inspect
 from collections.abc import Iterator as IteratorABC
-from typing import Callable, Iterator, TypeAlias
+from typing import Any, Callable, Iterator, TypeAlias
 
-from prolog.builtins.exceptions import PrologThrow
-from prolog.parser import Atom, Clause, Compound, Cut, List, Variable
-from prolog.unification import Substitution, apply_substitution, unify
+from prolog.exceptions import PrologError, PrologThrow
+from prolog.parser import Clause, Cut, List
+from prolog.terms import Atom, Compound, Number, Variable
+from prolog.unification import Substitution, apply_substitution, deref, unify
 from prolog.utils.list_utils import list_to_python, python_to_list
 
 BuiltinResult: TypeAlias = Iterator[Substitution] | Substitution | None
@@ -263,6 +264,58 @@ class PrologEngine:
         from prolog.builtins.io import IOBuiltins
 
         return IOBuiltins._format_to_string(format_term, args_term, subst)
+
+    def _check_instantiated(self, term: Any, subst: Substitution, predicate: str) -> None:
+        """Raise instantiation_error if term is an unbound variable.
+
+        Args:
+            term: The term to check
+            subst: Current substitution
+            predicate: Name of the calling predicate (e.g., 'arg/3')
+
+        Raises:
+            PrologThrow with instantiation_error term
+        """
+        term = deref(term, subst)
+        if isinstance(term, Variable):
+            error_term = PrologError.instantiation_error(predicate)
+            raise PrologThrow(error_term)
+
+    def _check_type(self, term: Any, expected_type: type | tuple[type, ...],
+                    type_name: str, subst: Substitution, predicate: str) -> None:
+        """Raise type_error if term doesn't match expected type.
+
+        Args:
+            term: The term to check
+            expected_type: Python type or tuple of types to check against
+            type_name: ISO name of the type (e.g., 'integer', 'atom')
+            subst: Current substitution
+            predicate: Name of the calling predicate
+
+        Raises:
+            PrologThrow with type_error term
+        """
+        term = deref(term, subst)
+        if not isinstance(term, expected_type):
+            error_term = PrologError.type_error(type_name, term, predicate)
+            raise PrologThrow(error_term)
+
+    def _check_domain(self, value: Any, is_valid: Callable[[Any], bool],
+                     domain_name: str, predicate: str) -> None:
+        """Raise domain_error if value is outside valid domain.
+
+        Args:
+            value: The value to check
+            is_valid: Predicate function that returns True if value is valid
+            domain_name: Name of the valid domain (e.g., 'not_less_than_zero')
+            predicate: Name of the calling predicate
+
+        Raises:
+            PrologThrow with domain_error term
+        """
+        if not is_valid(value):
+            error_term = PrologError.domain_error(domain_name, value, predicate)
+            raise PrologThrow(error_term)
 
 
 __all__ = [

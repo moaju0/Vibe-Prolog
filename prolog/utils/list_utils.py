@@ -7,7 +7,8 @@ plus helper functions for list length operations and matching.
 
 from typing import Any, Callable
 
-from prolog.parser import Atom, List, Variable
+from prolog.parser import List
+from prolog.terms import Atom, Variable
 from prolog.unification import Substitution, apply_substitution, deref, unify
 from prolog.utils.term_utils import term_to_string
 

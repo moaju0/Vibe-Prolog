@@ -1,6 +1,7 @@
 import pytest
 
-from prolog.parser import Atom, List, Number, Variable
+from prolog.parser import List
+from prolog.terms import Atom, Number, Variable
 from prolog.unification import Substitution, deref, unify
 from prolog.utils.list_utils import (
     compute_list_length,

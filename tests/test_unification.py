@@ -6,7 +6,8 @@ Tests complex unification scenarios.
 import pytest
 from prolog import PrologInterpreter
 from prolog.unification import vars
-from prolog.parser import Atom, Variable, Compound, List
+from prolog.parser import List
+from prolog.terms import Atom, Variable, Compound
 
 
 class TestBasicUnification:

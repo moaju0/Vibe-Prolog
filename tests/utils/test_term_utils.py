@@ -1,6 +1,7 @@
 import pytest
 
-from prolog.parser import Atom, Compound, List, Number, Variable
+from prolog.parser import List
+from prolog.terms import Atom, Compound, Number, Variable
 from prolog.unification import Substitution
 from prolog.utils.term_utils import term_sort_key, term_to_string, terms_equal
 

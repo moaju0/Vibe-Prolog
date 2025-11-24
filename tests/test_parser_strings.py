@@ -4,7 +4,8 @@ Tests for parser string handling, including escape sequences and edge cases.
 
 import pytest
 from prolog import PrologInterpreter
-from prolog.parser import PrologParser, Atom, Clause
+from prolog.parser import PrologParser, Clause
+from prolog.terms import Atom
 
 
 class TestSingleQuotedStrings:

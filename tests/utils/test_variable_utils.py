@@ -1,4 +1,5 @@
-from prolog.parser import Atom, Compound, List, Number, Variable
+from prolog.parser import List
+from prolog.terms import Atom, Compound, Number, Variable
 from prolog.unification import Substitution
 from prolog.utils.variable_utils import (
     collect_vars,

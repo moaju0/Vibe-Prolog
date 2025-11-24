@@ -1,7 +1,8 @@
 """Tests for shared engine utilities used by built-ins."""
 
 from prolog import PrologInterpreter
-from prolog.parser import Atom, Number, Variable, List
+from prolog.parser import List
+from prolog.terms import Atom, Number, Variable
 from prolog.unification import Substitution, unify
 
 

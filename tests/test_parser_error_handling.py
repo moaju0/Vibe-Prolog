@@ -4,7 +4,7 @@ import pytest
 
 from prolog import PrologInterpreter
 from prolog.builtins.exceptions import PrologThrow
-from prolog.parser import Atom, Compound
+from prolog.terms import Atom, Compound
 
 
 class TestParserErrorHandling:
@@ -18,7 +18,7 @@ class TestParserErrorHandling:
         error_term = excinfo.value.term
         assert isinstance(error_term, Compound)
         assert error_term.functor == "error"
-        assert error_term.args[1] == Atom("query/1")
+        assert error_term.args[1] == Compound("context", (Atom("query/1"),))
         syntax_term = error_term.args[0]
         assert isinstance(syntax_term, Compound)
         assert syntax_term.functor == "syntax_error"
@@ -31,7 +31,7 @@ class TestParserErrorHandling:
         error_term = excinfo.value.term
         assert isinstance(error_term, Compound)
         assert error_term.functor == "error"
-        assert error_term.args[1] == Atom("consult/1")
+        assert error_term.args[1] == Compound("context", (Atom("consult/1"),))
         syntax_term = error_term.args[0]
         assert isinstance(syntax_term, Compound)
         assert syntax_term.functor == "syntax_error"

@@ -9,7 +9,8 @@ from typing import Iterator
 
 from prolog.builtins import BuiltinRegistry, register_builtin
 from prolog.builtins.common import BuiltinArgs, EngineContext
-from prolog.parser import Atom, Compound, List
+from prolog.parser import List
+from prolog.terms import Atom, Compound
 from prolog.unification import Substitution, deref
 from prolog.utils.list_utils import list_to_python
 

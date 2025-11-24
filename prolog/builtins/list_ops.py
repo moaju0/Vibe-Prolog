@@ -10,6 +10,7 @@ from typing import Iterator
 
 from prolog.builtins import BuiltinRegistry, register_builtin
 from prolog.builtins.common import BuiltinArgs, EngineContext
+from prolog.exceptions import PrologError, PrologThrow
 from prolog.parser import List, Number, Variable
 from prolog.unification import Substitution, deref, unify
 from prolog.utils.list_utils import (
@@ -129,8 +130,8 @@ class ListOperationsBuiltins:
 
         if isinstance(length, Number):
             n = int(length.value)
-            if n < 0:
-                return
+            # Check for negative length (domain error)
+            engine._check_domain(n, lambda x: x >= 0, 'not_less_than_zero', 'length/2')
 
             if isinstance(lst, List):
                 new_subst = match_list_to_length(
