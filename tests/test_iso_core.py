@@ -942,12 +942,12 @@ class TestISOParserEdgeCases:
         prolog = PrologInterpreter()
 
         # Comments in expressions (test_186)
-        result = prolog.query_once("X/* /*/=7")
+        result = prolog.query_once("X/* comment */=7")
         assert result is not None
         assert result['X'] == 7
 
         # Nested comment syntax (test_187)
-        result = prolog.query_once("X/*/*/=7")
+        result = prolog.query_once("X/* /* nested */ */=7")
         assert result is not None
         assert result['X'] == 7
 

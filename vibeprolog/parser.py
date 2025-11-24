@@ -140,7 +140,6 @@ PROLOG_GRAMMAR = r"""
     %import common.WS
     %ignore WS
     %ignore /%.*/  // Line comments
-    %ignore /\/\*(.|\n)*?\*\//  // Block comments
 """
 
 
@@ -408,12 +407,42 @@ class PrologParser:
             PROLOG_GRAMMAR, parser="lalr", transformer=PrologTransformer()
         )
 
+    def _strip_block_comments(self, text: str) -> str:
+        """Strip block comments from text, handling nesting."""
+        result = []
+        i = 0
+        while i < len(text):
+            if text[i:i+2] == '/*':
+                depth = 1
+                i += 2
+                while i < len(text) and depth > 0:
+                    if text[i:i+2] == '/*':
+                        depth += 1
+                        i += 2
+                    elif text[i:i+2] == '*/':
+                        depth -= 1
+                        i += 2
+                    else:
+                        i += 1
+                if depth > 0:
+                    # Unterminated comment
+                    raise ValueError("Unterminated block comment")
+            else:
+                result.append(text[i])
+                i += 1
+        return ''.join(result)
+
     def parse(self, text: str, context: str = "parse/1") -> list[Clause]:
         """Parse Prolog source code and return list of clauses."""
         try:
+            text = self._strip_block_comments(text)
             return self.parser.parse(text)
         except LarkError as e:
             # Convert Lark parse error to Prolog syntax_error
+            error_term = PrologError.syntax_error(str(e), context)
+            raise PrologThrow(error_term)
+        except ValueError as e:
+            # Unterminated comment
             error_term = PrologError.syntax_error(str(e), context)
             raise PrologThrow(error_term)
 
@@ -421,7 +450,8 @@ class PrologParser:
         """Parse a single Prolog term."""
         try:
             # Add a period to make it a valid clause
-            result = self.parser.parse(f"dummy({text}).")
+            text = self._strip_block_comments(f"dummy({text}).")
+            result = self.parser.parse(text)
             if result and isinstance(result[0], Clause):
                 compound = result[0].head
                 if isinstance(compound, Compound) and compound.args:
@@ -429,5 +459,9 @@ class PrologParser:
             raise ValueError(f"Failed to parse term: {text}")
         except LarkError as e:
             # Convert Lark parse error to Prolog syntax_error
+            error_term = PrologError.syntax_error(str(e), context)
+            raise PrologThrow(error_term)
+        except ValueError as e:
+            # Unterminated comment or parse error
             error_term = PrologError.syntax_error(str(e), context)
             raise PrologThrow(error_term)
