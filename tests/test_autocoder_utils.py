@@ -1,15 +1,11 @@
 """Tests for autocoder_utils module."""
 
 import os
+import shutil
 import subprocess
-import sys
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-
-# Add ai-tools to path for importing
-sys.path.insert(0, str(Path(__file__).parent.parent / "ai-tools"))
 
 from autocoder_utils import (
     check_commands_available,

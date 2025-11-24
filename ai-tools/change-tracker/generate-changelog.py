@@ -62,7 +62,6 @@ def get_git_changes(since_date: datetime | None) -> list[dict] | None:
     cmd = [
         'git', 'log',
         '--pretty=format:%H|%ai|%an|%s',
-        '--no-merges'
     ]
 
     if since_date:
@@ -100,7 +99,7 @@ def get_git_changes(since_date: datetime | None) -> list[dict] | None:
 
 def get_git_stats(since_date: datetime | None) -> dict | None:
     """
-    Get file change statistics since the specified date.
+    Aggregate file statistics since the specified date by summing per-commit stats.
 
     Args:
         since_date: Date to get stats since, or None for all changes
@@ -108,55 +107,50 @@ def get_git_stats(since_date: datetime | None) -> dict | None:
     Returns:
         Dictionary with 'files_changed', 'insertions', 'deletions', or None on failure
     """
-    cmd = ['git', 'diff', '--numstat']
-
+    cmd = ['git', 'log', '--numstat', '--format=%H']
     if since_date:
         since_str = (since_date + timedelta(days=1)).strftime('%Y-%m-%d')
-        # Compare against the commit at that date
-        try:
-            ref_result = subprocess.run(
-                ['git', 'rev-list', '-1', f'--before={since_str}', 'HEAD'],
-                capture_output=True,
-                text=True,
-                check=True
-            )
-            ref = ref_result.stdout.strip()
-            if ref:
-                cmd = ['git', 'diff', '--numstat', ref, 'HEAD']
-            else:
-                cmd.append(f'--since={since_str}')
-        except subprocess.CalledProcessError:
-            pass
-    else:
-        # Get stats for all commits by diffing against the empty tree object.
-        # The hash '4b825dc642cb6eb9a060e54bf8d69288fbee4904' is the well-known ID for an empty tree.
-        cmd = ['git', 'diff', '--numstat', '4b825dc642cb6eb9a060e54bf8d69288fbee4904', 'HEAD']
+        cmd.extend(['--since', since_str])
+    cmd.append('HEAD')
 
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-
-        stats = {'files_changed': 0, 'insertions': 0, 'deletions': 0}
-
-        for line in result.stdout.strip().splitlines():
-            # git diff --numstat produces tab-separated: insertions  deletions  path
-            parts = line.split('\t')
-            if len(parts) != 3:
-                continue
-
-            insertions_raw, deletions_raw, _path = parts
-
-            # Binary files are indicated with '-' for insertions/deletions; treat as 0 changes but still count file
-            insertions = int(insertions_raw) if insertions_raw.isdigit() else 0
-            deletions = int(deletions_raw) if deletions_raw.isdigit() else 0
-
-            stats['files_changed'] += 1
-            stats['insertions'] += insertions
-            stats['deletions'] += deletions
-
-        return stats
     except subprocess.CalledProcessError:
-        print("Error running git diff for stats", file=sys.stderr)
+        print("Error running git log for stats", file=sys.stderr)
         return None
+
+    files_touched: set[str] = set()
+    insertions_total = 0
+    deletions_total = 0
+
+    for line in result.stdout.splitlines():
+        if '\t' not in line:
+            continue
+        parts = line.split('\t', 2)
+        if len(parts) != 3:
+            continue
+        insertions_raw, deletions_raw, path = parts
+        if not path:
+            continue
+
+        try:
+            insertions = int(insertions_raw)
+        except ValueError:
+            insertions = 0
+        try:
+            deletions = int(deletions_raw)
+        except ValueError:
+            deletions = 0
+
+        files_touched.add(path)
+        insertions_total += insertions
+        deletions_total += deletions
+
+    return {
+        'files_changed': len(files_touched),
+        'insertions': insertions_total,
+        'deletions': deletions_total,
+    }
 
 
 def get_closed_issues(since_date: datetime | None) -> list[dict] | None:

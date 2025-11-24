@@ -32,6 +32,18 @@ Repository assumptions:
 - Commands run inside a git repository whose default branch is `main`
 - Remote name `origin` exists (used for `git log origin/main..`)
 
+## Installation
+
+Install the package once so the shared modules are discoverable from any working
+directory:
+
+```bash
+uv pip install -e ./ai-tools
+```
+
+Re-run the same command whenever you change files under `ai-tools/` to refresh
+your environment.
+
 ## uv project
 
 A single `pyproject.toml` lives at `ai-tools/pyproject.toml`, so every script
