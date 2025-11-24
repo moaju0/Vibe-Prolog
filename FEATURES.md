@@ -155,8 +155,8 @@
 
 ### Comments
 - ✅ Line comments (`%`)
-- ❌ Block comments (`/* */`) - not properly implemented in parser
-- ❌ Nested block comments
+- ✅ Block comments (`/* */`) - fully implemented with nesting support
+- ✅ Nested block comments
 
 ### Special Syntax
 - ✅ Curly braces `{Term}` (sugar for `{}(Term)`)
@@ -211,5 +211,4 @@
 2. **Base Character Arithmetic**: `16'mod'2` syntax not implemented
 3. **SWI-Style Dict Syntax**: `tag{a:1}` syntax not supported
 4. **Operator Definition**: `:- op/3` directive rejected (not implemented)
-5. **Block Comments**: `/* */` comments not properly parsed
 6. **Unary Minus Precedence**: In some cases, unary minus may bind differently than expected (e.g., `-X + Y` parses as `-(X + Y)`)

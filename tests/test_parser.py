@@ -4,6 +4,7 @@ import pytest
 from vibeprolog.parser import (
     PrologParser, Clause, Compound, Atom, Variable, Number, List, Cut
 )
+from vibeprolog.exceptions import PrologThrow
 
 
 class TestBasicParsing:
@@ -361,6 +362,70 @@ class TestComments:
         clauses = parser.parse("parent(john, mary). % This is Mary's parent")
         assert len(clauses) == 1
         assert clauses[0].head.functor == "parent"
+
+    def test_ignore_block_comments(self):
+        """Test that block comments are ignored."""
+        parser = PrologParser()
+        clauses = parser.parse("""
+            /* This is a block comment */
+            parent(john, mary).
+        """)
+        assert len(clauses) == 1
+        assert clauses[0].head.functor == "parent"
+
+    def test_block_comments_adjacent_to_tokens(self):
+        """Test block comments adjacent to tokens."""
+        parser = PrologParser()
+        clauses = parser.parse("parent/*comment*/(john, mary).")
+        assert len(clauses) == 1
+        assert clauses[0].head.functor == "parent"
+
+    def test_nested_block_comments(self):
+        """Test nested block comments."""
+        parser = PrologParser()
+        clauses = parser.parse("""
+            /* /* nested */ comment */
+            parent(john, mary).
+        """)
+        assert len(clauses) == 1
+        assert clauses[0].head.functor == "parent"
+
+    def test_deeply_nested_block_comments(self):
+        """Test deeply nested block comments."""
+        parser = PrologParser()
+        clauses = parser.parse("""
+            /* /* /* deep */ nested */ comment */
+            parent(john, mary).
+        """)
+        assert len(clauses) == 1
+        assert clauses[0].head.functor == "parent"
+
+    def test_unterminated_block_comment(self):
+        """Test unterminated block comment raises error."""
+        parser = PrologParser()
+        with pytest.raises(PrologThrow, match="Unterminated block comment"):
+            parser.parse("/* unterminated parent(john, mary).")
+
+    def test_block_comment_with_newlines(self):
+        """Test block comments spanning multiple lines."""
+        parser = PrologParser()
+        clauses = parser.parse("""
+            /*
+             * Multi-line
+             * block comment
+             */
+            parent(john, mary).
+        """)
+        assert len(clauses) == 1
+        assert clauses[0].head.functor == "parent"
+
+    def test_block_comment_in_string(self):
+        parser = PrologParser()
+        clauses = parser.parse("write('/* not comment */').")
+        assert len(clauses) == 1
+        assert clauses[0].head.functor == "write"
+        # Further assert the atom argument contains '/* not comment */'
+        assert clauses[0].head.args[0].name == "/* not comment */"
 
 
 class TestStrings:
