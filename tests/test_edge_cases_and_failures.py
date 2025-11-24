@@ -5,7 +5,7 @@ This file targets specific code paths that are not covered by existing tests,
 focusing on failure cases and edge cases for built-in predicates.
 """
 import pytest
-from prolog import PrologInterpreter
+from vibeprolog import PrologInterpreter
 
 
 class TestArithmeticFailures:

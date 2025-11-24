@@ -1,8 +1,8 @@
 """Unification algorithm for Prolog terms."""
 
 from typing import Any
-from prolog.parser import List
-from prolog.terms import Variable, Atom, Number, Compound
+from vibeprolog.parser import List
+from vibeprolog.terms import Variable, Atom, Number, Compound
 
 
 class Substitution:

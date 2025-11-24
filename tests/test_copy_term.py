@@ -3,7 +3,7 @@ Tests for copy_term/2 builtin predicate.
 """
 
 import pytest
-from prolog import PrologInterpreter
+from vibeprolog import PrologInterpreter
 
 
 class TestCopyTerm:

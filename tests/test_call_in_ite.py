@@ -1,4 +1,4 @@
-from prolog import PrologInterpreter
+from vibeprolog import PrologInterpreter
 
 prolog = PrologInterpreter()
 

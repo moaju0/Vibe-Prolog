@@ -4,10 +4,10 @@ Tests complex unification scenarios.
 """
 
 import pytest
-from prolog import PrologInterpreter
-from prolog.unification import vars
-from prolog.parser import List
-from prolog.terms import Atom, Variable, Compound
+from vibeprolog import PrologInterpreter
+from vibeprolog.unification import vars
+from vibeprolog.parser import List
+from vibeprolog.terms import Atom, Variable, Compound
 
 
 class TestBasicUnification:

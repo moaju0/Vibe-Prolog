@@ -8,19 +8,19 @@ from __future__ import annotations
 
 from typing import Iterator
 
-from prolog.builtins import BuiltinRegistry, register_builtin
-from prolog.builtins.common import BuiltinArgs, EngineContext
-from prolog.exceptions import PrologError, PrologThrow
-from prolog.parser import List, Number, Variable
-from prolog.unification import Substitution, deref, unify
-from prolog.utils.list_utils import (
+from vibeprolog.builtins import BuiltinRegistry, register_builtin
+from vibeprolog.builtins.common import BuiltinArgs, EngineContext
+from vibeprolog.exceptions import PrologError, PrologThrow
+from vibeprolog.parser import List, Number, Variable
+from vibeprolog.unification import Substitution, deref, unify
+from vibeprolog.utils.list_utils import (
     compute_list_length,
     fresh_list_of_length,
     list_to_python,
     match_list_to_length,
     python_to_list,
 )
-from prolog.utils.term_utils import term_sort_key, terms_equal
+from vibeprolog.utils.term_utils import term_sort_key, terms_equal
 
 
 class ListOperationsBuiltins:

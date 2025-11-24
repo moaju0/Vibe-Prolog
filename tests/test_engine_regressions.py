@@ -1,6 +1,6 @@
 """Regression tests for engine correctness fixes."""
 
-from prolog import PrologInterpreter
+from vibeprolog import PrologInterpreter
 
 
 class TestListConversion:

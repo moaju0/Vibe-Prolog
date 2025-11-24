@@ -4,7 +4,7 @@ Tests how the interpreter handles choice points and backtracking.
 """
 
 import pytest
-from prolog import PrologInterpreter
+from vibeprolog import PrologInterpreter
 
 
 class TestBasicBacktracking:

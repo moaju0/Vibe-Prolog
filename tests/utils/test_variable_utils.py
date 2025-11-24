@@ -1,7 +1,7 @@
-from prolog.parser import List
-from prolog.terms import Atom, Compound, Number, Variable
-from prolog.unification import Substitution
-from prolog.utils.variable_utils import (
+from vibeprolog.parser import List
+from vibeprolog.terms import Atom, Compound, Number, Variable
+from vibeprolog.unification import Substitution
+from vibeprolog.utils.variable_utils import (
     collect_vars,
     collect_vars_in_order,
     copy_term_recursive,

@@ -1,7 +1,7 @@
 """Tests for once/1 built-in predicate."""
 
 import pytest
-from prolog import PrologInterpreter
+from vibeprolog import PrologInterpreter
 
 
 class TestOnce:

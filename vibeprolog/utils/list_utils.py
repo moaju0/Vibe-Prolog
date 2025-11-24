@@ -7,10 +7,10 @@ plus helper functions for list length operations and matching.
 
 from typing import Any, Callable
 
-from prolog.parser import List
-from prolog.terms import Atom, Variable
-from prolog.unification import Substitution, apply_substitution, deref, unify
-from prolog.utils.term_utils import term_to_string
+from vibeprolog.parser import List
+from vibeprolog.terms import Atom, Variable
+from vibeprolog.unification import Substitution, apply_substitution, deref, unify
+from vibeprolog.utils.term_utils import term_to_string
 
 
 def list_to_python(prolog_list: List, subst: Substitution | None = None) -> list[Any]:

@@ -1,7 +1,7 @@
 """Tests for current_predicate/1 builtin."""
 
 import pytest
-from prolog import PrologInterpreter
+from vibeprolog import PrologInterpreter
 
 
 class TestCurrentPredicate:

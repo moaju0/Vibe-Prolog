@@ -6,11 +6,11 @@ import inspect
 from collections.abc import Iterator as IteratorABC
 from typing import Any, Callable, Iterator, TypeAlias
 
-from prolog.exceptions import PrologError, PrologThrow
-from prolog.parser import Clause, Cut, List
-from prolog.terms import Atom, Compound, Number, Variable
-from prolog.unification import Substitution, apply_substitution, deref, unify
-from prolog.utils.list_utils import list_to_python, python_to_list
+from vibeprolog.exceptions import PrologError, PrologThrow
+from vibeprolog.parser import Clause, Cut, List
+from vibeprolog.terms import Atom, Compound, Number, Variable
+from vibeprolog.unification import Substitution, apply_substitution, deref, unify
+from vibeprolog.utils.list_utils import list_to_python, python_to_list
 
 BuiltinResult: TypeAlias = Iterator[Substitution] | Substitution | None
 BuiltinHandler: TypeAlias = Callable[
@@ -138,7 +138,7 @@ class PrologEngine:
         """Create the functor/arity dispatch table for built-in predicates."""
         registry: BuiltinRegistry = {}
 
-        from prolog.builtins import (
+        from vibeprolog.builtins import (
             all_solutions,
             arithmetic,
             control,
@@ -261,7 +261,7 @@ class PrologEngine:
 
     def _format_to_string(self, format_term, args_term, subst):
         """Compatibility shim that delegates to the I/O built-ins formatter."""
-        from prolog.builtins.io import IOBuiltins
+        from vibeprolog.builtins.io import IOBuiltins
 
         return IOBuiltins._format_to_string(format_term, args_term, subst)
 

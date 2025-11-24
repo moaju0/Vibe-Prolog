@@ -1,8 +1,8 @@
 """Tests for operator quoting in write_term_to_chars."""
 
-from prolog import PrologInterpreter
-from prolog.terms import Compound, Atom, Variable, Number
-from prolog.utils.list_utils import python_to_list
+from vibeprolog import PrologInterpreter
+from vibeprolog.terms import Compound, Atom, Variable, Number
+from vibeprolog.utils.list_utils import python_to_list
 
 
 class TestOperatorQuoting:

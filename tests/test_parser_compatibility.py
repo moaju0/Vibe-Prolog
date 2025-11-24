@@ -7,8 +7,8 @@ compatibility with ISO Prolog standards and proper handling of edge cases.
 
 import pytest
 from lark.exceptions import LarkError
-from prolog.exceptions import PrologThrow
-from prolog.parser import (
+from vibeprolog.exceptions import PrologThrow
+from vibeprolog.parser import (
     PrologParser, Clause, Compound, Atom, Variable, Number, List, Cut
 )
 

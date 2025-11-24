@@ -3,7 +3,7 @@
 import io
 import sys
 
-from prolog import PrologInterpreter
+from vibeprolog import PrologInterpreter
 
 
 class TestCleanupBindings:

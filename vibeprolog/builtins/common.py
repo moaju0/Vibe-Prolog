@@ -9,10 +9,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Iterator, TypeAlias
 
-from prolog.unification import Substitution
+from vibeprolog.unification import Substitution
 
 if TYPE_CHECKING:
-    from prolog.engine import PrologEngine
+    from vibeprolog.engine import PrologEngine
 
 # Common aliases for handler signatures.
 BuiltinArgs: TypeAlias = tuple[Any, ...]

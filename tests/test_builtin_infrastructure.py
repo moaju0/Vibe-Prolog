@@ -1,8 +1,8 @@
 """Tests for the modular built-in predicate infrastructure."""
 
-from prolog import PrologInterpreter
-from prolog.builtins._test_dummy import DummyBuiltins
-from prolog.engine import PrologEngine
+from vibeprolog import PrologInterpreter
+from vibeprolog.builtins._test_dummy import DummyBuiltins
+from vibeprolog.engine import PrologEngine
 
 
 def test_old_style_builtins_remain_available():

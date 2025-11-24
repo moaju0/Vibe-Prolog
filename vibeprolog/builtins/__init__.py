@@ -18,7 +18,7 @@ Example usage for a new built-in module:
 
 .. code-block:: python
 
-    from prolog.builtins import BuiltinPredicate, register_builtin
+    from vibeprolog.builtins import BuiltinPredicate, register_builtin
 
     class TypeTestBuiltins:
         @staticmethod
@@ -39,10 +39,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Callable, Protocol, TypeAlias
 
 if TYPE_CHECKING:
-    from prolog.engine import BuiltinRegistry
+    from vibeprolog.engine import BuiltinRegistry
 else:
     BuiltinRegistry: TypeAlias = dict[tuple[str, int], Callable]
-from prolog.unification import Substitution
+from vibeprolog.unification import Substitution
 
 
 class BuiltinPredicate(Protocol):

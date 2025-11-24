@@ -2,9 +2,9 @@
 
 import pytest
 
-from prolog import PrologInterpreter
-from prolog.builtins.exceptions import PrologThrow
-from prolog.terms import Atom, Compound
+from vibeprolog import PrologInterpreter
+from vibeprolog.builtins.exceptions import PrologThrow
+from vibeprolog.terms import Atom, Compound
 
 
 class TestParserErrorHandling:

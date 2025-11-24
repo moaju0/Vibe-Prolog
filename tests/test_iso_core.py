@@ -10,7 +10,7 @@ term formatting, operator precedence). There is minimal overlap between the two 
 """
 
 import pytest
-from prolog import PrologInterpreter
+from vibeprolog import PrologInterpreter
 
 
 class TestISOUnification:

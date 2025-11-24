@@ -45,7 +45,7 @@ You must keep ./FEATURES.md up to date when you add or change these
 
 1. **Import the interpreter**:
    ```python
-   from prolog import PrologInterpreter
+   from vibeprolog import PrologInterpreter
    ```
 
 2. **Create a new interpreter for each test**:
@@ -106,7 +106,7 @@ This is standard ISO prolog implementation. The parser should parse standard pro
 
 ### Adding a New Built-in
 
-1. **Choose a module in `prolog/builtins/`** that fits (e.g., `arithmetic.py`, `list_ops.py`, `type_tests.py`).
+1. **Choose a module in `vibeprolog/builtins/`** that fits (e.g., `arithmetic.py`, `list_ops.py`, `type_tests.py`).
 2. **Implement a static handler** with the signature `(args, subst, engine)` and annotate return types.
 3. **Register the predicate** in the module's `register(registry, engine_ref=None)` using `register_builtin`.
 4. **Write tests in `tests/`** covering success and failure cases.
@@ -116,7 +116,7 @@ This is standard ISO prolog implementation. The parser should parse standard pro
    uv run pytest tests/test_new_builtins.py -v
    ```
 
-> **Syntax errors**: When a built-in parses text (e.g., via `PrologParser` or `read_from_chars/2`) and the input might be malformed, wrap the parser call in `try/except (ValueError, LarkError)` and call `raise_syntax_error("predicate/arity", exc)` from `prolog.errors`. This ensures callers can intercept the ISO-style `error(syntax_error(_), Context)` term with `catch/3`.
+> **Syntax errors**: When a built-in parses text (e.g., via `PrologParser` or `read_from_chars/2`) and the input might be malformed, wrap the parser call in `try/except (ValueError, LarkError)` and call `raise_syntax_error("predicate/arity", exc)` from `vibeprolog.errors`. This ensures callers can intercept the ISO-style `error(syntax_error(_), Context)` term with `catch/3`.
 
 ### Debugging Tips
 
@@ -134,7 +134,7 @@ This is standard ISO prolog implementation. The parser should parse standard pro
 
 3. **Check parser output**:
    ```python
-   from prolog.parser import PrologParser
+   from vibeprolog.parser import PrologParser
    parser = PrologParser()
    result = parser.parse("your_query.")
    print(result)

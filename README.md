@@ -16,7 +16,7 @@ Did I really ask Codex to add more Emojis to this README? Yes I did...
 ## Try it out
 
 ```
-> uv run main.py ./examples/examples.pl  -q "mammal(X)" -v
+> uv run vibeprolog.py ./examples/examples.pl  -q "mammal(X)" -v
 
 Loading program from './examples/examples.pl'...
 Successfully loaded './examples/examples.pl'
@@ -27,7 +27,7 @@ X = dog
 Solution 2:
 X = cat
 
-> uv run main.py ./examples/examples.pl  -q "grandparent('tom', Y)" -v
+> uv run vibeprolog.py ./examples/examples.pl  -q "grandparent('tom', Y)" -v
 Loading program from './examples/examples.pl'...
 Successfully loaded './examples/examples.pl'
 Query: grandparent('tom', Y).
@@ -49,7 +49,7 @@ Vibe-Prolog implements ISO Prolog error reporting with structured error terms:
 
 Example:
 ```python
-from prolog import PrologInterpreter
+from vibeprolog import PrologInterpreter
 
 prolog = PrologInterpreter()
 # This will throw an instantiation error, which is caught by catch/3

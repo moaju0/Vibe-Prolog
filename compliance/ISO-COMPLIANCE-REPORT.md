@@ -11,12 +11,12 @@ This report documents the work done to support ISO Prolog conformity testing and
 The following predicates were implemented to support ISO conformity testing:
 
 1. **`read_from_chars/2`** - Parse Prolog terms from character lists or strings
-   - Location: `prolog/builtins/io.py`
+   - Location: `vibeprolog/builtins/io.py`
    - Status: ✅ Fully functional
    - Usage: `read_from_chars("f(a, b)", Term)` parses the string and unifies `Term` with `f(a, b)`
 
 2. **`write_term_to_chars/3`** - Convert Prolog terms to character lists with formatting options
-   - Location: `prolog/builtins/io.py`
+   - Location: `vibeprolog/builtins/io.py`
    - Status: ⚠️ Partially functional (operator precedence and spacing not fully implemented)
    - Supported options:
      - `ignore_ops(true/false)` - Write in canonical form
@@ -25,13 +25,13 @@ The following predicates were implemented to support ISO conformity testing:
    - Usage: `write_term_to_chars([1,2,3], [quoted(false)], Chars)` produces `Chars = ['[','1',',','2',',','3',']']`
 
 3. **`setup_call_cleanup/3`** - Execute goals with guaranteed cleanup
-   - Location: `prolog/builtins/control.py`
+   - Location: `vibeprolog/builtins/control.py`
    - Status: ✅ Fully functional
    - Semantics: Calls Setup once, then Goal (possibly backtracking), and always calls Cleanup after Goal completes
    - Usage: `setup_call_cleanup(open(file), process(file), close(file))`
 
 4. **`call_cleanup/2`** - Execute goal with guaranteed cleanup
-   - Location: `prolog/builtins/control.py`
+   - Location: `vibeprolog/builtins/control.py`
    - Status: ✅ Fully functional
    - Semantics: Calls Goal (possibly backtracking) and always calls Cleanup after Goal completes
    - Usage: `call_cleanup(Goal, cleanup_action)`
@@ -124,7 +124,7 @@ The current `write_term_to_chars/3` implementation has these limitations:
 
 Use `compliance/iso-tests-simple.pl` to verify basic functionality:
 ```bash
-uv run python main.py compliance/iso-tests-simple.pl -q "run_all_tests_manual"
+uv run vibeprolog.py compliance/iso-tests-simple.pl -q "run_all_tests_manual"
 ```
 
 ### Future Approach

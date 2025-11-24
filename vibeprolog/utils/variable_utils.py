@@ -7,8 +7,8 @@ Prolog terms, including support for existential quantification.
 
 from typing import Any, Callable
 
-from prolog.parser import Compound, List, Variable
-from prolog.unification import Substitution, deref
+from vibeprolog.parser import Compound, List, Variable
+from vibeprolog.unification import Substitution, deref
 
 
 def strip_existentials(goal: Any, subst: Substitution) -> tuple[Any, set[str]]:

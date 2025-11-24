@@ -10,15 +10,15 @@ from typing import Any
 
 from lark.exceptions import LarkError
 
-from prolog.builtins import BuiltinRegistry, register_builtin
-from prolog.builtins.common import BuiltinArgs, EngineContext
-from prolog.errors import raise_syntax_error
-from prolog.exceptions import PrologThrow
-from prolog.parser import List, PrologParser
-from prolog.terms import Atom, Compound, Number, Variable
-from prolog.unification import Substitution, deref, unify
-from prolog.utils.list_utils import list_to_python, python_to_list
-from prolog.utils.term_utils import term_to_string
+from vibeprolog.builtins import BuiltinRegistry, register_builtin
+from vibeprolog.builtins.common import BuiltinArgs, EngineContext
+from vibeprolog.errors import raise_syntax_error
+from vibeprolog.exceptions import PrologThrow
+from vibeprolog.parser import List, PrologParser
+from vibeprolog.terms import Atom, Compound, Number, Variable
+from vibeprolog.unification import Substitution, deref, unify
+from vibeprolog.utils.list_utils import list_to_python, python_to_list
+from vibeprolog.utils.term_utils import term_to_string
 
 USER_INPUT_STREAM = Atom("user_input")
 USER_OUTPUT_STREAM = Atom("user_output")

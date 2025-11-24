@@ -1,9 +1,9 @@
 import pytest
 
-from prolog.parser import List
-from prolog.terms import Atom, Number, Variable
-from prolog.unification import Substitution, deref, unify
-from prolog.utils.list_utils import (
+from vibeprolog.parser import List
+from vibeprolog.terms import Atom, Number, Variable
+from vibeprolog.unification import Substitution, deref, unify
+from vibeprolog.utils.list_utils import (
     compute_list_length,
     fresh_list_of_length,
     list_to_python,

@@ -7,12 +7,12 @@ from __future__ import annotations
 
 from typing import Iterator
 
-from prolog.builtins import BuiltinRegistry, register_builtin
-from prolog.builtins.common import BuiltinArgs, EngineContext
-from prolog.parser import List
-from prolog.terms import Atom, Compound
-from prolog.unification import Substitution, deref
-from prolog.utils.list_utils import list_to_python
+from vibeprolog.builtins import BuiltinRegistry, register_builtin
+from vibeprolog.builtins.common import BuiltinArgs, EngineContext
+from vibeprolog.parser import List
+from vibeprolog.terms import Atom, Compound
+from vibeprolog.unification import Substitution, deref
+from vibeprolog.utils.list_utils import list_to_python
 
 
 class HigherOrderBuiltins:

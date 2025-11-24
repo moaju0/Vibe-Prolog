@@ -1,6 +1,6 @@
 """Tests for the built-in dispatch registry."""
 
-from prolog import PrologInterpreter
+from vibeprolog import PrologInterpreter
 
 
 def test_registry_contains_core_builtins():

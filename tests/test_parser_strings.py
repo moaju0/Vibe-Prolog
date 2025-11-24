@@ -3,9 +3,9 @@ Tests for parser string handling, including escape sequences and edge cases.
 """
 
 import pytest
-from prolog import PrologInterpreter
-from prolog.parser import PrologParser, Clause
-from prolog.terms import Atom
+from vibeprolog import PrologInterpreter
+from vibeprolog.parser import PrologParser, Clause
+from vibeprolog.terms import Atom
 
 
 class TestSingleQuotedStrings:

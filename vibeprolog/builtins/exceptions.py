@@ -7,12 +7,12 @@ from __future__ import annotations
 
 from typing import Any, Iterator
 
-from prolog.builtins import BuiltinRegistry, register_builtin
-from prolog.builtins.common import BuiltinArgs, EngineContext
-from prolog.engine import PrologThrow
-from prolog.parser import Cut
-from prolog.terms import Atom, Compound
-from prolog.unification import Substitution, deref, unify
+from vibeprolog.builtins import BuiltinRegistry, register_builtin
+from vibeprolog.builtins.common import BuiltinArgs, EngineContext
+from vibeprolog.engine import PrologThrow
+from vibeprolog.parser import Cut
+from vibeprolog.terms import Atom, Compound
+from vibeprolog.unification import Substitution, deref, unify
 
 
 class ExceptionBuiltins:

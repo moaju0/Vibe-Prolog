@@ -1,6 +1,6 @@
 """Tests for write_term_to_chars/3 and read_from_chars/2 predicates."""
 
-from prolog import PrologInterpreter
+from vibeprolog import PrologInterpreter
 
 
 class TestWriteTermToChars:

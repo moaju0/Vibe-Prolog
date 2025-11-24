@@ -6,12 +6,12 @@ from pathlib import Path
 
 from lark.exceptions import LarkError
 
-from prolog.errors import raise_syntax_error
-from prolog.exceptions import PrologThrow
-from prolog.engine import CutException, PrologEngine
-from prolog.parser import PrologParser
-from prolog.terms import Compound, Variable
-from prolog.unification import apply_substitution
+from vibeprolog.errors import raise_syntax_error
+from vibeprolog.exceptions import PrologThrow
+from vibeprolog.engine import CutException, PrologEngine
+from vibeprolog.parser import PrologParser
+from vibeprolog.terms import Compound, Variable
+from vibeprolog.unification import apply_substitution
 
 
 class PrologInterpreter:
@@ -173,7 +173,7 @@ class PrologInterpreter:
 
     def _collect_variables(self, goals: list) -> set[str]:
         """Collect all variable names from goals."""
-        from prolog.parser import List
+        from vibeprolog.parser import List
 
         variables = set()
 
@@ -200,8 +200,8 @@ class PrologInterpreter:
 
     def _term_to_python(self, term) -> any:
         """Convert a Prolog term to a Python value."""
-        from prolog.parser import List
-        from prolog.terms import Atom, Number, Compound, Variable
+        from vibeprolog.parser import List
+        from vibeprolog.terms import Atom, Number, Compound, Variable
 
         if isinstance(term, Atom):
             return term.name

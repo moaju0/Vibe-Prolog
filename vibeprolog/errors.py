@@ -12,8 +12,8 @@ from lark.exceptions import (
 
 def raise_syntax_error(context: str, exc: Exception | None = None) -> None:
     """Raise a PrologThrow carrying error(syntax_error(_), Context)."""
-    from prolog.exceptions import PrologThrow
-    from prolog.terms import Atom, Compound
+    from vibeprolog.exceptions import PrologThrow
+    from vibeprolog.terms import Atom, Compound
 
     reason_atom = _syntax_error_reason(exc)
     syntax_error_term = Compound("syntax_error", (reason_atom,))
@@ -23,7 +23,7 @@ def raise_syntax_error(context: str, exc: Exception | None = None) -> None:
 
 def _syntax_error_reason(exc: Exception | None) -> "Atom":
     """Map parser exceptions to ISO syntax_error/1 reasons."""
-    from prolog.terms import Atom
+    from vibeprolog.terms import Atom
 
     if exc is None:
         return Atom("syntax_error")

@@ -5,8 +5,8 @@ from lark.exceptions import LarkError
 from dataclasses import dataclass
 from typing import Any
 
-from prolog.exceptions import PrologError, PrologThrow
-from prolog.terms import Atom, Variable, Number, Compound
+from vibeprolog.exceptions import PrologError, PrologThrow
+from vibeprolog.terms import Atom, Variable, Number, Compound
 
 
 @dataclass(frozen=True)

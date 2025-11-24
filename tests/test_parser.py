@@ -1,7 +1,7 @@
 """Tests for the Prolog parser."""
 
 import pytest
-from prolog.parser import (
+from vibeprolog.parser import (
     PrologParser, Clause, Compound, Atom, Variable, Number, List, Cut
 )
 

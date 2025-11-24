@@ -4,7 +4,7 @@ Tests arithmetic operations and comparisons.
 """
 
 import pytest
-from prolog import PrologInterpreter
+from vibeprolog import PrologInterpreter
 
 
 class TestBasicArithmetic:

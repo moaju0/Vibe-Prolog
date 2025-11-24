@@ -9,12 +9,12 @@ from __future__ import annotations
 from collections import OrderedDict
 from typing import Any, Callable, Iterator
 
-from prolog.builtins import BuiltinRegistry, register_builtin
-from prolog.builtins.common import BuiltinArgs, EngineContext
-from prolog.parser import List, Variable
-from prolog.unification import Substitution, apply_substitution, deref, unify
-from prolog.utils.term_utils import term_sort_key
-from prolog.utils.variable_utils import (
+from vibeprolog.builtins import BuiltinRegistry, register_builtin
+from vibeprolog.builtins.common import BuiltinArgs, EngineContext
+from vibeprolog.parser import List, Variable
+from vibeprolog.unification import Substitution, apply_substitution, deref, unify
+from vibeprolog.utils.term_utils import term_sort_key
+from vibeprolog.utils.variable_utils import (
     collect_vars,
     collect_vars_in_order,
     strip_existentials,

@@ -1,7 +1,7 @@
 """Tests for a minimal meta-interpreter."""
 
 import pytest
-from prolog import PrologInterpreter
+from vibeprolog import PrologInterpreter
 
 
 class TestMinimalMetaInterpreter:

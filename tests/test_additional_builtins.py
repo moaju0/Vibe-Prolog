@@ -1,7 +1,7 @@
 """Tests for additional built-in predicates."""
 
 import pytest
-from prolog import PrologInterpreter
+from vibeprolog import PrologInterpreter
 
 
 class TestTypeChecking:

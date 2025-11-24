@@ -7,11 +7,11 @@ from __future__ import annotations
 
 from typing import Iterator
 
-from prolog.builtins import BuiltinRegistry, register_builtin
-from prolog.builtins.common import BuiltinArgs, EngineContext
-from prolog.parser import Clause
-from prolog.terms import Atom, Compound, Number
-from prolog.unification import Substitution, apply_substitution, deref, unify
+from vibeprolog.builtins import BuiltinRegistry, register_builtin
+from vibeprolog.builtins.common import BuiltinArgs, EngineContext
+from vibeprolog.parser import Clause
+from vibeprolog.terms import Atom, Compound, Number
+from vibeprolog.unification import Substitution, apply_substitution, deref, unify
 
 
 class DatabaseBuiltins:

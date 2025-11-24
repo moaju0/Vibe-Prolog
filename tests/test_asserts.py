@@ -1,7 +1,7 @@
 """Tests for asserta/1, assertz/1, and assert/1 builtins."""
 
 import pytest
-from prolog import PrologInterpreter
+from vibeprolog import PrologInterpreter
 
 
 class TestAsserta:

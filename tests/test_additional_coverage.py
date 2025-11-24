@@ -4,7 +4,7 @@ Additional targeted tests to push coverage above 92%.
 These tests target very specific uncovered code paths.
 """
 import pytest
-from prolog import PrologInterpreter
+from vibeprolog import PrologInterpreter
 
 
 class TestFormatTwoArgs:

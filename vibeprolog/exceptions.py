@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from prolog.terms import Atom, Compound
+from vibeprolog.terms import Atom, Compound
 
 
 class PrologThrow(Exception):

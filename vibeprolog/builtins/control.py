@@ -8,10 +8,10 @@ from __future__ import annotations
 
 from typing import Iterator
 
-from prolog.builtins import BuiltinRegistry, register_builtin
-from prolog.builtins.common import BuiltinArgs, EngineContext, iter_empty
-from prolog.parser import Compound
-from prolog.unification import Substitution, deref, unify
+from vibeprolog.builtins import BuiltinRegistry, register_builtin
+from vibeprolog.builtins.common import BuiltinArgs, EngineContext, iter_empty
+from vibeprolog.parser import Compound
+from vibeprolog.unification import Substitution, deref, unify
 
 
 class ControlBuiltins:

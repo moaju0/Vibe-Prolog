@@ -10,13 +10,13 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from prolog.builtins import BuiltinRegistry, register_builtin
-from prolog.builtins.common import BuiltinArgs, EngineContext
-from prolog.parser import Compound, Number
-from prolog.unification import Substitution, deref, unify
+from vibeprolog.builtins import BuiltinRegistry, register_builtin
+from vibeprolog.builtins.common import BuiltinArgs, EngineContext
+from vibeprolog.parser import Compound, Number
+from vibeprolog.unification import Substitution, deref, unify
 
 if TYPE_CHECKING:
-    from prolog.engine import PrologEngine
+    from vibeprolog.engine import PrologEngine
 
 
 class ArithmeticBuiltins:

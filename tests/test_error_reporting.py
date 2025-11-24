@@ -1,7 +1,7 @@
 """Tests for ISO Prolog error reporting."""
 
-from prolog import PrologInterpreter
-from prolog.exceptions import PrologThrow
+from vibeprolog import PrologInterpreter
+from vibeprolog.exceptions import PrologThrow
 import pytest
 
 

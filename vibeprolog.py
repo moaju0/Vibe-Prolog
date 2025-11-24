@@ -5,7 +5,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from prolog import PrologInterpreter
+from vibeprolog import PrologInterpreter
 
 
 def load_program(prolog: PrologInterpreter, filename: str, verbose: bool = False) -> bool:

@@ -1,4 +1,4 @@
-from prolog import PrologInterpreter
+from vibeprolog import PrologInterpreter
 
 prolog = PrologInterpreter()
 prolog.consult("tests/test_mi_with_explain.pl")

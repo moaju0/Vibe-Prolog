@@ -1,7 +1,7 @@
 """Tests for stream selection built-ins (current_input/1, current_output/1)."""
 
 import pytest
-from prolog import PrologInterpreter
+from vibeprolog import PrologInterpreter
 
 
 @pytest.fixture

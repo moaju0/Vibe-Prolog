@@ -10,7 +10,7 @@ This module tests the built-ins and features added to support meta-interpreters:
 """
 
 import pytest
-from prolog import PrologInterpreter
+from vibeprolog import PrologInterpreter
 
 
 class TestFormatBuiltins:

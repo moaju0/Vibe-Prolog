@@ -1,6 +1,6 @@
 """Tests for throw/1 and catch/3 exception handling."""
 
-from prolog import PrologInterpreter
+from vibeprolog import PrologInterpreter
 
 
 class TestThrowCatch:

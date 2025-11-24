@@ -4,7 +4,7 @@ Inspired by scryer-prolog src/tests/rules.pl
 """
 
 import pytest
-from prolog import PrologInterpreter
+from vibeprolog import PrologInterpreter
 
 
 class TestBasicRules:

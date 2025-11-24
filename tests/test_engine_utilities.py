@@ -1,9 +1,9 @@
 """Tests for shared engine utilities used by built-ins."""
 
-from prolog import PrologInterpreter
-from prolog.parser import List
-from prolog.terms import Atom, Number, Variable
-from prolog.unification import Substitution, unify
+from vibeprolog import PrologInterpreter
+from vibeprolog.parser import List
+from vibeprolog.terms import Atom, Number, Variable
+from vibeprolog.unification import Substitution, unify
 
 
 def test_format_to_string_shared_logic():

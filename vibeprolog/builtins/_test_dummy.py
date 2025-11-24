@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from prolog.builtins import BuiltinRegistry
-from prolog.builtins.common import BuiltinArgs, EngineContext
-from prolog.unification import Substitution
+from vibeprolog.builtins import BuiltinRegistry
+from vibeprolog.builtins.common import BuiltinArgs, EngineContext
+from vibeprolog.unification import Substitution
 
 
 class DummyBuiltins:

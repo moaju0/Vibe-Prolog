@@ -88,4 +88,4 @@ run_tests_helper([Test|Tests], FailedTests) :-
         FailedTests = [Test|RestFailed]
     ).
 
-% Run with: uv run python main.py compliance/iso-tests-simple.pl -q "run_all_tests_manual"
+% Run with: uv run vibeprolog.py compliance/iso-tests-simple.pl -q "run_all_tests_manual"

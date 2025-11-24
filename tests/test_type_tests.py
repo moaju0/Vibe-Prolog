@@ -1,7 +1,7 @@
 """Tests for type testing predicates (atomic/1, callable/1, ground/1)."""
 
 import pytest
-from prolog import PrologInterpreter
+from vibeprolog import PrologInterpreter
 
 
 class TestAtomic:

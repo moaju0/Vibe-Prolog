@@ -7,11 +7,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from prolog.builtins import BuiltinRegistry, register_builtin
-from prolog.builtins.common import BuiltinArgs, EngineContext
-from prolog.parser import List
-from prolog.terms import Atom, Compound, Number, Variable
-from prolog.unification import Substitution, deref
+from vibeprolog.builtins import BuiltinRegistry, register_builtin
+from vibeprolog.builtins.common import BuiltinArgs, EngineContext
+from vibeprolog.parser import List
+from vibeprolog.terms import Atom, Compound, Number, Variable
+from vibeprolog.unification import Substitution, deref
 
 
 class TypeTestBuiltins:

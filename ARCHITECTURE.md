@@ -7,7 +7,7 @@ context so you can reason about the system in one place.
 ## Project Structure
 
 ```
-prolog/
+vibeprolog/
 ├── interpreter.py          # High-level PrologInterpreter interface
 ├── engine.py               # Core execution engine (~200 lines)
 ├── parser.py               # Prolog syntax parser
@@ -34,7 +34,7 @@ that document to understand missing directives, error terms, and parser gaps.
 ### Running the Demo
 
 ```bash
-uv run main.py
+uv run vibeprolog.py
 ```
 
 ### Running Tests
@@ -51,7 +51,7 @@ See the "Tooling & Tests" section for additional harness info.
 ### Using as a Library
 
 ```python
-from prolog import PrologInterpreter
+from vibeprolog import PrologInterpreter
 
 prolog = PrologInterpreter()
 prolog.consult_string("""
@@ -84,22 +84,22 @@ results = prolog.query("my_query(X)")
 
 The interpreter consists of four main components:
 
-1. **Parser** (`prolog/parser.py`) - Uses Lark to parse Prolog syntax with full
+1. **Parser** (`vibeprolog/parser.py`) - Uses Lark to parse Prolog syntax with full
    operator precedence, multi-base numeric literals, quoted atoms/strings,
    escapes, and ISO character code forms (except for a handful of noted edge
    cases).
-2. **Unification** (`prolog/unification.py`) - Robinson-style unification with
+2. **Unification** (`vibeprolog/unification.py`) - Robinson-style unification with
    occurs-check by default so cyclic structures are prevented.
-3. **Engine** (`prolog/engine.py`) - Backtracking search with built-in
+3. **Engine** (`vibeprolog/engine.py`) - Backtracking search with built-in
    predicates, cut semantics, dynamic predicate assertion/retraction, and the
    dispatcher that resolves functor/arity to handlers.
-4. **Interpreter** (`prolog/interpreter.py`) - Public API for loading and
+4. **Interpreter** (`vibeprolog/interpreter.py`) - Public API for loading and
    querying programs, plus helpers for consulting strings/files and capturing
    output streams.
 
 ## Built-in Registry
 
-Built-ins live under `prolog/builtins/` and register themselves via
+Built-ins live under `vibeprolog/builtins/` and register themselves via
 `prolog.builtins.register_builtin`. Each module exposes a static `register`
 method so the engine can populate its registry at startup. Handlers use the
 signature `(args, subst, engine)` and can yield multiple substitutions for
@@ -107,7 +107,7 @@ non-deterministic predicates.
 
 ### Adding a New Built-in Predicate
 
-1. **Choose the appropriate module** in `prolog/builtins/`:
+1. **Choose the appropriate module** in `vibeprolog/builtins/`:
    - Arithmetic operations → `arithmetic.py`
    - List operations → `list_ops.py`
    - Type tests → `type_tests.py`
@@ -142,28 +142,28 @@ non-deterministic predicates.
 
 ## Tooling & Tests
 
-- Exercise the system primarily through the Python API (`from prolog import
+- Exercise the system primarily through the Python API (`from vibeprolog import
   PrologInterpreter`) and the pytest suite (800+ tests covering ISO core,
   parser pathologies, and built-in behaviors).
 - `PrologInterpreter` exposes `consult/consult_string`, `query`, `query_once`,
   and `has_solution`, plus optional stdout capture so predicates like `write`
   and `format` can be observed while still returning substitutions.
 - Built-in predicates are dispatched through the registry in
-  `prolog/engine.py`. To add one, register a handler that either yields
+  `vibeprolog/engine.py`. To add one, register a handler that either yields
   substitutions or returns `None`. Helpers such as `_format_to_string`,
   `_list_to_python` (respects active substitutions), and `_fresh_variable`
   centralize tricky behavior so new built-ins stay consistent.
 
 ## Utility Modules
 
-Shared helpers for the AST live in `prolog/utils/`:
+Shared helpers for the AST live in `vibeprolog/utils/`:
 
 - `term_utils.py`: Formatting, comparison, and sorting helpers for terms.
 - `list_utils.py`: Convert between Python and Prolog list forms; match/shape
   lists.
 - `variable_utils.py`: Variable collection, copying, and existential stripping.
 
-These modules are imported by `prolog/engine.py` and have focused coverage in
+These modules are imported by `vibeprolog/engine.py` and have focused coverage in
 `tests/utils/`.
 
 ## Examples

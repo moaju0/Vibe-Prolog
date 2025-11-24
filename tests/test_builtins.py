@@ -1,7 +1,7 @@
 """Tests for built-in predicates in the Prolog engine."""
 
 import pytest
-from prolog import PrologInterpreter
+from vibeprolog import PrologInterpreter
 
 
 class TestUnification:

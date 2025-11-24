@@ -17,7 +17,7 @@ and other advanced Prolog features:
 """
 
 import pytest
-from prolog import PrologInterpreter
+from vibeprolog import PrologInterpreter
 
 
 class TestAppend:

@@ -7,14 +7,14 @@ from __future__ import annotations
 
 from typing import Iterator
 
-from prolog.builtins import BuiltinRegistry, register_builtin
-from prolog.builtins.common import BuiltinArgs, EngineContext
-from prolog.exceptions import PrologError, PrologThrow
-from prolog.parser import List
-from prolog.terms import Atom, Compound, Number, Variable
-from prolog.unification import Substitution, deref, unify
-from prolog.utils.term_utils import term_sort_key, terms_equal
-from prolog.utils.variable_utils import copy_term_recursive
+from vibeprolog.builtins import BuiltinRegistry, register_builtin
+from vibeprolog.builtins.common import BuiltinArgs, EngineContext
+from vibeprolog.exceptions import PrologError, PrologThrow
+from vibeprolog.parser import List
+from vibeprolog.terms import Atom, Compound, Number, Variable
+from vibeprolog.unification import Substitution, deref, unify
+from vibeprolog.utils.term_utils import term_sort_key, terms_equal
+from vibeprolog.utils.variable_utils import copy_term_recursive
 
 
 class TermManipulationBuiltins:

@@ -1,9 +1,9 @@
 import pytest
 
-from prolog.parser import List
-from prolog.terms import Atom, Compound, Number, Variable
-from prolog.unification import Substitution
-from prolog.utils.term_utils import term_sort_key, term_to_string, terms_equal
+from vibeprolog.parser import List
+from vibeprolog.terms import Atom, Compound, Number, Variable
+from vibeprolog.unification import Substitution
+from vibeprolog.utils.term_utils import term_sort_key, term_to_string, terms_equal
 
 
 def test_term_to_string_handles_all_term_types():
