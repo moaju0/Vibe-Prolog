@@ -115,19 +115,21 @@ class ReflectionBuiltins:
         flag_term = deref(flag_term, subst)
         value_term = deref(value_term, subst)
 
-        prolog_argv = ReflectionBuiltins._get_prolog_argv(engine)
+        supported_flags = {
+            "argv": ReflectionBuiltins._get_prolog_argv(engine)
+        }
 
-        # Only handle argv flag for now
         if isinstance(flag_term, Variable):
-            # Bind Flag to 'argv' and Value to argv list (enumeration)
-            new_subst = unify(flag_term, Atom("argv"), subst)
-            if new_subst is not None:
-                new_subst = unify(value_term, prolog_argv, new_subst)
+            # Enumerate supported flags
+            for flag_name, flag_value in supported_flags.items():
+                new_subst = unify(flag_term, Atom(flag_name), subst)
                 if new_subst is not None:
-                    yield new_subst
-        elif isinstance(flag_term, Atom) and flag_term.name == "argv":
-            # Flag is ground 'argv', bind Value
-            new_subst = unify(value_term, prolog_argv, subst)
+                    final_subst = unify(value_term, flag_value, new_subst)
+                    if final_subst is not None:
+                        yield final_subst
+        elif isinstance(flag_term, Atom) and flag_term.name in supported_flags:
+            flag_value = supported_flags[flag_term.name]
+            new_subst = unify(value_term, flag_value, subst)
             if new_subst is not None:
                 yield new_subst
 

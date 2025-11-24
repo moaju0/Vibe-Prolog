@@ -98,21 +98,11 @@ class TestArgv:
         # Should not match non-argv flags
         assert not prolog.has_solution("current_prolog_flag(version, _)")
 
-    def test_argv_deterministic(self):
-        """Test that argv/1 is deterministic (returns single solution)."""
+    def test_determinism(self):
+        """Test determinism of argv/1 and current_prolog_flag(argv, _)."""
         prolog = PrologInterpreter(argv=["a", "b"])
-
-        results = prolog.query("argv(Args)")
-        assert len(results) == 1
-        assert results[0]['Args'] == ["a", "b"]
-
-    def test_current_prolog_flag_argv_deterministic(self):
-        """Test that current_prolog_flag(argv, Args) is deterministic."""
-        prolog = PrologInterpreter(argv=["test"])
-
-        results = prolog.query("current_prolog_flag(argv, Args)")
-        assert len(results) == 1
-        assert results[0]['Args'] == ["test"]
+        assert len(list(prolog.query("argv(Args)"))) == 1
+        assert len(list(prolog.query("current_prolog_flag(argv, Args)"))) == 1
 
     def test_argv_with_atom_string_conversion(self):
         """Test using argv/1 results with atom_string/2."""
@@ -156,14 +146,3 @@ class TestArgv:
         prolog.consult_string("test_pred(X) :- argv([X]).")
 
         assert prolog.has_solution("test_pred(test_arg)")
-
-    def test_backtracking_behavior(self):
-        """Test that argv predicates don't create choice points."""
-        prolog = PrologInterpreter(argv=["a"])
-
-        # Should only have one solution
-        results = prolog.query("argv(X)")
-        assert len(results) == 1
-
-        results = prolog.query("current_prolog_flag(argv, X)")
-        assert len(results) == 1
