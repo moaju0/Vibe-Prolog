@@ -4,6 +4,7 @@ import pytest
 from vibeprolog.parser import (
     PrologParser, Clause, Compound, Atom, Variable, Number, List, Cut
 )
+from vibeprolog.exceptions import PrologThrow
 
 
 class TestBasicParsing:

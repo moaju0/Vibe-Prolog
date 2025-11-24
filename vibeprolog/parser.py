@@ -408,11 +408,27 @@ class PrologParser:
         )
 
     def _strip_block_comments(self, text: str) -> str:
-        """Strip block comments from text, handling nesting."""
+        """Strip block comments from text, handling nesting and quoted strings."""
         result = []
         i = 0
+        in_single_quote = False
+        in_double_quote = False
+        escape_next = False
         while i < len(text):
-            if text[i:i+2] == '/*':
+            char = text[i]
+            if escape_next:
+                escape_next = False
+                result.append(char)
+            elif char == '\\':
+                escape_next = True
+                result.append(char)
+            elif char == "'" and not in_double_quote:
+                in_single_quote = not in_single_quote
+                result.append(char)
+            elif char == '"' and not in_single_quote:
+                in_double_quote = not in_double_quote
+                result.append(char)
+            elif not in_single_quote and not in_double_quote and text.startswith('/*', i):
                 depth = 1
                 i += 2
                 while i < len(text) and depth > 0:
@@ -425,11 +441,11 @@ class PrologParser:
                     else:
                         i += 1
                 if depth > 0:
-                    # Unterminated comment
                     raise ValueError("Unterminated block comment")
+                continue  # Skip the comment
             else:
-                result.append(text[i])
-                i += 1
+                result.append(char)
+            i += 1
         return ''.join(result)
 
     def parse(self, text: str, context: str = "parse/1") -> list[Clause]:
