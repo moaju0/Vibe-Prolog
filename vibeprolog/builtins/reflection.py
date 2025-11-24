@@ -9,7 +9,7 @@ from typing import Iterator
 
 from vibeprolog.builtins import BuiltinRegistry, register_builtin
 from vibeprolog.builtins.common import BuiltinArgs, EngineContext
-from vibeprolog.terms import Atom, Compound, Number
+from vibeprolog.terms import Atom, Compound, Number, Variable
 from vibeprolog.unification import Substitution, deref, unify
 from vibeprolog.utils.list_utils import python_to_list
 
@@ -102,6 +102,11 @@ class ReflectionBuiltins:
         return unify(arg_list, prolog_argv, subst)
 
     @staticmethod
+    def _get_prolog_argv(engine: EngineContext) -> any:
+        """Convert engine.argv to Prolog list of atoms."""
+        return python_to_list([Atom(arg) for arg in engine.argv])
+
+    @staticmethod
     def _builtin_current_prolog_flag(
         args: BuiltinArgs, subst: Substitution, engine: EngineContext
     ) -> Iterator[Substitution]:
@@ -110,10 +115,18 @@ class ReflectionBuiltins:
         flag_term = deref(flag_term, subst)
         value_term = deref(value_term, subst)
 
+        prolog_argv = ReflectionBuiltins._get_prolog_argv(engine)
+
         # Only handle argv flag for now
-        if isinstance(flag_term, Atom) and flag_term.name == "argv":
-            # Convert argv to Prolog list of atoms
-            prolog_argv = python_to_list([Atom(arg) for arg in engine.argv])
+        if isinstance(flag_term, Variable):
+            # Bind Flag to 'argv' and Value to argv list (enumeration)
+            new_subst = unify(flag_term, Atom("argv"), subst)
+            if new_subst is not None:
+                new_subst = unify(value_term, prolog_argv, new_subst)
+                if new_subst is not None:
+                    yield new_subst
+        elif isinstance(flag_term, Atom) and flag_term.name == "argv":
+            # Flag is ground 'argv', bind Value
             new_subst = unify(value_term, prolog_argv, subst)
             if new_subst is not None:
                 yield new_subst

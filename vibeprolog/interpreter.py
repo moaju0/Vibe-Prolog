@@ -17,11 +17,21 @@ from vibeprolog.unification import apply_substitution
 class PrologInterpreter:
     """Main interface for the Prolog interpreter."""
 
-    def __init__(self, argv: list[str] | None = None):
+    def __init__(self, argv: list[str] | None = None) -> None:
         self.parser = PrologParser()
         self.clauses = []
-        self.argv = argv or []
+        self._argv: list[str] = argv or []
         self.engine = None
+
+    @property
+    def argv(self) -> list[str]:
+        return self.engine.argv if self.engine else self._argv
+
+    @argv.setter
+    def argv(self, value: list[str]) -> None:
+        self._argv = value
+        if self.engine is not None:
+            self.engine.argv = value
 
     def consult(self, filepath: str | Path):
         """Load Prolog clauses from a file."""
