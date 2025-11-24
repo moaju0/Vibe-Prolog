@@ -52,7 +52,7 @@ shares the same environment. From the repo root you can run:
 ```bash
 uv run ai-tools/kilocode/fix-issue-with-kilocode 123
 uv run ai-tools/kilocode/address-pr-comments-with-kilocode 456
-uv run ai-tools/kilocode/fix-issue-with-claude 789
+uv run ai-tools/claude/fix-issue-with-claude 789
 ```
 
 Each script also has an executable shebang, so you may invoke them directly via
@@ -111,7 +111,7 @@ stages/commits the changes, pushes, and raises a PR.
 Usage:
 
 ```bash
-uv run ai-tools/kilocode/fix-issue-with-claude 123
+uv run ai-tools/claude/fix-issue-with-claude 123
 # or
-./ai-tools/kilocode/fix-issue-with-claude 123
+./ai-tools/claude/fix-issue-with-claude 123
 ```
