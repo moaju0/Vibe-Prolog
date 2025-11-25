@@ -121,13 +121,14 @@ PROLOG_GRAMMAR = r"""
     // Patterns: 0'a (simple char), 0'\\ (backslash), 0'\' (quote), 0''' (doubled quote), 0'\xHH\ (hex)
     CHAR_CODE.1: /0'(\\x[0-9a-fA-F]+\\\\|\\\\\\\\|\\\\['tnr]|''|[^'])/ | /\d+'.'/
 
-    // Scientific notation, hex, octal, binary
+    // Scientific notation, hex, octal, binary, base'digits
     NUMBER.4: /-?0x[0-9a-fA-F]+/i
             | /-?0o[0-7]+/i
             | /-?0b[01]+/i
             | /-?\d+\.?\d*[eE][+-]?\d+/
             | /-?\d+\.\d+/
             | /-?\.\d+/
+            | /-?\d+'[a-zA-Z0-9_]+/
             | /-?\d+/
 
     STRING: /"([^"\\]|\\.)*"/ | /'(\\.|''|[^'\\])*'/
@@ -335,12 +336,50 @@ class PrologTransformer(Transformer):
         elif value.startswith(("-0b", "0b")) or value.startswith(("-0B", "0B")):
             # Binary number
             return Number(int(value, 2))
+        elif "'" in value:
+            # Base'digits syntax
+            return self._parse_base_number(value)
         elif "e" in value.lower() or "." in value:
             # Scientific notation or float
             return Number(float(value))
         else:
             # Regular integer
             return Number(int(value))
+
+    def _parse_base_number(self, value):
+        """Parse base'digits syntax like 16'ff or -2'abcd."""
+        # Handle negative sign
+        negative = value.startswith('-')
+        if negative:
+            value = value[1:]
+
+        # Split by '
+        parts = value.split("'", 1)
+        base_str, digits_str = parts
+        # Base must be a valid integer; token regex guarantees digits for base
+        base = int(base_str)
+        if not (2 <= base <= 36):
+            raise ValueError(f"Base must be between 2 and 36, got {base}")
+
+        # Remove underscores from digits
+        digits_clean = digits_str.replace('_', '')
+
+        if not digits_clean:
+            raise ValueError(f"Empty digits in {value}")
+
+        # Validate and accumulate value
+        result = 0
+        for digit in digits_clean.lower():
+            # Convert single digit in base up to 36
+            digit_val = int(digit, 36)
+            if digit_val >= base:
+                raise ValueError(f"Invalid digit '{digit}' for base {base} in {value}")
+            result = result * base + digit_val
+
+        if negative:
+            result = -result
+
+        return Number(result)
 
     def char_code(self, items):
         """Handle character code notation like 0'X or base'char"""

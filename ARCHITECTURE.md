@@ -85,9 +85,9 @@ results = prolog.query("my_query(X)")
 The interpreter consists of four main components:
 
 1. **Parser** (`vibeprolog/parser.py`) - Uses Lark to parse Prolog syntax with full
-   operator precedence, multi-base numeric literals, quoted atoms/strings,
-   escapes, and ISO character code forms (except for a handful of noted edge
-   cases).
+    operator precedence, multi-base numeric literals (including base-qualified
+    numbers like `16'ff`), quoted atoms/strings, escapes, and ISO character code
+    forms (except for a handful of noted edge cases).
 2. **Unification** (`vibeprolog/unification.py`) - Robinson-style unification with
    occurs-check by default so cyclic structures are prevented.
 3. **Engine** (`vibeprolog/engine.py`) - Backtracking search with built-in
@@ -213,8 +213,7 @@ you should be aware of:
 - ISO error term infrastructure (`error(ErrorType, Context)` along with
   `instantiation_error`, `type_error`, etc.) still needs work; most built-ins
   fail silently instead of raising structured errors.
-- A handful of parser edge cases remain unimplemented (`0'\\xHH\\` hex escapes,
-  and `16'mod'2` syntax).
+- A handful of parser edge cases remain unimplemented (`0'\\xHH\\` hex escapes).
 - No DCG, module system, CLP libraries, or tail-call optimization. Very deep
   recursion can still overflow Python's stack in pathological cases.
 

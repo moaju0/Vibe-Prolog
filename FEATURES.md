@@ -151,7 +151,7 @@
 - ✅ Binary (`0b`), octal (`0o`), hexadecimal (`0x`)
 - ✅ Scientific notation
 - ✅ Floating point
-- ⚠️ Character code arithmetic (`16'mod'2` - base'char'number syntax missing)
+- ✅ Base-qualified numbers (`16'ff`, `2'abcd` - base'digits syntax)
 
 ### Comments
 - ✅ Line comments (`%`)
@@ -208,7 +208,6 @@
 
 ### Parser Limitations
 1. **Hex Character Codes**: `0'\xHH\` syntax not fully supported
-2. **Base Character Arithmetic**: `16'mod'2` syntax not implemented
-3. **SWI-Style Dict Syntax**: `tag{a:1}` syntax not supported
-4. **Operator Definition**: `:- op/3` directive rejected (not implemented)
-6. **Unary Minus Precedence**: In some cases, unary minus may bind differently than expected (e.g., `-X + Y` parses as `-(X + Y)`)
+2. **SWI-Style Dict Syntax**: `tag{a:1}` syntax not supported
+3. **Operator Definition**: `:- op/3` directive rejected (not implemented)
+4. **Unary Minus Precedence**: In some cases, unary minus may bind differently than expected (e.g., `-X + Y` parses as `-(X + Y)`)

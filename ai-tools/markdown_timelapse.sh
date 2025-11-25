@@ -56,7 +56,11 @@ trap cleanup EXIT
 
 # Get commits that touched this file (oldest first)
 # macOS doesn't have 'tac', but BSD 'tail -r' reverses lines.
-git log --follow --format='%H' -- "$FILE" | tail -r > "$COMMITS_FILE"
+if command -v tac >/dev/null 2>&1; then
+    git log --follow --format='%H' -- "$FILE" | tac > "$COMMITS_FILE"
+else
+    git log --follow --format='%H' -- "$FILE" | tail -r > "$COMMITS_FILE"
+fi
 
 if [ ! -s "$COMMITS_FILE" ]; then
   echo "No commits found for $FILE" >&2

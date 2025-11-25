@@ -448,6 +448,117 @@ class TestStrings:
         assert clause.head.args[0].name == ""
 
 
+class TestBaseDigits:
+    """Tests for parsing base'digits syntax."""
+
+    def test_parse_hex_base16(self):
+        """Test parsing hexadecimal with base 16."""
+        parser = PrologParser()
+        clauses = parser.parse("num(16'ff).")
+        clause = clauses[0]
+        assert isinstance(clause.head.args[0], Number)
+        assert clause.head.args[0].value == 255
+
+    def test_parse_binary_base2(self):
+        """Test parsing binary with base 2."""
+        parser = PrologParser()
+        clauses = parser.parse("num(2'1010).")
+        clause = clauses[0]
+        assert isinstance(clause.head.args[0], Number)
+        assert clause.head.args[0].value == 10
+
+    def test_parse_decimal_base10(self):
+        """Test parsing decimal with base 10."""
+        parser = PrologParser()
+        clauses = parser.parse("num(10'123).")
+        clause = clauses[0]
+        assert isinstance(clause.head.args[0], Number)
+        assert clause.head.args[0].value == 123
+
+    def test_parse_base36_max(self):
+        """Test parsing with maximum base 36."""
+        parser = PrologParser()
+        clauses = parser.parse("num(36'z).")
+        clause = clauses[0]
+        assert isinstance(clause.head.args[0], Number)
+        assert clause.head.args[0].value == 35
+
+    def test_parse_negative_base_digits(self):
+        """Test parsing negative base'digits."""
+        parser = PrologParser()
+        clauses = parser.parse("num(-16'ff).")
+        clause = clauses[0]
+        assert isinstance(clause.head.args[0], Number)
+        assert clause.head.args[0].value == -255
+
+    def test_parse_with_underscores(self):
+        """Test parsing with underscores for readability."""
+        parser = PrologParser()
+        clauses = parser.parse("num(16'f_f).")
+        clause = clauses[0]
+        assert isinstance(clause.head.args[0], Number)
+        assert clause.head.args[0].value == 255
+
+    def test_parse_case_insensitive_digits(self):
+        """Test that digits are case insensitive."""
+        parser = PrologParser()
+        clauses = parser.parse("num(16'FF).")
+        clause = clauses[0]
+        assert isinstance(clause.head.args[0], Number)
+        assert clause.head.args[0].value == 255
+
+    def test_parse_mixed_case_digits(self):
+        """Test mixed case digits."""
+        parser = PrologParser()
+        clauses = parser.parse("num(16'AbCd).")
+        clause = clauses[0]
+        assert isinstance(clause.head.args[0], Number)
+        # A=10, b=11, C=12, d=13: 10*16^3 + 11*16^2 + 12*16 + 13 = 40960 + 2816 + 192 + 13 = 43981
+        assert clause.head.args[0].value == 10*4096 + 11*256 + 12*16 + 13
+
+    def test_invalid_base_too_low(self):
+        """Test invalid base below 2."""
+        parser = PrologParser()
+        with pytest.raises(PrologThrow, match="Base must be between 2 and 36"):
+            parser.parse("num(1'1).")
+
+    def test_invalid_base_too_high(self):
+        """Test invalid base above 36."""
+        parser = PrologParser()
+        with pytest.raises(PrologThrow, match="Base must be between 2 and 36"):
+            parser.parse("num(37'1).")
+
+    def test_invalid_digit_for_base(self):
+        """Test digit value >= base."""
+        parser = PrologParser()
+        with pytest.raises(PrologThrow, match="Invalid digit '3' for base 2"):
+            parser.parse("num(2'13).")
+
+    def test_invalid_digit_letter_for_base(self):
+        """Test letter digit >= base."""
+        parser = PrologParser()
+        with pytest.raises(PrologThrow, match="Invalid digit 'g' for base 16"):
+            parser.parse("num(16'fg).")
+
+    def test_empty_digits(self):
+        """Test empty digits after base'."""
+        parser = PrologParser()
+        with pytest.raises(PrologThrow, match="syntax_error"):
+            parser.parse("num(16').")
+
+    def test_invalid_base_not_integer(self):
+        """Test non-integer base."""
+        parser = PrologParser()
+        with pytest.raises(PrologThrow, match="syntax_error"):
+            parser.parse("num(a'1).")
+
+    def test_invalid_digit_character(self):
+        """Test invalid digit character."""
+        parser = PrologParser()
+        with pytest.raises(PrologThrow, match="syntax_error"):
+            parser.parse("num(16'@).")
+
+
 class TestComplexExamples:
     """Tests for parsing complex real-world examples."""
 
