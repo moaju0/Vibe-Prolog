@@ -26,7 +26,7 @@ Be sure to include the following in each issue
 - include comprehensive test coverage
 - update FEATURES.md
 
-Don't include estimates or lines numbers
+Don't include estimates or line numbers
 ```
 
 ## Prioritise work
