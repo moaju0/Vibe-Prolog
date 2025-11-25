@@ -152,20 +152,69 @@ def get_upstream_remote_branch() -> tuple[str, str]:
     return remote_name, remote_branch
 
 
-def find_pr_number_for_branch(owner: str, repo: str, branch_name: str, display_branch: str) -> str:
-    head_ref = f"{owner}:{branch_name}"
+def get_git_remotes() -> list[str]:
+    """Get list of configured git remotes."""
+    output = run(["git", "remote"]).strip()
+    if not output:
+        return []
+    return [line.strip() for line in output.split("\n") if line.strip()]
+
+
+def find_base_repo_remote(tracking_remote: str) -> str:
+    """
+    Find the base repository remote for PR searches.
+
+    For fork-based workflows, PRs live in the upstream repo, not the fork.
+    This function tries to find the upstream remote, falling back to the
+    tracking remote if no upstream is found.
+
+    Args:
+        tracking_remote: The remote that the current branch tracks
+
+    Returns:
+        The remote name to use for PR searches (tries "upstream" first)
+    """
+    remotes = get_git_remotes()
+
+    # For fork workflows, try "upstream" first
+    if "upstream" in remotes and tracking_remote != "upstream":
+        return "upstream"
+
+    # Fall back to the tracking remote
+    return tracking_remote
+
+
+def find_pr_number_for_branch(
+    base_owner: str,
+    base_repo: str,
+    head_owner: str,
+    branch_name: str,
+    display_branch: str,
+) -> str:
+    """
+    Find PR number by searching in the base repository for a branch from the fork.
+
+    Args:
+        base_owner: Owner of the base repository (where the PR lives)
+        base_repo: Name of the base repository (where the PR lives)
+        head_owner: Owner of the fork (whose branch has the changes)
+        branch_name: Name of the branch with changes
+        display_branch: Branch name for display in error messages
+
+    Returns:
+        PR number as string
+    """
+    head_ref = f"{head_owner}:{branch_name}"
     json_output = run(
         [
             "gh",
             "api",
-            f"/repos/{owner}/{repo}/pulls",
-            "-X",
-            "GET",
-            "-F",
+            f"/repos/{base_owner}/{base_repo}/pulls",
+            "-f",
             "state=open",
-            "-F",
+            "-f",
             f"head={head_ref}",
-            "-F",
+            "-f",
             "per_page=50",
         ]
     )
@@ -190,11 +239,32 @@ def find_pr_number_for_branch(owner: str, repo: str, branch_name: str, display_b
 
 
 def resolve_pr_from_current_branch() -> tuple[str, str, str]:
+    """
+    Auto-detect PR number from current branch.
+
+    For fork-based workflows, searches in the upstream repository
+    while using the fork owner in the head ref.
+
+    Returns:
+        Tuple of (base_owner, base_repo, pr_number)
+    """
     local_branch = get_current_branch_name()
-    remote_name, remote_branch = get_upstream_remote_branch()
-    owner, repo = get_owner_repo(remote_name)
-    pr_number = find_pr_number_for_branch(owner, repo, remote_branch, local_branch)
-    return owner, repo, pr_number
+    tracking_remote, remote_branch = get_upstream_remote_branch()
+
+    # Get fork owner from tracking remote (only need owner for head ref)
+    fork_owner, _ = get_owner_repo(tracking_remote)
+
+    # Find base repo (tries "upstream" first for fork workflows)
+    base_remote = find_base_repo_remote(tracking_remote)
+    base_owner, base_repo = get_owner_repo(base_remote)
+
+    # Search in base repo for fork's branch
+    pr_number = find_pr_number_for_branch(
+        base_owner, base_repo, fork_owner, remote_branch, local_branch
+    )
+
+    # Return base repo since that's where the PR lives
+    return base_owner, base_repo, pr_number
 
 
 def address_pr_comments_with_kilocode(argv: Sequence[str] | None = None) -> None:
