@@ -116,7 +116,7 @@ This is standard ISO prolog implementation. The parser should parse standard pro
    uv run pytest tests/test_new_builtins.py -v
    ```
 
-> **Syntax errors**: When a built-in parses text (e.g., via `PrologParser` or `read_from_chars/2`) and the input might be malformed, wrap the parser call in `try/except (ValueError, LarkError)` and call `raise_syntax_error("predicate/arity", exc)` from `vibeprolog.errors`. This ensures callers can intercept the ISO-style `error(syntax_error(_), Context)` term with `catch/3`.
+> **Syntax errors**: When a built-in parses text (e.g., via `PrologParser` or `read_from_chars/2`) and the input might be malformed, wrap the parser call in `try/except (ValueError, LarkError)` and create an error term with `PrologError.syntax_error(str(exc), "predicate/arity")` then raise `PrologThrow(error_term)`. This ensures callers can intercept the ISO-style `error(syntax_error(_), Context)` term with `catch/3`.
 
 ### Debugging Tips
 

@@ -6,8 +6,7 @@ from pathlib import Path
 
 from lark.exceptions import LarkError
 
-from vibeprolog.errors import raise_syntax_error
-from vibeprolog.exceptions import PrologThrow
+from vibeprolog.exceptions import PrologError, PrologThrow
 from vibeprolog.engine import CutException, PrologEngine
 from vibeprolog.parser import PrologParser
 from vibeprolog.terms import Compound, Variable
@@ -42,7 +41,8 @@ class PrologInterpreter:
         try:
             clauses = self.parser.parse(content, "consult/1")
         except (ValueError, LarkError) as exc:
-            raise_syntax_error("consult/1", exc)
+            error_term = PrologError.syntax_error(str(exc), "consult/1")
+            raise PrologThrow(error_term)
         self.clauses.extend(clauses)
         self.engine = PrologEngine(self.clauses, self.argv)
 
@@ -51,7 +51,8 @@ class PrologInterpreter:
         try:
             clauses = self.parser.parse(prolog_code, "consult/1")
         except (ValueError, LarkError) as exc:
-            raise_syntax_error("consult/1", exc)
+            error_term = PrologError.syntax_error(str(exc), "consult/1")
+            raise PrologThrow(error_term)
         self.clauses.extend(clauses)
         self.engine = PrologEngine(self.clauses, self.argv)
 
@@ -155,7 +156,8 @@ class PrologInterpreter:
         try:
             clauses = self.parser.parse(prolog_code, "query/1")
         except (ValueError, LarkError) as exc:
-            raise_syntax_error("query/1", exc)
+            error_term = PrologError.syntax_error(str(exc), "query/1")
+            raise PrologThrow(error_term)
 
         if clauses and clauses[0].body:
             # Flatten conjunction into list of goals
@@ -166,7 +168,8 @@ class PrologInterpreter:
         try:
             clauses = self.parser.parse(prolog_code, "query/1")
         except (ValueError, LarkError) as exc:
-            raise_syntax_error("query/1", exc)
+            error_term = PrologError.syntax_error(str(exc), "query/1")
+            raise PrologThrow(error_term)
         if clauses:
             return [clauses[0].head]
 

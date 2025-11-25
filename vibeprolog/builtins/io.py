@@ -12,8 +12,7 @@ from lark.exceptions import LarkError
 
 from vibeprolog.builtins import BuiltinRegistry, register_builtin
 from vibeprolog.builtins.common import BuiltinArgs, EngineContext
-from vibeprolog.errors import raise_syntax_error
-from vibeprolog.exceptions import PrologThrow
+from vibeprolog.exceptions import PrologError, PrologThrow
 from vibeprolog.parser import List, PrologParser
 from vibeprolog.terms import Atom, Compound, Number, Variable
 from vibeprolog.unification import Substitution, deref, unify
@@ -295,7 +294,8 @@ class IOBuiltins:
             if isinstance(exc, PrologThrow):
                 raise exc
             else:
-                raise_syntax_error("read_from_chars/2", exc)
+                error_term = PrologError.syntax_error(str(exc), "read_from_chars/2")
+                raise PrologThrow(error_term)
 
     @staticmethod
     def _builtin_write_term_to_chars(
