@@ -26,7 +26,7 @@ def fix_issue_with_kilocode(argv: Sequence[str] | None = None) -> None:
 def fix_issue_with_claude(argv: Sequence[str] | None = None) -> None:
     """CLI wrapper for the claude issue workflow."""
     config = IssueWorkflowConfig(
-        tool_cmd=["claude"],
+        tool_cmd=["claude", "-p", "fix this issue", "--permission-mode", "acceptEdits"],
         branch_prefix="fix-claude",
         default_commit_message="Update from claude",
     )
