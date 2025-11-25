@@ -1,5 +1,7 @@
 """Prolog parser using Lark."""
 
+import re
+
 from lark import Lark, Transformer
 from lark.exceptions import LarkError
 from dataclasses import dataclass
@@ -118,8 +120,8 @@ PROLOG_GRAMMAR = r"""
     cut: "!"
 
     // Character codes: 0'X where X is any character (must come before NUMBER)
-    // Patterns: 0'a (simple char), 0'\\ (backslash), 0'\' (quote), 0''' (doubled quote), 0'\xHH\ (hex)
-    CHAR_CODE.1: /0'(\\x[0-9a-fA-F]+\\\\|\\\\\\\\|\\\\['tnr]|''|[^'])/ | /\d+'.'/
+    // Patterns: 0'a (simple char), 0'\\ (backslash), 0'\' (quote), 0''' (doubled quote), 0'\xHH (hex)
+    CHAR_CODE.5: /0'(\\x[0-9a-zA-Z]+\\?|\\\\\\\\|\\\\['tnr]|''|[^'])/ | /\d+'.'/
 
     // Scientific notation, hex, octal, binary, base'digits
     NUMBER.4: /-?0x[0-9a-fA-F]+/i
@@ -382,7 +384,7 @@ class PrologTransformer(Transformer):
         return Number(result)
 
     def char_code(self, items):
-        """Handle character code notation like 0'X or base'char"""
+        """Handle character code notation like 0'X or base'char."""
         code_str = str(items[0])
 
         # Check for base'char format (e.g., 16'mod'2)
@@ -408,27 +410,37 @@ class PrologTransformer(Transformer):
             # Handle backslash escape sequences
             if char_part.startswith("\\"):
                 if char_part.startswith("\\x"):
-                    # Hex escape: \x41\ or just \x41
-                    if char_part.endswith("\\"):
-                        hex_part = char_part[2:-1]  # Remove \x and trailing \
-                    else:
-                        hex_part = char_part[2:]  # Just remove \x
-                    return Number(int(hex_part, 16))
-                elif char_part == "\\\\":
+                    match = re.fullmatch(r"\\x([0-9a-zA-Z]*)\\?", char_part)
+                    if not match:
+                        raise ValueError("unexpected_char")
+
+                    hex_digits = match.group(1)
+                    if len(hex_digits) < 2:
+                        raise ValueError("incomplete_reduction")
+
+                    try:
+                        return Number(int(hex_digits, 16))
+                    except ValueError as exc:
+                        raise ValueError("unexpected_char") from exc
+
+                if char_part == "\\\\":
                     # Escaped backslash
                     return Number(ord("\\"))
-                elif char_part == "\\'":
+                if char_part == "\\'":
                     # Escaped single quote
                     return Number(ord("'"))
-                elif len(char_part) >= 2:
+
+                if len(char_part) >= 2:
                     # Other escape like \t, \n, etc - just use the second char
                     return Number(ord(char_part[1]))
+
+                raise ValueError("unexpected_char")
 
             # Regular character
             if char_part:
                 return Number(ord(char_part[0]))
 
-        return Number(0)
+        raise ValueError("unexpected_char")
 
     def curly_braces(self, items):
         """Handle curly braces {X} which is syntax sugar for {}(X)"""

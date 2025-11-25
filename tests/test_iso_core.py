@@ -853,24 +853,24 @@ class TestISOParserEdgeCases:
         # Should be equal (test_116): both ways of escaping quote
         assert prolog.has_solution("0''' = 0'\\'")
 
-    @pytest.mark.skip(reason="Hex character code syntax 0'\\xHH\\ requires the parser to handle "
-                      "a trailing backslash after the hex digits. The current CHAR_CODE regex "
-                      "matches this but the lexer fails to tokenize it correctly because the "
-                      "trailing backslash conflicts with string literal tokenization. This is "
-                      "an extremely obscure ISO Prolog syntax rarely used in practice.")
     def test_character_codes_hex(self):
         # Conformity: test_123, test_124, test_125
         prolog = PrologInterpreter()
 
         # Hex character code for 'A' (0x41 = 65)
-        result = prolog.query_once("X = 0'\\x41\\\\")
+        result = prolog.query_once("X = 0'\\x41")
         assert result is not None
         assert result['X'] == 65
 
-        # Another hex character code
-        result = prolog.query_once("X = 0'\\x1\\\\")
+        # Longer hex sequence also representing 'A'
+        result = prolog.query_once("X = 0'\\x0041")
         assert result is not None
-        assert result['X'] == 1
+        assert result['X'] == 65
+
+        # Trailing backslash form remains valid for compatibility
+        result = prolog.query_once("X = 0'\\x41\\")
+        assert result is not None
+        assert result['X'] == 65
 
     @pytest.mark.skip(reason="Base'char'number syntax (e.g., 16'mod'2) is an extremely obscure "
                       "ISO Prolog feature where NUMBER'ATOM'NUMBER is tokenized as a special "

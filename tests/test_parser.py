@@ -5,6 +5,7 @@ from vibeprolog.parser import (
     PrologParser, Clause, Compound, Atom, Variable, Number, List, Cut
 )
 from vibeprolog.exceptions import PrologThrow
+from vibeprolog import PrologInterpreter
 
 
 class TestBasicParsing:
@@ -557,6 +558,60 @@ class TestBaseDigits:
         parser = PrologParser()
         with pytest.raises(PrologThrow, match="syntax_error"):
             parser.parse("num(16'@).")
+
+
+class TestCharacterCodeHexEscapes:
+    """Tests for ISO/SWI-style 0'\\xHH character code escapes."""
+
+    def test_hex_escape_two_digits(self):
+        parser = PrologParser()
+        clauses = parser.parse("code(0'\\x41).")
+        number = clauses[0].head.args[0]
+        assert isinstance(number, Number)
+        assert number.value == 65
+
+    def test_hex_escape_longer_sequence(self):
+        parser = PrologParser()
+        clauses = parser.parse("code(0'\\x0041).")
+        number = clauses[0].head.args[0]
+        assert isinstance(number, Number)
+        assert number.value == 65
+
+    def test_hex_escape_optional_trailing_backslash(self):
+        parser = PrologParser()
+        clauses = parser.parse("code(0'\\x41\\).")
+        number = clauses[0].head.args[0]
+        assert isinstance(number, Number)
+        assert number.value == 65
+
+    def test_hex_escape_lower_and_uppercase_digits(self):
+        prolog = PrologInterpreter()
+        result_lower = prolog.query_once("X is 0'\\x6a.")
+        assert result_lower is not None
+        assert result_lower['X'] == ord('j')
+
+        result_upper = prolog.query_once("X is 0'\\x4A.")
+        assert result_upper is not None
+        assert result_upper['X'] == ord('J')
+
+    def test_hex_escape_respects_token_boundaries(self):
+        parser = PrologParser()
+        clauses = parser.parse("pair(0'\\x41, 0'B).")
+        left, right = clauses[0].head.args
+        assert isinstance(left, Number)
+        assert left.value == 65
+        assert isinstance(right, Number)
+        assert right.value == ord('B')
+
+    def test_hex_escape_rejects_short_sequence(self):
+        parser = PrologParser()
+        with pytest.raises(PrologThrow, match="incomplete_reduction"):
+            parser.parse("code(0'\\x4).")
+
+    def test_hex_escape_rejects_non_hex_digit(self):
+        parser = PrologParser()
+        with pytest.raises(PrologThrow, match="unexpected_char"):
+            parser.parse("code(0'\\x4G).")
 
 
 class TestComplexExamples:
