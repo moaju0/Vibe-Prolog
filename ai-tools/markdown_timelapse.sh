@@ -97,6 +97,7 @@ while read -r commit; do
   # Convert all PDF pages to a single tall PNG so nothing is truncated
   # -density 150 for decent resolution; -append stacks pages vertically.
   magick convert -density 150 "$PDF[0-]" -append "$PNG"
+  rm -f "$PDF"
 
   i=$((i+1))
 done < "$COMMITS_FILE"
