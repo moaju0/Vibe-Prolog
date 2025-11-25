@@ -50,4 +50,4 @@ These use my `paige-manage-github` CLI which isn't in this project.
 ## Address PR review
 
 Will address issues on the current PR, or can take a PR number
-`uv tool run --from ./ai-tools address-pr-comments-with-kilocode`
+uv tool run --from ./ai-tools address-pr-comments-with-kilocode
