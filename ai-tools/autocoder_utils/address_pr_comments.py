@@ -229,8 +229,10 @@ def find_pr_number_for_branch(
             f"No open pull request found for branch {display_branch!r}. Please pass a PR number."
         )
     if len(data) > 1:
+        pr_numbers = [str(pr.get("number")) for pr in data if pr.get("number")]
+        pr_list = ", ".join([f"#{n}" for n in pr_numbers])
         raise SystemExit(
-            f"Multiple open pull requests match branch {display_branch!r}. Please pass a PR number."
+            f"Multiple open pull requests match branch {display_branch!r}: {pr_list}. Please pass a PR number."
         )
     pr_number = data[0].get("number")
     if not pr_number:
