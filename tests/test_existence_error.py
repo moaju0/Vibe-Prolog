@@ -53,6 +53,64 @@ def check_existence_error(error_dict, expected_procedure_name, expected_arity, e
     assert context['context'][0] == expected_context
 
 
+def check_instantiation_error(error_dict, expected_context="call/1"):
+    """Helper function to check that an error dictionary represents a valid instantiation_error.
+
+    Args:
+        error_dict: The error dictionary from query results
+        expected_context: The expected context predicate (default: "call/1")
+    """
+    assert isinstance(error_dict, dict)
+    assert 'error' in error_dict
+
+    error_parts = error_dict['error']
+    assert isinstance(error_parts, list)
+    assert len(error_parts) == 2
+
+    # Check instantiation_error
+    error_type = error_parts[0]
+    assert error_type == "instantiation_error"
+
+    # Check the context
+    context = error_parts[1]
+    assert isinstance(context, dict)
+    assert 'context' in context
+    assert context['context'][0] == expected_context
+
+
+def check_type_error(error_dict, expected_type, expected_culprit, expected_context="call/1"):
+    """Helper function to check that an error dictionary represents a valid type_error.
+
+    Args:
+        error_dict: The error dictionary from query results
+        expected_type: The expected type (e.g., "callable")
+        expected_culprit: The expected culprit value
+        expected_context: The expected context predicate (default: "call/1")
+    """
+    assert isinstance(error_dict, dict)
+    assert 'error' in error_dict
+
+    error_parts = error_dict['error']
+    assert isinstance(error_parts, list)
+    assert len(error_parts) == 2
+
+    # Check type_error(type, culprit)
+    error_type = error_parts[0]
+    assert isinstance(error_type, dict)
+    assert 'type_error' in error_type
+    type_error_parts = error_type['type_error']
+    assert isinstance(type_error_parts, list)
+    assert len(type_error_parts) == 2
+    assert type_error_parts[0] == expected_type
+    assert type_error_parts[1] == expected_culprit
+
+    # Check the context
+    context = error_parts[1]
+    assert isinstance(context, dict)
+    assert 'context' in context
+    assert context['context'][0] == expected_context
+
+
 class TestExistenceError:
     """Tests for existence_error exception handling."""
 
@@ -135,14 +193,7 @@ class TestExistenceError:
         assert result is not None
 
         error = result.get('Error')
-        # For unbound variables, we expect instantiation_error
-        assert isinstance(error, dict)
-        assert 'error' in error
-        error_parts = error['error']
-        assert isinstance(error_parts, list)
-        # Check that it's an instantiation_error
-        error_type = error_parts[0]
-        assert error_type == "instantiation_error"
+        check_instantiation_error(error)
 
     def test_call_with_non_callable(self):
         """Test that call/1 with non-callable term raises type_error.
@@ -157,17 +208,7 @@ class TestExistenceError:
         assert result is not None
 
         error = result.get('Error')
-        assert isinstance(error, dict)
-        assert 'error' in error
-        error_parts = error['error']
-        assert isinstance(error_parts, list)
-        # Check that it's a type_error
-        error_type = error_parts[0]
-        assert isinstance(error_type, dict)
-        assert 'type_error' in error_type
-        type_error_parts = error_type['type_error']
-        assert type_error_parts[0] == "callable"
-        assert type_error_parts[1] == 123
+        check_type_error(error, "callable", 123)
 
     def test_direct_call_to_undefined_predicate_fails(self):
         """Test that directly calling an undefined predicate just fails (no error).
