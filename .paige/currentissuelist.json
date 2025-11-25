@@ -1,0 +1,84 @@
+{
+  "repository": "nlothian/Vibe-Prolog",
+  "issues": [
+    {
+      "number": 88,
+      "title": "The function raise_syntax_error appears to be unused ",
+      "url": "https://github.com/nlothian/Vibe-Prolog/issues/88",
+      "parent": null,
+      "blocked_by": [],
+      "blocking": [],
+      "description": "![high](https://www.gstatic.com/codereviewagent/high-priority.svg)\r\n\r\nin ./prolog/errors.py\r\n\r\nThe function `raise_syntax_error` appears to be unused after the recent changes. The parser now handles syntax errors by directly creating a `PrologError` and raising `PrologThrow`. If this function and its helper `_syntax_error_reason` are no longer needed, this entire file might be obsolete and could be removed to simplify the codebase.\r\n\r\n_Originally posted by @gemini-code-assist[bot] in https://github.com/nlothian/Vibe-Prolog/pull/83#discussion_r2554015849_\r\n            ",
+      "comments": [],
+      "labels": [],
+      "milestones": [],
+      "linked_branches": []
+    },
+    {
+      "number": 87,
+      "title": "Parser: support Base'atom'digit syntax",
+      "url": "https://github.com/nlothian/Vibe-Prolog/issues/87",
+      "parent": null,
+      "blocked_by": [],
+      "blocking": [],
+      "description": "ARCHITECTURE.md also calls out the missing `Base'atom'digit` syntax for numeric literals.\n\nPlease implement parsing for ISO-style base-qualified numbers such as `16'ff` or `2'abcd`, ensuring both atom and digit parts obey the spec (case-insensitive digits, base bounds, sign handling, etc.).\n\nAcceptance criteria:\n- Parser accepts valid `Base'atom'digit` literals and emits the correct integer value.\n- Invalid bases, digits outside the base, and malformed atoms raise ISO-compliant syntax errors.\n- Add comprehensive test cases covering minimum/maximum bases, uppercase/lowercase digits, underscores/spacing edge cases, and failure scenarios.\n- Update FEATURES.md and ARCHITECTURE.md to say this syntax is implemented.",
+      "comments": [],
+      "labels": [],
+      "milestones": [],
+      "linked_branches": []
+    },
+    {
+      "number": 86,
+      "title": "Parser: support 0'\\xHH hex escapes",
+      "url": "https://github.com/nlothian/Vibe-Prolog/issues/86",
+      "parent": null,
+      "blocked_by": [],
+      "blocking": [],
+      "description": "ARCHITECTURE.md still lists `0'\\xHH` style hexadecimal character escapes as unimplemented.\n\nPlease extend the numeric literal handling so that `0'\\xHH` (and longer sequences like `0'\\x0041`) parse to the corresponding character code, matching ISO and SWI behavior. Include validation for malformed hex digits and length requirements.\n\nAcceptance criteria:\n- Literal parsing recognizes `0'\\xHH` escapes anywhere a character code literal is allowed.\n- Invalid sequences raise the same syntax errors as SWI-Prolog.\n- Add comprehensive test cases covering valid/invalid hex lengths, upper/lowercase digits, and interaction with surrounding tokens.\n- Update FEATURES.md and ARCHITECTURE.md to note that these escapes are now supported.",
+      "comments": [],
+      "labels": [],
+      "milestones": [],
+      "linked_branches": []
+    },
+    {
+      "number": 7,
+      "title": "Compatibility: Mirror SWI-Prolog examples",
+      "url": "https://github.com/nlothian/Vibe-Prolog/issues/7",
+      "parent": null,
+      "blocked_by": [
+        {
+          "number": 75,
+          "title": "Implement command-line argument support (argv)",
+          "url": "https://github.com/nlothian/Vibe-Prolog/issues/75",
+          "blocking_issue_status": "closed"
+        }
+      ],
+      "blocking": [],
+      "description": "## Overview\n\nThis task is about **validating that our Prolog interpreter behaves the same way as SWI-Prolog**, which is one of the most popular Prolog implementations. We want to ensure our syntax and behavior match what developers expect from widely-used Prolog systems.\n\n## Why This Matters\n\n- **Compatibility**: Users should be able to run standard Prolog examples on our interpreter\n- **Confidence**: Automated tests comparing our output to SWI-Prolog give us confidence we're implementing Prolog correctly\n- **Documentation**: This helps identify what features we're missing or where we deviate from standard behavior\n\n## Prerequisites\n\n1. **Install SWI-Prolog** on your system:\n   - Mac: `brew install swi-prolog`\n   - Linux: `apt-get install swi-prolog` or `yum install swi-prolog`\n   - Windows: Download from https://www.swi-prolog.org/Download.html\n\n2. **Verify installation**:\n   ```bash\n   swipl --version\n   ```\n\n3. **Understand our test structure** (see `AGENTS.md` for details):\n   - All tests go in `tests/` directory\n   - Test files are named `test_*.py`\n   - Use pytest framework with test classes\n   - Import with `from prolog import PrologInterpreter`\n\n## Step-by-Step Instructions\n\n### Step 1: Find Representative SWI-Prolog Examples\n\nLook for examples in these categories (prioritize ones testing features marked \u2705 in `FEATURES.md`):\n\n**Control Flow Examples:**\n- Conjunction (`,`), disjunction (`;`), if-then-else (`->`)\n- Negation (`\\+`), cut (`!`)\n- Backtracking behavior\n\n**Arithmetic Examples:**\n- Arithmetic evaluation (`is/2`)\n- Arithmetic comparison (`=:=`, `<`, `>`, etc.)\n- Complex expressions with operators (`+`, `-`, `*`, `/`, `mod`, `**`)\n\n**Data Structure Examples:**\n- List manipulation (`append/3`, `member/2`, `length/2`, `reverse/2`)\n- Compound terms (`functor/3`, `arg/3`, `=../2`)\n- Type testing (`var/1`, `atom/1`, `number/1`, etc.)\n\n**Good sources for examples:**\n- [SWI-Prolog documentation](https://www.swi-prolog.org/pldoc/man?section=builtin)\n- [Learn Prolog Now!](http://www.learnprolognow.org/)\n- SWI-Prolog's own test suite\n\n### Step 2: Test Examples in SWI-Prolog\n\nBefore porting, verify the example works in SWI-Prolog:\n\n```bash\n# Start SWI-Prolog\nswipl\n\n# Test a query\n?- append([1,2], [3,4], X).\nX = [1, 2, 3, 4].\n\n# Test with backtracking\n?- member(X, [1,2,3]).\nX = 1 ;\nX = 2 ;\nX = 3.\n```\n\n**Document the expected behavior** - write down:\n- What query you ran\n- What solutions you got\n- Whether it backtracks (provides multiple solutions)\n- Any error messages\n\n### Step 3: Create Test Cases\n\nCreate a new test file or add to an existing one. Follow this pattern:\n\n```python\n\"\"\"Tests comparing behavior to SWI-Prolog examples.\"\"\"\n\nimport pytest\nfrom prolog import PrologInterpreter\n\n\nclass TestSWIPrologControlFlow:\n    \"\"\"Tests based on SWI-Prolog control flow examples.\"\"\"\n    \n    def test_conjunction_example(self):\n        \"\"\"\n        SWI-Prolog example from: [URL or book reference]\n        Query: X = 1, Y = 2.\n        Expected: X = 1, Y = 2\n        \"\"\"\n        prolog = PrologInterpreter()\n        result = prolog.query_once(\"X = 1, Y = 2\")\n        assert result is not None\n        assert result['X'] == 1\n        assert result['Y'] == 2\n    \n    def test_backtracking_example(self):\n        \"\"\"\n        SWI-Prolog example: member/2 with backtracking\n        Query: member(X, [a,b,c]).\n        Expected: X = a ; X = b ; X = c\n        \"\"\"\n        prolog = PrologInterpreter()\n        results = list(prolog.query(\"member(X, [a, b, c])\"))\n        assert len(results) == 3\n        assert results[0]['X'] == 'a'\n        assert results[1]['X'] == 'b'\n        assert results[2]['X'] == 'c'\n\n\nclass TestSWIPrologArithmetic:\n    \"\"\"Tests based on SWI-Prolog arithmetic examples.\"\"\"\n    \n    def test_arithmetic_expression(self):\n        \"\"\"\n        SWI-Prolog example: X is 2 + 3 * 4.\n        Expected: X = 14 (multiplication before addition)\n        \"\"\"\n        prolog = PrologInterpreter()\n        result = prolog.query_once(\"X is 2 + 3 * 4\")\n        assert result is not None\n        assert result['X'] == 14\n```\n\n### Step 4: Run Tests and Compare\n\n```bash\n# Run your new tests\nuv run pytest tests/test_swi_examples.py -v\n\n# Run all tests to make sure nothing broke\nuv run pytest\n```\n\n### Step 5: Document Incompatibilities\n\nIf you find differences between our interpreter and SWI-Prolog:\n\n1. **Add a comment in your test** explaining the deviation:\n   ```python\n   @pytest.mark.skip(reason=\"Feature not implemented: read/1\")\n   def test_read_term(self):\n       \"\"\"SWI-Prolog supports read/1 but we don't implement it yet.\"\"\"\n       pass\n   ```\n\n2. **Update FEATURES.md** if you discover missing features or incorrect implementations\n\n3. **Create follow-up issues** for significant problems:\n   ```bash\n   gh issue create --title \"Fix: append/3 fails with improper lists\" \\\n       --body \"Found in SWI-Prolog compatibility testing. Expected behavior: ...\"\n   ```\n\n## Example Test File Structure\n\nLook at existing test files for patterns to follow:\n- `tests/test_iso_core.py` - Well-organized ISO standard tests\n- `tests/test_builtins.py` - Tests for built-in predicates\n- `tests/test_arithmetic.py` - Arithmetic operation tests\n\n## Testing Checklist\n\n- [ ] Selected 10-15 representative examples from SWI-Prolog\n- [ ] Verified each example works in SWI-Prolog (document expected output)\n- [ ] Created test file(s) in `tests/` directory following pytest conventions\n- [ ] Each test has a docstring explaining the SWI-Prolog source\n- [ ] Tests cover control flow, arithmetic, and data structures\n- [ ] All tests pass (or marked with `@pytest.mark.skip` with reason)\n- [ ] Documented any incompatibilities in test comments\n- [ ] Updated `FEATURES.md` if you found missing/incorrect features\n- [ ] Created follow-up issues for bugs or missing features found\n\n## Questions?\n\n- Review existing test files in `tests/` directory for examples\n- Check `AGENTS.md` for development workflow guidelines\n- Check `FEATURES.md` to see what's already implemented\n- Ask for help if you're unsure about expected behavior\n\n## Success Criteria\n\n- At least 10 new tests comparing our behavior to SWI-Prolog\n- Tests cover multiple categories (control, arithmetic, data structures)\n- Any incompatibilities are documented\n- All tests either pass or are marked with clear skip reasons\n- `FEATURES.md` updated if new gaps discovered",
+      "comments": [],
+      "labels": [],
+      "milestones": [],
+      "linked_branches": []
+    },
+    {
+      "number": 6,
+      "title": "Compatibility: Add comprehensive fixtures",
+      "url": "https://github.com/nlothian/Vibe-Prolog/issues/6",
+      "parent": null,
+      "blocked_by": [
+        {
+          "number": 75,
+          "title": "Implement command-line argument support (argv)",
+          "url": "https://github.com/nlothian/Vibe-Prolog/issues/75",
+          "blocking_issue_status": "closed"
+        }
+      ],
+      "blocking": [],
+      "description": "## Goal\nBuild a suite of real-world Prolog fixture files that exercise the interpreter across recursion, list operations, meta-predicates, arithmetic, and (if supported) DCGs. Use them in pytest so we can validate correctness, performance, and robustness on larger programs.\n\n## Why this matters\nWe currently test mostly small snippets. Larger, more varied programs will catch parser/engine edge cases and help us gauge scalability.\n\n## Deliverables\n- New `.pl` fixture files under `tests/fixtures/` (create the folder if missing).\n- Pytest coverage that loads/runs the fixtures (new or existing `tests/test_*.py`).\n- Documentation of each fixture in `tests/README.md` (add if missing) plus any relevant notes in `FEATURES.md`.\n\n## Fixture requirements\n- Include both success and intentional failure cases.\n- Cover: recursion (e.g., factorial, Fibonacci), list ops (append, map, member, reverse), meta-predicates (e.g., `call/1`, `findall/3`), arithmetic-heavy code (accumulators, comparisons), DCGs if available (simple grammar with pass/fail cases).\n- Add at least one large fact base (hundreds of facts) to mimic real workloads; ensure queries that traverse it succeed and some that fail.\n\n## Implementation steps \n1) Create fixture files in `tests/fixtures/` following descriptive names (e.g., `recursion.pl`, `lists.pl`, `meta_predicates.pl`, `arithmetic.pl`, `dcg_sample.pl`, `large_facts.pl`). Include queries/goals inside comments where helpful.\n2) Write or extend pytest files to load these fixtures and assert expected solutions/failures using `PrologInterpreter`. Include both deterministic and backtracking scenarios.\n3) For DCGs: if not yet supported, leave fixtures scaffolded and mark related tests `xfail` with a TODO.\n4) Document each fixture\u2019s intent and key predicates in `tests/README.md`; update `FEATURES.md` so supported features stay accurate.\n5) Run `uv run pytest` to ensure all tests (including new ones) pass.\n\n## Definition of done\n- Fixtures and tests live under `tests/` and run via pytest.\n- Large fact base exists with corresponding queries.\n- README + `FEATURES.md` updated.\n- `uv run pytest` passes.\n",
+      "comments": [],
+      "labels": [],
+      "milestones": [],
+      "linked_branches": []
+    }
+  ]
+}

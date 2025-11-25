@@ -1,0 +1,4 @@
+- A complete, widely compatible Prolog implementation
+- Robust: It should handle all kinds of error conditions gracefully
+- Fast: It should run prolog programs fast
+- Scalable: It should be able to run large prolog programs

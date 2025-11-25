@@ -64,10 +64,14 @@ def get_repo_root() -> Path:
     return Path(output)
 
 
-def get_owner_repo() -> tuple[str, str]:
-    url = run(["git", "config", "--get", "remote.origin.url"]).strip()
+def get_owner_repo(remote: str = "origin") -> tuple[str, str]:
+    remote = remote or "origin"
+    try:
+        url = run(["git", "config", "--get", f"remote.{remote}.url"]).strip()
+    except SystemExit as exc:
+        raise SystemExit(f"Could not determine remote.{remote}.url") from exc
     if not url:
-        raise SystemExit("Could not determine remote.origin.url")
+        raise SystemExit(f"Could not determine remote.{remote}.url")
 
     url = url.rstrip("/")
     if url.endswith(".git"):
