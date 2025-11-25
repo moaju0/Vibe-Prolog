@@ -531,13 +531,13 @@ class TestBaseDigits:
     def test_invalid_digit_for_base(self):
         """Test digit value >= base."""
         parser = PrologParser()
-        with pytest.raises(PrologThrow, match="Digit '3' value 3 >= base 2"):
+        with pytest.raises(PrologThrow, match="Digit '3' out of range for base 2"):
             parser.parse("num(2'13).")
 
     def test_invalid_digit_letter_for_base(self):
         """Test letter digit >= base."""
         parser = PrologParser()
-        with pytest.raises(PrologThrow, match="Digit 'g' value 16 >= base 16"):
+        with pytest.raises(PrologThrow, match="Digit 'g' out of range for base 16"):
             parser.parse("num(16'fg).")
 
     def test_empty_digits(self):

@@ -359,33 +359,22 @@ class PrologTransformer(Transformer):
             raise ValueError(f"Invalid base'digits syntax: {value}")
 
         base_str, digits_str = parts
-        try:
-            base = int(base_str)
-        except ValueError:
-            raise ValueError(f"Invalid base in {value}: {base_str}")
-
+        # Base is guaranteed to be digits by the grammar; a direct int() is sufficient
+        base = int(base_str)
         if not (2 <= base <= 36):
             raise ValueError(f"Base must be between 2 and 36, got {base}")
 
         # Remove underscores from digits
         digits_clean = digits_str.replace('_', '')
-
         if not digits_clean:
             raise ValueError(f"Empty digits in {value}")
 
-        # Validate digits
+        # Accumulate value in the given base
         result = 0
         for digit in digits_clean.lower():
-            if digit.isdigit():
-                digit_val = int(digit)
-            elif 'a' <= digit <= 'z':
-                digit_val = ord(digit) - ord('a') + 10
-            else:
-                raise ValueError(f"Invalid digit '{digit}' in {value}")
-
+            digit_val = int(digit, 36)  # 0-9 -> 0-9, a-z -> 10-35
             if digit_val >= base:
-                raise ValueError(f"Digit '{digit}' value {digit_val} >= base {base} in {value}")
-
+                raise ValueError(f"Digit '{digit}' out of range for base {base} in {value}")
             result = result * base + digit_val
 
         if negative:
