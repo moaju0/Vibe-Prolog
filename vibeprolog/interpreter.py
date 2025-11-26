@@ -89,11 +89,7 @@ class PrologInterpreter:
         for item in items:
             if isinstance(item, Clause):
                 # Associate clause with current module context
-                try:
-                    item.module = self.current_module
-                except Exception:
-                    # Best-effort: set attribute even if dataclass is frozen-like
-                    setattr(item, "module", self.current_module)
+                item.module = self.current_module
 
                 last_predicate = self._add_clause(
                     item, source_name, closed_predicates, last_predicate

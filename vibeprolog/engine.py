@@ -127,31 +127,9 @@ class PrologEngine:
             if builtin_results is not None:
                 return builtin_results
 
-            # Search only clauses defined in the target module
-            for clause in self.clauses:
-                clause_module = getattr(clause, "module", "user")
-                if clause_module != module_name:
-                    continue
-
-                renamed_clause = self._rename_variables(clause)
-                new_subst = unify(inner_goal, renamed_clause.head, subst)
-                if new_subst is not None:
-                    body_goals: list[Compound | Atom | Cut]
-                    if renamed_clause.is_fact():
-                        body_goals = []
-                    else:
-                        body_goals = self._flatten_body(renamed_clause.body)
-                    try:
-                        if renamed_clause.is_fact():
-                            yield from self._solve_goals(remaining_goals, new_subst)
-                        else:
-                            new_goals = body_goals + remaining_goals
-                            yield from self._solve_goals(new_goals, new_subst)
-                    except CutException:
-                        # Cut handling: treat as end of search for this branch
-                        raise
-                    except PrologThrow:
-                        raise
+            # Delegate clause-search to the module's predicate index when available
+            for result in self._solve_module_predicate(module_name, key, inner_goal, subst, remaining_goals):
+                yield result
             return
 
         builtin_results = self._try_builtin(goal, subst)
@@ -193,6 +171,24 @@ class PrologEngine:
                         raise
                 except PrologThrow:
                     raise
+
+    def _solve_module_predicate(self, module_name, key, inner_goal, subst, remaining_goals):
+        # Resolve a module-qualified goal by consulting the module's predicate index if available.
+        module = getattr(self.interpreter, "modules", {}).get(module_name)
+        if module is None:
+            return iter(())
+        # Prefer indexed predicates if available
+        preds = getattr(module, "predicates", {}).get(key, [])
+        for clause in preds:
+            renamed_clause = self._rename_variables(clause)
+            new_subst = unify(inner_goal, renamed_clause.head, subst)
+            if new_subst is not None:
+                body_goals = [] if renamed_clause.is_fact() else self._flatten_body(renamed_clause.body)
+                if renamed_clause.is_fact():
+                    yield from self._solve_goals(remaining_goals, new_subst)
+                else:
+                    new_goals = body_goals + remaining_goals
+                    yield from self._solve_goals(new_goals, new_subst)
 
     def _try_builtin(
         self, goal: Compound, subst: Substitution

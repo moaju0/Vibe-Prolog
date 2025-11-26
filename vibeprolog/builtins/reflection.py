@@ -156,24 +156,34 @@ class ReflectionBuiltins:
         if interp is None:
             return iter(())
 
-        if isinstance(module_term, Atom):
-            module_name = module_term.name
+        # Helper to yield for a specific module under a given sub-subst
+        def _emit_for_module(module_name: str, subst_in: Substitution) -> Iterator[Substitution]:
             mod = interp.modules.get(module_name)
             if mod is None:
                 return iter(())
-
             # exports(List)
             exports_list = python_to_list([Compound("/", (Atom(n), Number(a))) for (n, a) in sorted(mod.exports)])
-            # Try exports property
-            exp_unify = unify(property_term, Compound("exports", (exports_list,)), subst)
+            exp_unify = unify(property_term, Compound("exports", (exports_list,)), subst_in)
             if exp_unify is not None:
                 yield exp_unify
-
             # file(Path) - if available
             if mod.file is not None:
-                file_unify = unify(property_term, Compound("file", (Atom(str(mod.file)),)), subst)
+                file_unify = unify(property_term, Compound("file", (Atom(str(mod.file)),)), subst_in)
                 if file_unify is not None:
                     yield file_unify
+        # If module_term is a specific module
+        if isinstance(module_term, Atom):
+            module_name = module_term.name
+            for r in _emit_for_module(module_name, subst):
+                yield r
+            return
+        # Otherwise, module_term is a variable: enumerate all modules
+        for module_name in getattr(interp, "modules", {}):
+            # Try unifying the module_term with the concrete module name
+            result = unify(module_term, Atom(module_name), subst)
+            if result is not None:
+                for r in _emit_for_module(module_name, result):
+                    yield r
         return iter(())
 
     @staticmethod
