@@ -227,6 +227,10 @@ class IOBuiltins:
         register_builtin(registry, "close", 1, IOBuiltins._builtin_close)
         register_builtin(registry, "read", 1, IOBuiltins._builtin_read)
         register_builtin(registry, "read", 2, IOBuiltins._builtin_read_from_stream)
+        register_builtin(registry, "get_char", 1, IOBuiltins._builtin_get_char)
+        register_builtin(registry, "get_char", 2, IOBuiltins._builtin_get_char_from_stream)
+        register_builtin(registry, "put_char", 1, IOBuiltins._builtin_put_char)
+        register_builtin(registry, "put_char", 2, IOBuiltins._builtin_put_char_to_stream)
 
     @staticmethod
     def _builtin_write(
@@ -923,6 +927,176 @@ class IOBuiltins:
         engine.remove_stream(stream_term)
 
         return subst
+
+    @staticmethod
+    def _builtin_get_char(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext | None
+    ) -> Substitution | None:
+        """get_char/1 - Read a character from current input stream.
+
+        get_char(Char)
+        Reads a single character from the current input stream and unifies it with Char.
+        Returns 'end_of_file' on EOF.
+        """
+        if engine is None:
+            return None
+
+        char_var = args[0]
+        stream = engine.get_stream(USER_INPUT_STREAM)
+        if stream is None:
+            error_term = PrologError.existence_error("stream", USER_INPUT_STREAM, "get_char/1")
+            raise PrologThrow(error_term)
+
+        if stream.mode not in ("read", "append"):
+            error_term = PrologError.permission_error("input", "stream", stream.handle, "get_char/1")
+            raise PrologThrow(error_term)
+
+        return IOBuiltins._read_char_from_stream(stream, char_var, subst, "get_char/1")
+
+    @staticmethod
+    def _builtin_get_char_from_stream(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext | None
+    ) -> Substitution | None:
+        """get_char/2 - Read a character from specified stream.
+
+        get_char(Stream, Char)
+        Reads a single character from Stream and unifies it with Char.
+        Returns 'end_of_file' on EOF.
+        """
+        if engine is None:
+            return None
+
+        stream_term, char_var = args
+
+        engine._check_instantiated(stream_term, subst, "get_char/2")
+        engine._check_type(stream_term, Atom, "stream_or_alias", subst, "get_char/2")
+
+        stream_term = deref(stream_term, subst)
+
+        stream = engine.get_stream(stream_term)
+        if stream is None:
+            error_term = PrologError.existence_error("stream", stream_term, "get_char/2")
+            raise PrologThrow(error_term)
+
+        if stream.mode not in ("read", "append"):
+            error_term = PrologError.permission_error("input", "stream", stream_term, "get_char/2")
+            raise PrologThrow(error_term)
+
+        return IOBuiltins._read_char_from_stream(stream, char_var, subst, "get_char/2")
+
+    @staticmethod
+    def _read_char_from_stream(
+        stream: Stream, char_var: Any, subst: Substitution, context: str
+    ) -> Substitution | None:
+        """Helper to read a single character from a stream."""
+        try:
+            # Check pushback buffer first
+            if stream.pushback_buffer:
+                ch = stream.pushback_buffer.pop()
+            else:
+                ch = stream.file_obj.read(1)
+
+            if ch == "":
+                # EOF
+                return unify(char_var, Atom("end_of_file"), subst)
+            else:
+                # Return single character as atom
+                return unify(char_var, Atom(ch), subst)
+        except (OSError, IOError) as e:
+            # Handle I/O errors
+            error_term = PrologError.permission_error("input", "stream", stream.handle, context)
+            raise PrologThrow(error_term)
+
+    @staticmethod
+    def _builtin_put_char(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext | None
+    ) -> Substitution | None:
+        """put_char/1 - Write a character to current output stream.
+
+        put_char(Char)
+        Writes a single character Char to the current output stream.
+        """
+        if engine is None:
+            return None
+
+        char_term = args[0]
+
+        engine._check_instantiated(char_term, subst, "put_char/1")
+
+        char_term = deref(char_term, subst)
+
+        # Validate that it's a single character atom
+        if not isinstance(char_term, Atom):
+            error_term = PrologError.type_error("in_character", char_term, "put_char/1")
+            raise PrologThrow(error_term)
+
+        if len(char_term.name) != 1:
+            error_term = PrologError.type_error("in_character", char_term, "put_char/1")
+            raise PrologThrow(error_term)
+
+        stream = engine.get_stream(USER_OUTPUT_STREAM)
+        if stream is None:
+            error_term = PrologError.existence_error("stream", USER_OUTPUT_STREAM, "put_char/1")
+            raise PrologThrow(error_term)
+
+        if stream.mode not in ("write", "append"):
+            error_term = PrologError.permission_error("output", "stream", stream.handle, "put_char/1")
+            raise PrologThrow(error_term)
+
+        return IOBuiltins._write_char_to_stream(stream, char_term.name, "put_char/1")
+
+    @staticmethod
+    def _builtin_put_char_to_stream(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext | None
+    ) -> Substitution | None:
+        """put_char/2 - Write a character to specified stream.
+
+        put_char(Stream, Char)
+        Writes a single character Char to Stream.
+        """
+        if engine is None:
+            return None
+
+        stream_term, char_term = args
+
+        engine._check_instantiated(stream_term, subst, "put_char/2")
+        engine._check_instantiated(char_term, subst, "put_char/2")
+        engine._check_type(stream_term, Atom, "stream_or_alias", subst, "put_char/2")
+
+        stream_term = deref(stream_term, subst)
+        char_term = deref(char_term, subst)
+
+        # Validate that it's a single character atom
+        if not isinstance(char_term, Atom):
+            error_term = PrologError.type_error("in_character", char_term, "put_char/2")
+            raise PrologThrow(error_term)
+
+        if len(char_term.name) != 1:
+            error_term = PrologError.type_error("in_character", char_term, "put_char/2")
+            raise PrologThrow(error_term)
+
+        stream = engine.get_stream(stream_term)
+        if stream is None:
+            error_term = PrologError.existence_error("stream", stream_term, "put_char/2")
+            raise PrologThrow(error_term)
+
+        if stream.mode not in ("write", "append"):
+            error_term = PrologError.permission_error("output", "stream", stream_term, "put_char/2")
+            raise PrologThrow(error_term)
+
+        return IOBuiltins._write_char_to_stream(stream, char_term.name, "put_char/2")
+
+    @staticmethod
+    def _write_char_to_stream(stream: Stream, char: str, context: str) -> Substitution | None:
+        """Helper to write a single character to a stream."""
+        try:
+            stream.file_obj.write(char)
+            stream.file_obj.flush()  # Ensure immediate output
+            return {}
+        except (OSError, IOError) as e:
+            # Handle I/O errors
+            error_term = PrologError.permission_error("output", "stream", stream.handle, context)
+            raise PrologThrow(error_term)
 
 
 __all__ = ["IOBuiltins"]
