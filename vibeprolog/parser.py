@@ -579,35 +579,60 @@ class PrologParser:
         pldoc_comments = []
         cleaned = []
         i = 0
+        in_single_quote = False
+        in_double_quote = False
+        escape_next = False
         while i < len(text):
-            if text.startswith('%%', i):
-                # Line comment
-                pos = len(''.join(cleaned))  # position in cleaned text
-                # Find end of line
-                end = text.find('\n', i)
-                if end == -1:
-                    end = len(text)
-                comment = text[i+2:end].rstrip('\n')
-                pldoc_comments.append((pos, comment))
-                i = end + 1 if end < len(text) else len(text)
-            elif text.startswith('/*', i):
-                # Block comment
-                pos = len(''.join(cleaned))
-                is_pldoc = text.startswith('/**', i) or text.startswith('/*!', i)
-                i += 3 if is_pldoc else 2
-                comment_content = []
-                while i < len(text):
-                    if text.startswith('*/', i):
-                        i += 2
-                        break
-                    comment_content.append(text[i])
-                    i += 1
-                if is_pldoc:
-                    comment = ''.join(comment_content)
+            if not in_single_quote and not in_double_quote:
+                if text.startswith('%%', i):
+                    # Line comment
+                    pos = len(''.join(cleaned))  # position in cleaned text
+                    # Find end of line
+                    end = text.find('\n', i)
+                    if end == -1:
+                        end = len(text)
+                    comment = text[i+2:end].rstrip('\n')
                     pldoc_comments.append((pos, comment))
-            else:
-                cleaned.append(text[i])
-                i += 1
+                    i = end + 1 if end < len(text) else len(text)
+                    continue
+                elif text.startswith('/*', i):
+                    # Block comment
+                    pos = len(''.join(cleaned))
+                    is_pldoc = text.startswith('/**', i) or text.startswith('/*!', i)
+                    i += 3 if is_pldoc else 2
+                    comment_content = []
+                    depth = 1
+                    while i < len(text) and depth > 0:
+                        if text.startswith('/*', i):
+                            depth += 1
+                            i += 2
+                        elif text.startswith('*/', i):
+                            depth -= 1
+                            if depth == 0:
+                                if is_pldoc:
+                                    pldoc_comments.append((pos, ''.join(comment_content)))
+                                i += 2
+                                break
+                            else:
+                                i += 2
+                        else:
+                            if is_pldoc:
+                                comment_content.append(text[i])
+                            i += 1
+                    if depth > 0:
+                        raise ValueError("Unterminated block comment")
+                    continue
+            # Not in comment, add char
+            cleaned.append(text[i])
+            if escape_next:
+                escape_next = False
+            elif text[i] == '\\':
+                escape_next = True
+            elif text[i] == "'" and not in_double_quote:
+                in_single_quote = not in_single_quote
+            elif text[i] == '"' and not in_single_quote:
+                in_double_quote = not in_double_quote
+            i += 1
         cleaned_text = ''.join(cleaned)
         pldoc_comments.sort(key=lambda x: x[0])
         return cleaned_text, pldoc_comments
