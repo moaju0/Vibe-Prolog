@@ -44,6 +44,12 @@ class ReflectionBuiltins:
             2,
             ReflectionBuiltins._builtin_current_prolog_flag,
         )
+        register_builtin(
+            registry,
+            "predicate_documentation",
+            2,
+            ReflectionBuiltins._builtin_predicate_documentation,
+        )
 
     @staticmethod
     def _builtin_predicate_property(
@@ -155,6 +161,36 @@ class ReflectionBuiltins:
             new_subst = unify(value_term, flag_value, subst)
             if new_subst is not None:
                 yield new_subst
+
+    @staticmethod
+    def _builtin_predicate_documentation(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext
+    ) -> Iterator[Substitution]:
+        """predicate_documentation(Indicator, Doc) - Get documentation for a predicate."""
+        indicator_term, doc_term = args
+        indicator_term = deref(indicator_term, subst)
+        doc_term = deref(doc_term, subst)
+
+        key: tuple[str, int] | None = None
+        if isinstance(indicator_term, Compound) and indicator_term.functor == "/" and len(indicator_term.args) == 2:
+            name_term, arity_term = indicator_term.args
+            if isinstance(name_term, Atom) and isinstance(arity_term, Number):
+                key = (name_term.name, int(arity_term.value))
+        elif isinstance(indicator_term, Compound):
+            key = (indicator_term.functor, len(indicator_term.args))
+        elif isinstance(indicator_term, Atom):
+            key = (indicator_term.name, 0)
+
+        if key is None:
+            return iter(())
+
+        doc = engine.predicate_docs.get(key)
+        if doc is None:
+            return iter(())
+
+        result = unify(doc_term, Atom(doc), subst)
+        if result is not None:
+            yield result
 
 
 __all__ = ["ReflectionBuiltins"]

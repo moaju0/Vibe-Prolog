@@ -346,6 +346,7 @@ class TestExistenceErrorEdgeCases:
     def test_predicate_does_not_exist_after_retract_all(self):
         """Test that existence_error is raised after retracting all clauses."""
         prolog = PrologInterpreter()
+        prolog.consult_string(":- dynamic(temp_pred/0).")
         prolog.consult_string("temp_pred.")
 
         # Predicate exists

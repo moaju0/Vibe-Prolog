@@ -2,7 +2,7 @@
 
 import re
 
-from lark import Lark, Transformer
+from lark import Lark, Transformer, v_args
 from lark.exceptions import LarkError, UnexpectedCharacters, UnexpectedToken
 from dataclasses import dataclass
 from typing import Any
@@ -42,6 +42,8 @@ class Clause:
 
     head: Compound
     body: list[Compound] | None = None  # None for facts
+    doc: str | None = None  # PlDoc documentation
+    meta: Any = None  # Lark meta information
 
     def is_fact(self):
         return self.body is None
@@ -55,6 +57,8 @@ class Directive:
     """A Prolog directive (e.g., :- initialization(goal).)."""
 
     goal: Any  # The directive term, e.g., initialization(goal)
+    doc: str | None = None  # PlDoc documentation
+    meta: Any = None  # Lark meta information
 
 
 @dataclass
@@ -193,8 +197,9 @@ class PrologTransformer(Transformer):
     def clause(self, items):
         return items[0]
 
-    def directive(self, items):
-        return Directive(goal=items[0])
+    @v_args(meta=True)
+    def directive(self, meta, items):
+        return Directive(goal=items[0], meta=meta)
 
     def predicate_indicators(self, items):
         return items
@@ -208,12 +213,14 @@ class PrologTransformer(Transformer):
     def discontiguous_directive(self, items):
         return PredicatePropertyDirective("discontiguous", tuple(items[0]))
 
-    def fact(self, items):
-        return Clause(head=items[0], body=None)
+    @v_args(meta=True)
+    def fact(self, meta, items):
+        return Clause(head=items[0], body=None, meta=meta)
 
-    def rule(self, items):
+    @v_args(meta=True)
+    def rule(self, meta, items):
         head, body = items
-        return Clause(head=head, body=body)
+        return Clause(head=head, body=body, meta=meta)
 
     def goals(self, items):
         return items
@@ -507,28 +514,46 @@ class PrologParser:
 
     def __init__(self):
         self.parser = Lark(
-            PROLOG_GRAMMAR, parser="lalr", transformer=PrologTransformer()
+            PROLOG_GRAMMAR, parser="lalr", propagate_positions=True
         )
 
-    def _strip_block_comments(self, text: str) -> str:
-        """Strip block comments from text, handling nesting and quoted strings."""
+    def _strip_block_comments(self, text: str) -> tuple[str, list[tuple[int, str]]]:
+        """Strip block comments from text, handling nesting and quoted strings.
+        Returns cleaned text and list of (position, pldoc_comment) tuples."""
         result = []
+        pldoc_comments = []
         i = 0
         in_single_quote = False
         in_double_quote = False
         escape_next = False
         while i < len(text):
-            if not in_single_quote and not in_double_quote and text.startswith('/*', i):
+            if not in_single_quote and not in_double_quote and (text.startswith('/*', i) or text.startswith('/**', i) or text.startswith('/*!', i)):
+                comment_start = i
                 depth = 1
-                i += 2
+                if text.startswith('/**', i) or text.startswith('/*!', i):
+                    i += 3  # Skip /** or /*!
+                    is_pldoc = True
+                else:
+                    i += 2  # Skip /*
+                    is_pldoc = False
+                comment_content = []
                 while i < len(text) and depth > 0:
                     if text.startswith('/*', i):
                         depth += 1
                         i += 2
                     elif text.startswith('*/', i):
                         depth -= 1
-                        i += 2
+                        if depth == 0:
+                            # End of comment
+                            if is_pldoc:
+                                pldoc_comments.append((comment_start, ''.join(comment_content)))
+                            i += 2
+                            break
+                        else:
+                            i += 2
                     else:
+                        if is_pldoc:
+                            comment_content.append(text[i])
                         i += 1
                 if depth > 0:
                     raise ValueError("Unterminated block comment")
@@ -547,13 +572,105 @@ class PrologParser:
                 in_double_quote = not in_double_quote
 
             i += 1
-        return ''.join(result)
+        return ''.join(result), pldoc_comments
+
+    def _collect_pldoc_comments(self, text: str) -> tuple[str, list[tuple[int, str]]]:
+        """Collect PlDoc comments and return cleaned text with positions in cleaned text."""
+        pldoc_comments = []
+        cleaned = []
+        i = 0
+        in_single_quote = False
+        in_double_quote = False
+        escape_next = False
+        while i < len(text):
+            if not in_single_quote and not in_double_quote:
+                if text.startswith('%%', i):
+                    # Line comment
+                    pos = len(''.join(cleaned))  # position in cleaned text
+                    # Find end of line
+                    end = text.find('\n', i)
+                    if end == -1:
+                        end = len(text)
+                    comment = text[i+2:end].rstrip('\n')
+                    pldoc_comments.append((pos, comment))
+                    i = end + 1 if end < len(text) else len(text)
+                    continue
+                elif text.startswith('/*', i):
+                    # Block comment
+                    pos = len(''.join(cleaned))
+                    is_pldoc = text.startswith('/**', i) or text.startswith('/*!', i)
+                    i += 3 if is_pldoc else 2
+                    comment_content = []
+                    depth = 1
+                    while i < len(text) and depth > 0:
+                        if text.startswith('/*', i):
+                            depth += 1
+                            i += 2
+                        elif text.startswith('*/', i):
+                            depth -= 1
+                            if depth == 0:
+                                if is_pldoc:
+                                    pldoc_comments.append((pos, ''.join(comment_content)))
+                                i += 2
+                                break
+                            else:
+                                i += 2
+                        else:
+                            if is_pldoc:
+                                comment_content.append(text[i])
+                            i += 1
+                    if depth > 0:
+                        raise ValueError("Unterminated block comment")
+                    continue
+            # Not in comment, add char
+            cleaned.append(text[i])
+            if escape_next:
+                escape_next = False
+            elif text[i] == '\\':
+                escape_next = True
+            elif text[i] == "'" and not in_double_quote:
+                in_single_quote = not in_single_quote
+            elif text[i] == '"' and not in_single_quote:
+                in_double_quote = not in_double_quote
+            i += 1
+        cleaned_text = ''.join(cleaned)
+        pldoc_comments.sort(key=lambda x: x[0])
+        return cleaned_text, pldoc_comments
+
+    def _associate_pldoc_comments(self, items: list, comments: list[tuple[int, str]]):
+        """Associate PlDoc comments with clauses/directives."""
+        if not comments:
+            return
+
+        # Robust association: attach each comment to the next item by source position.
+        # We rely on Lark's propagate_positions to furnish item.meta.start_pos where available.
+        entities: list[tuple[int, str, object]] = []
+        for pos, text in comments:
+            entities.append((pos, 'comment', text))
+        for item in items:
+            start_pos = getattr(item.meta, 'start_pos', None) if hasattr(item, 'meta') else None
+            if start_pos is not None:
+                entities.append((start_pos, 'item', item))
+
+        entities.sort(key=lambda x: x[0])
+        last_comment_text: str | None = None
+        for _, entity_type, payload in entities:
+            if entity_type == 'comment':
+                last_comment_text = payload
+            elif entity_type == 'item':
+                if last_comment_text is not None:
+                    payload.doc = last_comment_text
+                last_comment_text = None
 
     def parse(self, text: str, context: str = "parse/1") -> list[Clause | Directive]:
         """Parse Prolog source code and return list of clauses."""
         try:
-            text = self._strip_block_comments(text)
-            parsed_items = self.parser.parse(text)
+            text, pldoc_comments = self._collect_pldoc_comments(text)
+            tree = self.parser.parse(text)
+            transformer = PrologTransformer()
+            parsed_items = transformer.transform(tree)
+            # Associate PlDoc comments with items
+            self._associate_pldoc_comments(parsed_items, pldoc_comments)
             return parsed_items
         except (UnexpectedToken, UnexpectedCharacters) as e:
             # If the lexer/parser choked inside a char code hex escape like 0'\x4G,
@@ -584,8 +701,10 @@ class PrologParser:
         """Parse a single Prolog term."""
         try:
             # Add a period to make it a valid clause
-            text = self._strip_block_comments(f"dummy({text}).")
-            result = self.parser.parse(text)
+            text, _ = self._collect_pldoc_comments(f"dummy({text}).")
+            tree = self.parser.parse(text)
+            transformer = PrologTransformer()
+            result = transformer.transform(tree)
             if result and isinstance(result[0], Clause):
                 compound = result[0].head
                 if isinstance(compound, Compound) and compound.args:
