@@ -154,6 +154,7 @@
 - ✅ Leading-dot and trailing-zero floats
 - ✅ Floating point
 - ✅ Base-qualified numbers (`16'ff`, `2'abcd` - base'digits syntax)
+- ❌ Base'char'number syntax (`16'mod'2`) - Intentionally not implemented. This is an extremely obscure ISO edge case with ambiguous semantics in the standard. No real-world usage observed, and implementation would require significant parser restructuring for minimal value.
 
 ### Comments
 - ✅ Line comments (`%`)
@@ -212,3 +213,4 @@
 2. **SWI-Style Dict Syntax**: `tag{a:1}` syntax not supported
 3. **Operator Definition**: `:- op/3` directive rejected (not implemented)
 4. **Unary Minus Precedence**: In some cases, unary minus may bind differently than expected (e.g., `-X + Y` parses as `-(X + Y)`)
+5. **Base'char'number Syntax**: `Base'char'number` syntax (e.g., `16'mod'2`) intentionally not implemented - extremely obscure ISO feature with ambiguous semantics and no practical use

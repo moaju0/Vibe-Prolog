@@ -872,12 +872,9 @@ class TestISOParserEdgeCases:
         assert result is not None
         assert result['X'] == 65
 
-    @pytest.mark.skip(reason="Base'char'number syntax (e.g., 16'mod'2) is an extremely obscure "
-                      "ISO Prolog feature where NUMBER'ATOM'NUMBER is tokenized as a special "
-                      "arithmetic operator. This requires the lexer to recognize patterns like "
-                      "16'mod'2 as a single expression with embedded character codes. This syntax "
-                      "is almost never used in real Prolog code and would require significant "
-                      "parser restructuring to support properly.")
+    @pytest.mark.skip(reason="Base'char'number syntax (e.g., 16'mod'2) intentionally not implemented. "
+                      "This is an extremely obscure ISO edge case with ambiguous semantics and no "
+                      "real-world usage. See FEATURES.md and ARCHITECTURE.md for decision rationale.")
     def test_character_codes_in_arithmetic(self):
         # Conformity: test_127, test_128, test_130
         prolog = PrologInterpreter()

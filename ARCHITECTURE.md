@@ -214,6 +214,10 @@ you should be aware of:
   `instantiation_error`, `type_error`, etc.) still needs work; most built-ins
   fail silently instead of raising structured errors.
 - Character code hex escapes (`0'\\xHH`) are supported alongside other character code forms.
+- Base'char'number syntax (e.g., `16'mod'2`) is intentionally not implemented.
+  This is an extremely obscure ISO edge case with ambiguous semantics in the
+  standard, no real-world usage, and would require significant parser
+  restructuring for minimal value.
 - No DCG, module system, CLP libraries, or tail-call optimization. Very deep
   recursion can still overflow Python's stack in pathological cases.
 
