@@ -2,244 +2,255 @@
 import Layout from '../layouts/Layout.astro';
 ---
 
-<Layout title="AI Tools - Vibe Prolog" description="AI coding tools and automation workflows used to build Vibe Prolog">
+<Layout title="AI Workflow - Vibe Prolog" description="Development workflow for building Vibe Prolog with AI coding tools">
   <div class="hero">
-    <h1>AI TOOLS & AUTOMATION</h1>
-    <p class="subtitle">HOW MULTIPLE AI CODING TOOLS WORK TOGETHER TO BUILD VIBE PROLOG</p>
+    <h1>AI WORKFLOW</h1>
+    <p class="subtitle">AUTOMATED DEVELOPMENT PROCESS FOR VIBE PROLOG</p>
   </div>
 
   <div class="content">
     <section>
       <h2>Overview</h2>
       <p>
-        Vibe Prolog is built entirely with AI code generation, demonstrating what's possible when
-        you leverage multiple AI coding tools working together. This page documents the tools and
-        workflows used throughout the development process.
+        This page documents the automated workflow used to develop Vibe Prolog. The entire
+        development process—from issue creation to PR merge—leverages AI coding tools to
+        maintain high velocity and code quality.
       </p>
     </section>
 
     <section>
-      <h2>Primary Development Tools</h2>
+      <h2>Creating New Work</h2>
 
-      <div class="tool-card">
-        <h3>Claude Code</h3>
-        <p>
-          The main development interface for iterative coding. Claude Code provides an interactive
-          CLI that integrates with the codebase, allowing for natural language programming and
-          complex multi-step tasks.
-        </p>
-        <ul>
-          <li>Interactive development sessions</li>
-          <li>Code generation and refactoring</li>
-          <li>Test writing and debugging</li>
-          <li>Documentation generation</li>
-        </ul>
+      <div class="workflow-step">
+        <h3>Step 1: Analyze Current State</h3>
+        <p>Review the project goals and current issues to determine what to work on next:</p>
+        <div class="code-example">
+          <pre><code>read FEATURES.md and ARCHITECTURE.md carefully,
+and review the goals in AGENTS.md
+
+look at .paige/currentissuelist.json to understand
+the current github issues.
+
+Given this information and the goals of this project,
+after the current issues are addressed what should
+we work on next?</code></pre>
+        </div>
       </div>
 
-      <div class="tool-card">
-        <h3>Claude Sonnet 4.5</h3>
-        <p>
-          The core AI model powering the implementation. Handles complex architectural decisions,
-          algorithm implementations, and maintains code quality throughout the project.
-        </p>
-        <ul>
-          <li>Core Prolog engine implementation</li>
-          <li>Parser design and unification algorithm</li>
-          <li>Built-in predicate implementation</li>
-          <li>Comprehensive test suite development</li>
-        </ul>
+      <div class="workflow-step">
+        <h3>Step 2: Plan Issues</h3>
+        <p>Determine how many issues should be created for the planned work:</p>
+        <div class="code-example">
+          <pre><code>how many issues should we raise for these?</code></pre>
+        </div>
+      </div>
+
+      <div class="workflow-step">
+        <h3>Step 3: Create Issues</h3>
+        <p>Use the GitHub CLI to create detailed issues:</p>
+        <div class="code-example">
+          <pre><code>use the `gh issue` command line tool and create
+issues for all of these.
+
+Be explicit in outlining exactly what needs to be
+done so an inexperienced developer can follow it.
+
+Be sure to include the following in each issue:
+- include comprehensive test coverage
+- update FEATURES.md
+
+Don't include estimates or line numbers</code></pre>
+        </div>
       </div>
     </section>
 
     <section>
-      <h2>Automation & Workflows</h2>
+      <h2>Grooming Issues</h2>
 
-      <div class="tool-card">
-        <h3>Kilocode</h3>
-        <p>
-          Automated issue-to-PR workflow tools that streamline the development process by handling
-          the entire cycle from issue creation to pull request submission.
-        </p>
-
-        <h4><code>fix-issue-with-kilocode</code></h4>
-        <p>Automates the complete workflow of fixing a GitHub issue:</p>
-        <ol>
-          <li>Creates a new branch based on the issue</li>
-          <li>Runs <code>kilocode</code> against the issue content</li>
-          <li>Commits and pushes any changes</li>
-          <li>Opens a pull request with generated title and body</li>
-        </ol>
-
+      <div class="workflow-step">
+        <h3>Inspect and Split Issues</h3>
+        <p>Review complex issues and split them into smaller, manageable tasks:</p>
         <div class="code-example">
-          <pre><code>fix-issue-with-kilocode 123</code></pre>
+          <pre><code>use `gh issue` to inspect issue &lt;issue number&gt;.
+
+Can we split this into multiple issues?</code></pre>
         </div>
-
-        <h4><code>address-pr-comments-with-kilocode</code></h4>
-        <p>Automatically addresses review comments on pull requests:</p>
-        <ol>
-          <li>Fetches PR details and review comments</li>
-          <li>Checks out the PR branch</li>
-          <li>Runs <code>kilocode --auto</code> to address comments</li>
-          <li>Commits changes with AI-generated commit message</li>
-          <li>Pushes updates to the PR</li>
-        </ol>
-
+        <p class="note">After determining how to split the issue:</p>
         <div class="code-example">
-          <pre><code>address-pr-comments-with-kilocode 456</code></pre>
-        </div>
+          <pre><code>Use the `gh issue` tool and create these issues.
 
-        <p class="tool-requirements">
-          <strong>Requirements:</strong> <code>uv</code>, <code>git</code>, <code>gh</code>,
-          <code>kilocode</code>, <code>llm</code>, and <code>OPENAI_API_KEY</code> environment variable
-        </p>
+Note which ones block others
+
+Provide comprehensive instructions for how to
+implement these changes.
+
+Make sure each issue contains instructions to
+update FEATURES.md and to provide comprehensive
+test coverage.
+
+No estimates or line numbers should be provided</code></pre>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Prioritizing Work</h2>
+
+      <p class="note">
+        These commands use the <code>paige-manage-github</code> CLI tool (external to this project).
+      </p>
+
+      <div class="workflow-step">
+        <h3>List All Issues</h3>
+        <p>Get a comprehensive list of all issues with their details:</p>
+        <div class="code-example">
+          <pre><code>uv run --project ../paige-github-tooling \
+  paige-manage-github --list-issues</code></pre>
+        </div>
       </div>
 
-      <div class="tool-card">
-        <h3>gh-pr-helper</h3>
-        <p>
-          A utility that fetches GitHub PR comments and formats them in markdown suitable for
-          AI coding agents. Makes it easy to feed review feedback back into the AI development cycle.
-        </p>
-
-        <h4>Features</h4>
-        <ul>
-          <li>Fetches both general PR comments and inline code review comments</li>
-          <li>Organizes comments by file and line number</li>
-          <li>Includes code context (diff hunks) for inline comments</li>
-          <li>Filters out metadata not useful for AI agents</li>
-        </ul>
-
+      <div class="workflow-step">
+        <h3>Sort by Priority</h3>
+        <p>Automatically prioritize issues based on dependencies and importance:</p>
         <div class="code-example">
-          <pre><code>gh-pr-helper nlothian/Vibe-Prolog/pull/10 > comments.md</code></pre>
+          <pre><code>uv run --project ../paige-github-tooling \
+  paige-manage-github --prioritize-issues</code></pre>
         </div>
+      </div>
+    </section>
 
-        <p class="tool-requirements">
-          <strong>Requirements:</strong> Python 3.12+, <code>gh</code> (GitHub CLI)
+    <section>
+      <h2>Fixing Issues</h2>
+
+      <div class="workflow-step">
+        <h3>Get Next Issue</h3>
+        <p>Retrieve the highest priority issue to work on:</p>
+        <div class="code-example">
+          <pre><code>next_issue="$(uv run --project ../paige-github-tooling \
+  paige-manage-github --next-issue)"</code></pre>
+        </div>
+      </div>
+
+      <div class="workflow-step">
+        <h3>Fix Using Kilocode</h3>
+        <p>Automatically implement the fix and create a PR:</p>
+        <div class="code-example">
+          <pre><code>uv tool run --from ./ai-tools \
+  fix-issue-with-kilocode "$next_issue"</code></pre>
+        </div>
+      </div>
+
+      <div class="workflow-step">
+        <h3>Fix Using Claude</h3>
+        <p>Alternatively, use Claude Code for the implementation:</p>
+        <div class="code-example">
+          <pre><code>uv tool run --from ./ai-tools \
+  fix-issue-with-claude "$next_issue"</code></pre>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Addressing PR Reviews</h2>
+
+      <div class="workflow-step">
+        <h3>Auto-Address Comments</h3>
+        <p>Automatically address review comments on the current PR:</p>
+        <div class="code-example">
+          <pre><code>uv tool run --from ./ai-tools \
+  address-pr-comments-with-kilocode</code></pre>
+        </div>
+        <p class="note">
+          This command works on the current branch's PR, or you can specify a PR number.
         </p>
       </div>
     </section>
 
     <section>
-      <h2>Supporting Tools</h2>
+      <h2>Complete Workflow</h2>
+
+      <div class="workflow">
+        <div class="workflow-card">
+          <div class="step-number">1</div>
+          <div class="step-content">
+            <h4>Plan Work</h4>
+            <p>Analyze current state, review goals, and determine next tasks</p>
+          </div>
+        </div>
+
+        <div class="workflow-card">
+          <div class="step-number">2</div>
+          <div class="step-content">
+            <h4>Create Issues</h4>
+            <p>Generate detailed GitHub issues with comprehensive instructions</p>
+          </div>
+        </div>
+
+        <div class="workflow-card">
+          <div class="step-number">3</div>
+          <div class="step-content">
+            <h4>Prioritize</h4>
+            <p>Sort issues by priority and dependencies</p>
+          </div>
+        </div>
+
+        <div class="workflow-card">
+          <div class="step-number">4</div>
+          <div class="step-content">
+            <h4>Implement</h4>
+            <p>Use AI tools to automatically implement fixes and create PRs</p>
+          </div>
+        </div>
+
+        <div class="workflow-card">
+          <div class="step-number">5</div>
+          <div class="step-content">
+            <h4>Review & Iterate</h4>
+            <p>Address PR comments automatically and iterate until merged</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Tools Used</h2>
 
       <div class="tool-list">
         <div class="tool-item">
-          <h4>GitHub Copilot</h4>
-          <p>Provides real-time code suggestions and completions during development (via Cursor IDE)</p>
+          <h4>fix-issue-with-kilocode</h4>
+          <p>Automates the complete workflow: creates branch, implements fix, commits, and opens PR</p>
         </div>
 
         <div class="tool-item">
-          <h4>LLM CLI</h4>
-          <p>Command-line interface for large language models, used for commit message generation and text processing</p>
+          <h4>fix-issue-with-claude</h4>
+          <p>Uses Claude Code for interactive implementation of GitHub issues</p>
         </div>
 
         <div class="tool-item">
-          <h4>UV</h4>
-          <p>Fast Python package and project management tool, replacing traditional pip/virtualenv workflows</p>
+          <h4>address-pr-comments-with-kilocode</h4>
+          <p>Automatically addresses review comments and updates the PR</p>
+        </div>
+
+        <div class="tool-item">
+          <h4>paige-manage-github</h4>
+          <p>External tool for issue management, listing, and prioritization</p>
+        </div>
+
+        <div class="tool-item">
+          <h4>GitHub CLI (gh)</h4>
+          <p>Used throughout the workflow for issue and PR management</p>
         </div>
       </div>
-    </section>
-
-    <section>
-      <h2>Development Workflow</h2>
-
-      <div class="workflow">
-        <div class="workflow-step">
-          <div class="step-number">1</div>
-          <div class="step-content">
-            <h4>Issue Creation</h4>
-            <p>Create a GitHub issue describing the feature, bug fix, or improvement</p>
-          </div>
-        </div>
-
-        <div class="workflow-step">
-          <div class="step-number">2</div>
-          <div class="step-content">
-            <h4>Automated Implementation</h4>
-            <p>Run <code>fix-issue-with-kilocode</code> to automatically create branch, implement, and open PR</p>
-          </div>
-        </div>
-
-        <div class="workflow-step">
-          <div class="step-number">3</div>
-          <div class="step-content">
-            <h4>AI Review</h4>
-            <p>AI tools review the PR, run tests, and provide feedback on code quality</p>
-          </div>
-        </div>
-
-        <div class="workflow-step">
-          <div class="step-number">4</div>
-          <div class="step-content">
-            <h4>Address Comments</h4>
-            <p>Run <code>address-pr-comments-with-kilocode</code> to automatically address review feedback</p>
-          </div>
-        </div>
-
-        <div class="workflow-step">
-          <div class="step-number">5</div>
-          <div class="step-content">
-            <h4>Merge</h4>
-            <p>Once all checks pass and review is satisfied, merge the PR</p>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section>
-      <h2>Installation & Setup</h2>
-
-      <p>To use these tools in your own projects:</p>
-
-      <h3>Kilocode Tools</h3>
-      <div class="code-example">
-        <pre><code>cd ai-tools
-uv run kilocode/fix-issue-with-kilocode --help
-uv run kilocode/address-pr-comments-with-kilocode --help</code></pre>
-      </div>
-
-      <h3>gh-pr-helper</h3>
-      <div class="code-example">
-        <pre><code>cd ai-tools/gh-pr-helper
-chmod +x gh-pr-helper
-./gh-pr-helper nlothian/Vibe-Prolog/pull/10</code></pre>
-      </div>
-
-      <p>
-        See the individual README files in the <code>ai-tools/</code> directory for detailed
-        installation instructions and requirements.
-      </p>
-    </section>
-
-    <section>
-      <h2>The Philosophy</h2>
-
-      <p>
-        This project demonstrates that AI code generation is most powerful when multiple tools
-        work together in a coordinated workflow:
-      </p>
-
-      <ul>
-        <li><strong>Interactive AI</strong> for complex problem-solving and architecture</li>
-        <li><strong>Automated workflows</strong> for repetitive tasks and process automation</li>
-        <li><strong>Human oversight</strong> for quality control and strategic decisions</li>
-        <li><strong>Continuous iteration</strong> to improve code quality over time</li>
-      </ul>
-
-      <p>
-        By combining these approaches, we can achieve higher code quality and faster development
-        than any single approach alone.
-      </p>
     </section>
 
     <section class="cta">
-      <h2>Want to Contribute?</h2>
+      <h2>Want to Learn More?</h2>
       <p>
-        Tool vendors: Want to add your AI coding tool to this project? We'd love to try it!
-        Open a PR or issue on GitHub.
+        Check out the ai-tools directory in the repository to see the implementation
+        of these automation scripts.
       </p>
-      <a href="https://github.com/nlothian/Vibe-Prolog" class="neon-button primary" target="_blank" rel="noopener">
-        VIEW ON GITHUB
+      <a href="https://github.com/nlothian/Vibe-Prolog/tree/main/ai-tools" class="neon-button primary" target="_blank" rel="noopener">
+        VIEW AI TOOLS
       </a>
     </section>
   </div>
@@ -294,7 +305,7 @@ chmod +x gh-pr-helper
 
   h3 {
     font-family: var(--font-display);
-    font-size: 2rem;
+    font-size: 1.8rem;
     color: var(--color-electric-magenta);
     margin-bottom: var(--space-sm);
     margin-top: var(--space-lg);
@@ -303,10 +314,10 @@ chmod +x gh-pr-helper
   }
 
   h4 {
-    font-size: 1.5rem;
+    font-size: 1.3rem;
     color: var(--color-acid-green);
     margin-bottom: var(--space-sm);
-    margin-top: var(--space-md);
+    margin-top: 0;
     letter-spacing: 0.03em;
     text-shadow: 0 0 10px rgba(57, 255, 20, 0.3);
   }
@@ -316,35 +327,8 @@ chmod +x gh-pr-helper
     line-height: 1.8;
   }
 
-  ul, ol {
-    margin: var(--space-md) 0;
-    padding-left: var(--space-xl);
-  }
-
-  li {
-    margin-bottom: var(--space-sm);
-    line-height: 1.8;
-  }
-
-  .tool-card {
-    background-color: rgba(26, 26, 26, 0.6);
-    backdrop-filter: blur(10px);
-    border: 1px solid rgba(0, 240, 255, 0.5);
-    padding: var(--space-xl);
-    margin-bottom: var(--space-lg);
-    box-shadow: 0 0 40px rgba(0, 240, 255, 0.3);
-    transition: all var(--duration-normal) var(--easing-elastic);
-  }
-
-  .tool-card:hover {
-    transform: translateY(-8px);
-    box-shadow: 0 0 60px rgba(0, 240, 255, 0.6);
-    border-color: rgba(0, 240, 255, 0.8);
-  }
-
-  .tool-card h3 {
-    margin-top: 0;
-    color: var(--color-electric-magenta);
+  .workflow-step {
+    margin-bottom: var(--space-xl);
   }
 
   .code-example {
@@ -364,20 +348,25 @@ chmod +x gh-pr-helper
     font-family: 'Courier New', Courier, monospace;
     font-size: 0.9rem;
     color: var(--color-acid-green);
+    line-height: 1.6;
   }
 
-  .tool-requirements {
+  .note {
     margin-top: var(--space-md);
     padding: var(--space-md);
-    background-color: rgba(255, 255, 0, 0.1);
-    border-left: 3px solid var(--color-toxic-yellow);
-    font-size: 0.9rem;
-    box-shadow: 0 0 10px rgba(255, 255, 0, 0.2);
+    background-color: rgba(0, 240, 255, 0.1);
+    border-left: 3px solid var(--color-cyber-blue);
+    font-size: 0.95rem;
+    box-shadow: 0 0 10px rgba(0, 240, 255, 0.2);
   }
 
-  .tool-requirements strong {
-    color: var(--color-toxic-yellow);
-    text-shadow: 0 0 10px rgba(255, 255, 0, 0.4);
+  .note code {
+    background-color: rgba(26, 26, 26, 0.8);
+    color: var(--color-acid-green);
+    padding: 0.2rem 0.6rem;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 0.9em;
+    border: 1px solid rgba(57, 255, 20, 0.3);
   }
 
   .tool-list {
@@ -399,7 +388,6 @@ chmod +x gh-pr-helper
   }
 
   .tool-item h4 {
-    margin-top: 0;
     color: var(--color-acid-green);
   }
 
@@ -414,10 +402,22 @@ chmod +x gh-pr-helper
     margin-top: var(--space-lg);
   }
 
-  .workflow-step {
+  .workflow-card {
     display: flex;
     gap: var(--space-md);
     align-items: start;
+    padding: var(--space-lg);
+    background-color: rgba(26, 26, 26, 0.6);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(0, 240, 255, 0.5);
+    box-shadow: 0 0 30px rgba(0, 240, 255, 0.3);
+    transition: all var(--duration-normal) var(--easing-elastic);
+  }
+
+  .workflow-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 0 50px rgba(0, 240, 255, 0.5);
+    border-color: rgba(0, 240, 255, 0.8);
   }
 
   .step-number {
@@ -442,7 +442,6 @@ chmod +x gh-pr-helper
   }
 
   .step-content h4 {
-    margin-top: 0;
     margin-bottom: var(--space-xs);
     color: var(--color-cyber-blue);
   }
@@ -450,16 +449,6 @@ chmod +x gh-pr-helper
   .step-content p {
     margin-top: var(--space-xs);
     color: rgba(0, 240, 255, 0.8);
-  }
-
-  .step-content code {
-    background-color: rgba(26, 26, 26, 0.8);
-    color: var(--color-acid-green);
-    padding: 0.2rem 0.6rem;
-    font-family: 'Courier New', Courier, monospace;
-    font-size: 0.9em;
-    border: 1px solid rgba(57, 255, 20, 0.3);
-    box-shadow: 0 0 10px rgba(57, 255, 20, 0.2);
   }
 
   .cta {
@@ -524,19 +513,16 @@ chmod +x gh-pr-helper
       font-size: 1.5rem;
     }
 
-    .workflow-step {
+    .workflow-card {
       flex-direction: column;
       gap: var(--space-sm);
+      padding: var(--space-md);
     }
 
     .step-number {
       width: 2.5rem;
       height: 2.5rem;
       font-size: 1.2rem;
-    }
-
-    .tool-card {
-      padding: var(--space-md);
     }
 
     .neon-button {
