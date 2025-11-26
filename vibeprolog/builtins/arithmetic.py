@@ -4,10 +4,12 @@ Implements ISO-style arithmetic predicates:
 - ``is/2`` for arithmetic evaluation
 - ``=:=/2`` and ``=\\=/2`` for numeric equality/inequality
 - ``</2``, ``>/2``, ``=<``/2, ``>=``/2 for comparisons
+- ISO math functions: abs, min, max, sqrt, sin, cos, tan, exp, log, floor, ceiling, round, sign
 """
 
 from __future__ import annotations
 
+import math
 from typing import TYPE_CHECKING, Any
 
 from vibeprolog.builtins import BuiltinRegistry, register_builtin
@@ -117,6 +119,96 @@ class ArithmeticBuiltins:
                         return left**right
                 except ZeroDivisionError:
                     return None
+
+            # Binary math functions
+            BINARY_MATH_FUNCTIONS = {"min": min, "max": max}
+            if expr.functor in BINARY_MATH_FUNCTIONS and len(expr.args) == 2:
+                left = ArithmeticBuiltins._eval_arithmetic(expr.args[0], subst, engine)
+                right = ArithmeticBuiltins._eval_arithmetic(expr.args[1], subst, engine)
+                if left is None or right is None:
+                    return None
+                return BINARY_MATH_FUNCTIONS[expr.functor](left, right)
+
+            # Unary math functions
+            if expr.functor == "abs" and len(expr.args) == 1:
+                arg = ArithmeticBuiltins._eval_arithmetic(expr.args[0], subst, engine)
+                if arg is None:
+                    return None
+                return abs(arg)
+
+            if expr.functor == "sqrt" and len(expr.args) == 1:
+                arg = ArithmeticBuiltins._eval_arithmetic(expr.args[0], subst, engine)
+                if arg is None:
+                    return None
+                try:
+                    return math.sqrt(arg)
+                except (ValueError, TypeError):
+                    return None
+
+            if expr.functor == "sin" and len(expr.args) == 1:
+                arg = ArithmeticBuiltins._eval_arithmetic(expr.args[0], subst, engine)
+                if arg is None:
+                    return None
+                return math.sin(arg)
+
+            if expr.functor == "cos" and len(expr.args) == 1:
+                arg = ArithmeticBuiltins._eval_arithmetic(expr.args[0], subst, engine)
+                if arg is None:
+                    return None
+                return math.cos(arg)
+
+            if expr.functor == "tan" and len(expr.args) == 1:
+                arg = ArithmeticBuiltins._eval_arithmetic(expr.args[0], subst, engine)
+                if arg is None:
+                    return None
+                return math.tan(arg)
+
+            if expr.functor == "exp" and len(expr.args) == 1:
+                arg = ArithmeticBuiltins._eval_arithmetic(expr.args[0], subst, engine)
+                if arg is None:
+                    return None
+                try:
+                    return math.exp(arg)
+                except OverflowError:
+                    return None
+
+            if expr.functor == "log" and len(expr.args) == 1:
+                arg = ArithmeticBuiltins._eval_arithmetic(expr.args[0], subst, engine)
+                if arg is None:
+                    return None
+                try:
+                    return math.log(arg)
+                except (ValueError, TypeError):
+                    return None
+
+            if expr.functor == "floor" and len(expr.args) == 1:
+                arg = ArithmeticBuiltins._eval_arithmetic(expr.args[0], subst, engine)
+                if arg is None:
+                    return None
+                return math.floor(arg)
+
+            if expr.functor == "ceiling" and len(expr.args) == 1:
+                arg = ArithmeticBuiltins._eval_arithmetic(expr.args[0], subst, engine)
+                if arg is None:
+                    return None
+                return math.ceil(arg)
+
+            if expr.functor == "round" and len(expr.args) == 1:
+                arg = ArithmeticBuiltins._eval_arithmetic(expr.args[0], subst, engine)
+                if arg is None:
+                    return None
+                return round(arg)
+
+            if expr.functor == "sign" and len(expr.args) == 1:
+                arg = ArithmeticBuiltins._eval_arithmetic(expr.args[0], subst, engine)
+                if arg is None:
+                    return None
+                if arg > 0:
+                    return 1
+                elif arg < 0:
+                    return -1
+                else:
+                    return 0
 
         return None
 

@@ -54,6 +54,21 @@
 - ✅ `>/2` – Arithmetic greater than
 - ✅ `>=/2` – Arithmetic greater than or equal
 
+### Arithmetic Functions (ISO 9.3)
+- ✅ `abs/1` – Absolute value
+- ✅ `min/2` – Minimum of two values
+- ✅ `max/2` – Maximum of two values
+- ✅ `sqrt/1` – Square root
+- ✅ `sin/1` – Sine (radians)
+- ✅ `cos/1` – Cosine (radians)
+- ✅ `tan/1` – Tangent (radians)
+- ✅ `exp/1` – Exponential (e^x)
+- ✅ `log/1` – Natural logarithm
+- ✅ `floor/1` – Floor (round down)
+- ✅ `ceiling/1` – Ceiling (round up)
+- ✅ `round/1` – Round to nearest integer
+- ✅ `sign/1` – Sign of number (-1, 0, or 1)
+
 ### All Solutions (ISO 8.10)
 - ✅ `findall/3` – Collect all solutions
 - ✅ `bagof/3` – Collect solutions with duplicates
