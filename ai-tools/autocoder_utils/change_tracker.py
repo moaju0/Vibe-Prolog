@@ -40,18 +40,16 @@ def find_most_recent_change_file(changes_dir: Path) -> datetime | None:
 
 def get_git_changes(since_date: datetime | None) -> list[dict] | None:
     """
-    Get git changes since the specified date.
+    Get git changes since the specified date using committer date.
+    Uses committer date (when merged) instead of author date (when originally written).
     """
     cmd = [
         "git",
         "log",
-        "--pretty=format:%H|%ai|%an|%s",
+        "--pretty=format:%H|%ci|%an|%s",
     ]
 
-    if since_date:
-        since_str = (since_date + timedelta(days=1)).strftime("%Y-%m-%d")
-        cmd.append(f"--since={since_str}")
-
+    # Don't filter by date in git - we'll filter in Python by committer date
     try:
         result = subprocess.run(
             cmd,
@@ -64,16 +62,26 @@ def get_git_changes(since_date: datetime | None) -> list[dict] | None:
         return None
 
     commits = []
+    since_str = None
+    if since_date:
+        since_str = (since_date + timedelta(days=1)).strftime("%Y-%m-%d")
+
     for line in result.stdout.strip().split("\n"):
         if not line:
             continue
 
         parts = line.split("|", 3)
         if len(parts) == 4:
+            commit_date = parts[1].split()[0]  # Extract date from committer timestamp
+
+            # Filter by committer date if since_date is specified
+            if since_str and commit_date < since_str:
+                continue
+
             commits.append(
                 {
                     "hash": parts[0][:8],
-                    "date": parts[1].split()[0],
+                    "date": commit_date,
                     "author": parts[2],
                     "message": parts[3],
                 }
@@ -85,11 +93,9 @@ def get_git_changes(since_date: datetime | None) -> list[dict] | None:
 def get_git_stats(since_date: datetime | None) -> dict | None:
     """
     Aggregate file statistics since the specified date by summing per-commit stats.
+    Uses committer date to match when commits were merged, not authored.
     """
-    cmd = ["git", "log", "--numstat", "--format=%H"]
-    if since_date:
-        since_str = (since_date + timedelta(days=1)).strftime("%Y-%m-%d")
-        cmd.extend(["--since", since_str])
+    cmd = ["git", "log", "--numstat", "--format=%H|%ci"]
     cmd.append("HEAD")
 
     try:
@@ -101,10 +107,27 @@ def get_git_stats(since_date: datetime | None) -> dict | None:
     files_touched: set[str] = set()
     insertions_total = 0
     deletions_total = 0
+    current_commit_date = None
+    since_str = None
+    if since_date:
+        since_str = (since_date + timedelta(days=1)).strftime("%Y-%m-%d")
 
     for line in result.stdout.splitlines():
+        # Check if this is a commit header (hash|date)
+        if "|" in line and "\t" not in line:
+            parts = line.split("|", 1)
+            if len(parts) == 2:
+                current_commit_date = parts[1].split()[0]  # Extract date from timestamp
+            continue
+
+        # This is a numstat line
         if "\t" not in line:
             continue
+
+        # Skip stats if commit is before since_date
+        if since_str and current_commit_date and current_commit_date < since_str:
+            continue
+
         parts = line.split("\t", 2)
         if len(parts) != 3:
             continue
@@ -134,7 +157,7 @@ def get_git_stats(since_date: datetime | None) -> dict | None:
 
 def get_closed_issues(since_date: datetime | None) -> list[dict] | None:
     """
-    Get closed GitHub issues since the specified date.
+    Get closed GitHub issues since the specified date, including which PR closed them.
     """
     cmd = [
         "gh",
@@ -143,7 +166,7 @@ def get_closed_issues(since_date: datetime | None) -> list[dict] | None:
         "--state",
         "closed",
         "--json",
-        "number,title,closedAt,url",
+        "number,title,closedAt,url,closedByPullRequestsReferences",
         "--limit",
         "1000",
     ]
@@ -173,12 +196,17 @@ def get_closed_issues(since_date: datetime | None) -> list[dict] | None:
             if issue["closedAt"]:
                 closed_date = issue["closedAt"].split("T")[0]
                 if closed_date >= since_str:
+                    # Extract PR numbers that closed this issue
+                    closing_pr_numbers = [
+                        pr["number"] for pr in issue.get("closedByPullRequestsReferences", [])
+                    ]
                     filtered_issues.append(
                         {
                             "number": issue["number"],
                             "title": issue["title"],
                             "closed_at": closed_date,
                             "url": issue["url"],
+                            "closing_pr_numbers": closing_pr_numbers,
                         }
                     )
         return filtered_issues
@@ -189,6 +217,9 @@ def get_closed_issues(since_date: datetime | None) -> list[dict] | None:
             "title": issue["title"],
             "closed_at": issue["closedAt"].split("T")[0] if issue["closedAt"] else "unknown",
             "url": issue["url"],
+            "closing_pr_numbers": [
+                pr["number"] for pr in issue.get("closedByPullRequestsReferences", [])
+            ],
         }
         for issue in all_issues
     ]
@@ -296,14 +327,11 @@ def format_changes_markdown(
     lines.append(f"- **Deletions**: -{stats['deletions']}")
     lines.append("")
 
-    issue_to_pr = {}
-    for pr in prs:
-        issue_match = re.search(r"#(\d+)", pr["title"])
-        if issue_match:
-            issue_number = int(issue_match.group(1))
-            matching_issue = next((issue for issue in issues if issue["number"] == issue_number), None)
-            if matching_issue:
-                issue_to_pr[issue_number] = pr
+    # Create a mapping of PR number to PR object for easy lookup
+    pr_by_number = {pr["number"]: pr for pr in prs}
+
+    # Track which PRs are associated with issues
+    pr_numbers_with_issues = set()
 
     if issues:
         lines.append("## Issues")
@@ -314,15 +342,22 @@ def format_changes_markdown(
             lines.append(f"URL: {issue['url']}")
             lines.append("")
 
-            closing_pr = issue_to_pr.get(issue["number"])
-            if closing_pr:
+            # Get PRs that closed this issue from the closing_pr_numbers field
+            closing_pr_numbers = issue.get("closing_pr_numbers", [])
+            if closing_pr_numbers:
                 lines.append("**Closed by:**")
-                lines.append(f"- PR #{closing_pr['number']}: {closing_pr['title']}")
-                lines.append(f"  - Merged: {closing_pr['merged_at']}")
-                lines.append(f"  - URL: {closing_pr['url']}")
+                for pr_num in closing_pr_numbers:
+                    pr_numbers_with_issues.add(pr_num)
+                    closing_pr = pr_by_number.get(pr_num)
+                    if closing_pr:
+                        lines.append(f"- PR #{closing_pr['number']}: {closing_pr['title']}")
+                        lines.append(f"  - Merged: {closing_pr['merged_at']}")
+                        lines.append(f"  - URL: {closing_pr['url']}")
+                    else:
+                        # PR might be outside the date range we queried
+                        lines.append(f"- PR #{pr_num} (not in this changelog's date range)")
                 lines.append("")
 
-    pr_numbers_with_issues = {pr["number"] for pr in issue_to_pr.values()}
     standalone_prs = [pr for pr in prs if pr["number"] not in pr_numbers_with_issues]
 
     if standalone_prs:
