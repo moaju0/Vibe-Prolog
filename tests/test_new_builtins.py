@@ -115,8 +115,8 @@ class TestCall:
     def test_call_with_variable(self):
         """Test calling a goal stored in a variable."""
         prolog = PrologInterpreter()
-        prolog.consult_string("number(42).")
-        result = prolog.query_once("Goal = number(42), call(Goal).")
+        prolog.consult_string("custom_number(42).")
+        result = prolog.query_once("Goal = custom_number(42), call(Goal).")
         assert result is not None
 
     def test_call_arithmetic(self):

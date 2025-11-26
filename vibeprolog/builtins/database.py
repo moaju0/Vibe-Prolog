@@ -83,6 +83,17 @@ class DatabaseBuiltins:
         else:
             new_clause = Clause(clause_term, None)
 
+        head = new_clause.head
+        if isinstance(head, Compound):
+            key = (head.functor, len(head.args))
+        elif isinstance(head, Atom):
+            key = (head.name, 0)
+        else:
+            return None
+
+        context = "asserta/1" if position == "front" else "assertz/1"
+        engine._ensure_dynamic_permission(key, context)
+
         if position == "front":
             engine.clauses.insert(0, new_clause)
         else:
@@ -90,6 +101,7 @@ class DatabaseBuiltins:
 
         # Update the predicate index
         engine._add_predicate_to_index(new_clause)
+        engine._record_predicate_source(key, "runtime")
 
         return subst
 
@@ -121,9 +133,15 @@ class DatabaseBuiltins:
                 # Track which predicate is being retracted
                 head = clause.head
                 if isinstance(head, Compound):
-                    retracted_predicates.add((head.functor, len(head.args)))
+                    key = (head.functor, len(head.args))
                 elif isinstance(head, Atom):
-                    retracted_predicates.add((head.name, 0))
+                    key = (head.name, 0)
+                else:
+                    continue
+                retracted_predicates.add(key)
+
+        for key in retracted_predicates:
+            engine._ensure_dynamic_permission(key, "retract/1")
 
         for i, new_subst in reversed(matches):
             engine.clauses.pop(i)
@@ -161,6 +179,8 @@ class DatabaseBuiltins:
         arity = arity_term.value
         name = name_term.name
 
+        engine._ensure_dynamic_permission((name, arity), "abolish/1")
+
         clauses_to_keep = []
         had_clauses = False  # Track if any clauses were removed
         for clause in engine.clauses:
@@ -182,6 +202,7 @@ class DatabaseBuiltins:
         # Update the index if clauses were removed
         if had_clauses:
             engine._predicate_index.discard((name, arity))
+            engine.predicate_sources.pop((name, arity), None)
 
         return subst
 

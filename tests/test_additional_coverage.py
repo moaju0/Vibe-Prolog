@@ -36,6 +36,7 @@ class TestAssertRules:
     def test_assert_simple_rule(self):
         """Test assert/1 with a simple rule."""
         prolog = PrologInterpreter()
+        prolog.consult_string(":- dynamic(test_rule/1).")
         # Note: assert with :- syntax might not be fully supported
         # Test with fact-based approach
         assert prolog.has_solution("assert(test_rule(X))")

@@ -113,7 +113,7 @@ class TestDynamicFactModification:
 
     def test_assert_fact(self):
         prolog = PrologInterpreter()
-        prolog.consult_string("p(a).")
+        prolog.consult_string(":- dynamic(p/1).\np(a).")
 
         # Assert a new fact
         prolog.query_once("assert(p(b))")
@@ -126,6 +126,7 @@ class TestDynamicFactModification:
     def test_retract_fact(self):
         prolog = PrologInterpreter()
         prolog.consult_string("""
+            :- dynamic(p/1).
             p(a).
             p(b).
             p(c).
@@ -142,6 +143,7 @@ class TestDynamicFactModification:
     def test_retract_all_matching(self):
         prolog = PrologInterpreter()
         prolog.consult_string("""
+            :- dynamic(p/1).
             p(1).
             p(2).
             p(3).

@@ -154,6 +154,21 @@ non-deterministic predicates.
   `_list_to_python` (respects active substitutions), and `_fresh_variable`
   centralize tricky behavior so new built-ins stay consistent.
 
+### Predicate properties and mutability
+
+- `PrologInterpreter.predicate_properties` maps `(functor, arity)` to a set of
+  properties (`dynamic`, `multifile`, `discontiguous`, `static`, `built_in`).
+- `PrologInterpreter._predicate_sources` tracks which consult call introduced
+  each predicate so non-multifile predicates cannot be extended by later files.
+- The same structures are shared with `PrologEngine` so runtime database
+  operations enforce the recorded properties.
+
+User-defined predicates start as **static**, meaning `asserta/1`, `assertz/1`,
+`retract/1`, and `abolish/1` raise `permission_error` unless the predicate was
+declared `dynamic/1`. Built-ins are always `static` and `built_in`. Discontiguity
+and multifile declarations are validated during consultation to ensure clause
+ordering and multi-file composition follow ISO expectations.
+
 ## Utility Modules
 
 Shared helpers for the AST live in `vibeprolog/utils/`:
