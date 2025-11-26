@@ -57,6 +57,22 @@ class Directive:
     goal: Any  # The directive term, e.g., initialization(goal)
 
 
+@dataclass
+class PredicateIndicator:
+    """A predicate indicator Name/Arity."""
+
+    name: Any
+    arity: Any
+
+
+@dataclass
+class PredicatePropertyDirective:
+    """Directive declaring predicate properties such as dynamic/1."""
+
+    property: str
+    indicators: tuple[PredicateIndicator, ...]
+
+
 # Lark grammar for Prolog
 PROLOG_GRAMMAR = r"""
     start: (clause | directive)+
@@ -64,7 +80,13 @@ PROLOG_GRAMMAR = r"""
     clause: fact | rule
     fact: term "."
     rule: term ":-" goals "."
-    directive: ":-" term "."
+    directive: ":-" (property_directive | term) "."
+
+    property_directive: "dynamic" "(" predicate_indicators ")"    -> dynamic_directive
+        | "multifile" "(" predicate_indicators ")"   -> multifile_directive
+        | "discontiguous" "(" predicate_indicators ")" -> discontiguous_directive
+
+    predicate_indicators: comparison_term ("," comparison_term)*
 
     goals: term ("," term)*
 
@@ -173,6 +195,24 @@ class PrologTransformer(Transformer):
 
     def directive(self, items):
         return Directive(goal=items[0])
+
+    def predicate_indicator(self, items):
+        if len(items) == 2:
+            name, arity = items
+            return PredicateIndicator(name=name, arity=arity)
+        return items[0]
+
+    def predicate_indicators(self, items):
+        return items
+
+    def dynamic_directive(self, items):
+        return PredicatePropertyDirective("dynamic", tuple(items[0]))
+
+    def multifile_directive(self, items):
+        return PredicatePropertyDirective("multifile", tuple(items[0]))
+
+    def discontiguous_directive(self, items):
+        return PredicatePropertyDirective("discontiguous", tuple(items[0]))
 
     def fact(self, items):
         return Clause(head=items[0], body=None)

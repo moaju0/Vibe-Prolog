@@ -10,6 +10,7 @@ class TestAsserta:
     def test_asserta_fact_ordering(self):
         """Test that asserta/1 adds facts at the beginning."""
         prolog = PrologInterpreter()
+        prolog.consult_string(":- dynamic(p/1).")
         # Add initial facts
         prolog.query_once("assert(p(1)).")
         prolog.query_once("assert(p(2)).")
@@ -27,6 +28,7 @@ class TestAsserta:
     def test_asserta_multiple(self):
         """Test multiple asserta calls."""
         prolog = PrologInterpreter()
+        prolog.consult_string(":- dynamic(p/1).")
         prolog.query_once("assert(p(1)).")
         prolog.query_once("asserta(p(0)).")
         prolog.query_once("asserta(p(-1)).")
@@ -44,6 +46,7 @@ class TestAssertz:
     def test_assertz_fact_ordering(self):
         """Test that assertz/1 adds facts at the end."""
         prolog = PrologInterpreter()
+        prolog.consult_string(":- dynamic(p/1).")
         # Add initial facts
         prolog.query_once("assert(p(1)).")
         prolog.query_once("assert(p(2)).")
@@ -61,6 +64,7 @@ class TestAssertz:
     def test_assertz_multiple(self):
         """Test multiple assertz calls."""
         prolog = PrologInterpreter()
+        prolog.consult_string(":- dynamic(p/1).")
         prolog.query_once("assert(p(1)).")
         prolog.query_once("assertz(p(2)).")
         prolog.query_once("assertz(p(3)).")
@@ -78,6 +82,7 @@ class TestAssert:
     def test_assert_fact_ordering(self):
         """Test that assert/1 adds facts at the end (like assertz/1)."""
         prolog = PrologInterpreter()
+        prolog.consult_string(":- dynamic(p/1).")
         # Add initial facts
         prolog.query_once("assert(p(1)).")
         prolog.query_once("assert(p(2)).")
@@ -99,6 +104,7 @@ class TestMixedAssert:
     def test_mixed_ordering(self):
         """Test ordering when mixing different assert variants."""
         prolog = PrologInterpreter()
+        prolog.consult_string(":- dynamic(p/1).")
 
         # Add initial fact
         prolog.query_once("assert(p(2)).")
@@ -142,9 +148,11 @@ class TestAssertBuiltins:
     def test_assert_deterministic(self):
         """Test that assert builtins are deterministic (single solution)."""
         prolog = PrologInterpreter()
+        prolog.consult_string(":- dynamic(p/1).")
         results = list(prolog.query("assert(p(test))."))
         assert len(results) == 1
         assert results[0] == {}
+
 
         results = list(prolog.query("asserta(p(test))."))
         assert len(results) == 1

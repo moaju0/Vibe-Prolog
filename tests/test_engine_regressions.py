@@ -58,6 +58,7 @@ class TestIfThenStreaming:
         """->/2 and ;/2 should leave remaining condition choices untouched."""
 
         prolog = PrologInterpreter()
+        prolog.consult_string(":- dynamic(next/1).")
         prolog.query_once("assertz(next(1)).")
         prolog.query_once("assertz(next(2)).")
 

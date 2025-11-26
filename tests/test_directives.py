@@ -1,117 +1,98 @@
-"""Tests for Prolog directives."""
-
 import pytest
 
 from vibeprolog import PrologInterpreter
-from vibeprolog.exceptions import PrologThrow
+from vibeprolog.engine import PrologThrow
 
 
-class TestInitializationDirective:
-    """Tests for :- initialization/1 directive."""
-
-    def test_single_initialization_simple_goal(self):
-        """Test single initialization directive with simple goal."""
+class TestPredicateDirectives:
+    def test_dynamic_allows_assert_and_retract(self):
         prolog = PrologInterpreter()
-        prolog.consult_string("""
-            :- initialization(write('Hello')).
-            test.
-        """)
-        # Check that initialization ran (but since write outputs, hard to test directly)
-        # For now, just check no exception
-        assert prolog.has_solution("test")
+        prolog.consult_string(":- dynamic(foo/1).\nfoo(1).")
 
-    def test_multiple_initializations_in_order(self):
-        """Test multiple initialization directives execute in order."""
-        prolog = PrologInterpreter()
-        prolog.consult_string("""
-            :- initialization(asserta(fact1)).
-            :- initialization(asserta(fact2)).
-            test.
-        """)
-        # fact2 should be first since asserta adds to front
-        assert prolog.has_solution("fact2")
-        assert prolog.has_solution("fact1")
+        assert prolog.has_solution("catch(asserta(foo(2)), _, true)")
+        assert prolog.has_solution("foo(2)")
 
-    def test_initialization_with_side_effects(self):
-        """Test initialization that performs side effects."""
-        prolog = PrologInterpreter()
-        prolog.consult_string("""
-            :- initialization(assertz(side_effect)).
-            query :- side_effect.
-        """)
-        assert prolog.has_solution("query")
+        result = prolog.query_once(
+            "catch(retract(foo(1)), error(permission_error(modify, static_procedure, _), _), fail)"
+        )
+        assert result is not None
+        assert prolog.has_solution("\\+ foo(1)")
 
-    def test_initialization_accessing_facts(self):
-        """Test initialization accessing facts defined in same file."""
+    def test_static_predicate_rejects_assert(self):
         prolog = PrologInterpreter()
-        prolog.consult_string("""
-            base_fact.
-            :- initialization((base_fact, assertz(derived_fact))).
-            query :- derived_fact.
-        """)
-        assert prolog.has_solution("query")
+        result = prolog.query_once(
+            "catch(asserta(bar(1)), error(permission_error(modify, static_procedure, Pred), context(Context)), true)."
+        )
 
-    def test_empty_initialization(self):
-        """Test :- initialization(true)."""
-        prolog = PrologInterpreter()
-        prolog.consult_string("""
-            :- initialization(true).
-            test.
-        """)
-        assert prolog.has_solution("test")
+        assert result is not None
+        assert result["Pred"] == {"/": ["bar", 1]}
+        assert result["Context"] == "asserta/1"
+        assert not prolog.has_solution("bar(1)")
 
-    def test_initialization_with_complex_goal(self):
-        """Test initialization with conjunction."""
+    def test_multifile_allows_multiple_sources(self):
         prolog = PrologInterpreter()
-        prolog.consult_string("""
-            :- initialization((asserta(a), asserta(b))).
-            test :- a, b.
-        """)
-        assert prolog.has_solution("test")
+        prolog.consult_string(":- multifile(shared/1).\nshared(1).")
+        prolog.consult_string("shared(2).")
 
-    def test_non_callable_goal_number(self):
-        """Test error for non-callable goal (number)."""
-        prolog = PrologInterpreter()
-        with pytest.raises(PrologThrow) as exc_info:
-            prolog.consult_string(":- initialization(42).")
-        error = exc_info.value.term
-        assert error.functor == "error"
-        assert error.args[0].functor == "type_error"
-        assert error.args[0].args[0].name == "callable"
+        results = prolog.query("shared(X)")
+        values = {row["X"] for row in results}
+        assert values == {1, 2}
 
-    def test_unbound_variable_goal(self):
-        """Test error for unbound variable as goal."""
+    def test_non_multifile_redefinition_raises(self):
         prolog = PrologInterpreter()
-        with pytest.raises(PrologThrow) as exc_info:
-            prolog.consult_string(":- initialization(X).")
-        error = exc_info.value.term
-        assert error.functor == "error"
-        assert error.args[0].name == "instantiation_error"
+        prolog.consult_string("solo(1).")
 
-    def test_initialization_goal_failure(self):
-        """Test initialization goal that fails - consult succeeds since failure is not error."""
-        prolog = PrologInterpreter()
-        prolog.consult_string("""
-            :- initialization(fail).
-            test.
-        """)
-        assert prolog.has_solution("test")
+        with pytest.raises(PrologThrow):
+            prolog.consult_string("solo(2).")
 
-    def test_initialization_throwing_exception(self):
-        """Test initialization goal that throws exception."""
+    def test_discontiguous_requires_directive(self):
         prolog = PrologInterpreter()
-        with pytest.raises(PrologThrow) as exc_info:
-            prolog.consult_string("""
-                :- initialization(throw(test_error)).
-                test.
-            """)
-        # Should propagate the thrown term
-        assert exc_info.value.term.name == "test_error"
 
-    def test_initialization_in_multiple_consults(self):
-        """Test initialization in multiple consulted strings."""
+        with pytest.raises(PrologThrow):
+            prolog.consult_string("alpha(1).\nbeta(1).\nalpha(2).")
+
+        prolog2 = PrologInterpreter()
+        prolog2.consult_string(
+            ":- discontiguous(alpha/1).\nalpha(1).\nbeta(1).\nalpha(2)."
+        )
+        results = prolog2.query("alpha(X)")
+        assert {row["X"] for row in results} == {1, 2}
+
+    def test_predicate_property_queries(self):
         prolog = PrologInterpreter()
-        prolog.consult_string(":- initialization(asserta(first)).")
-        prolog.consult_string(":- initialization(asserta(second)).")
-        assert prolog.has_solution("first")
-        assert prolog.has_solution("second")
+        prolog.consult_string(
+            ":- dynamic(dyn/1).\n:- multifile(dyn/1).\n:- discontiguous(dyn/1).\ndyn(1)."
+        )
+
+        assert prolog.has_solution("predicate_property(dyn/1, dynamic(dyn/1))")
+        assert prolog.has_solution("predicate_property(dyn/1, multifile(dyn/1))")
+        assert prolog.has_solution("predicate_property(dyn/1, discontiguous(dyn/1))")
+        assert not prolog.has_solution("predicate_property(dyn/1, static(dyn/1))")
+
+        prolog.consult_string("static_p(1).")
+        assert prolog.has_solution("predicate_property(static_p/1, static(static_p/1))")
+
+        built_in_props = prolog.query("predicate_property(member(_, _), Prop)")
+        assert any(row["Prop"] == "built_in" for row in built_in_props)
+
+    def test_invalid_predicate_indicators_raise_errors(self):
+        prolog = PrologInterpreter()
+
+        with pytest.raises(PrologThrow):
+            prolog.consult_string(":- dynamic(X/1).")
+
+        with pytest.raises(PrologThrow):
+            prolog.consult_string(":- dynamic(1/2).")
+
+        with pytest.raises(PrologThrow):
+            prolog.consult_string(":- dynamic(foo/x).")
+
+        with pytest.raises(PrologThrow):
+            prolog.consult_string(":- dynamic(foo/ -1).")
+
+    def test_builtins_cannot_be_dynamic(self):
+        prolog = PrologInterpreter()
+
+        with pytest.raises(PrologThrow):
+            prolog.consult_string(":- dynamic(member/2).")
+

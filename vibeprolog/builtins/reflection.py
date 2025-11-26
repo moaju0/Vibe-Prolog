@@ -48,23 +48,46 @@ class ReflectionBuiltins:
     @staticmethod
     def _builtin_predicate_property(
         args: BuiltinArgs, subst: Substitution, engine: EngineContext
-    ) -> Substitution | None:
+    ) -> Iterator[Substitution]:
         goal_term, property_term = args
         goal_term = deref(goal_term, subst)
         property_term = deref(property_term, subst)
 
-        builtins = set(engine._builtin_registry.keys())
-        builtins.add(("!", 0))
-
-        is_builtin = False
-        if isinstance(goal_term, Compound):
-            is_builtin = (goal_term.functor, len(goal_term.args)) in builtins
+        indicator_term: Compound | None = None
+        key: tuple[str, int] | None = None
+        if isinstance(goal_term, Compound) and goal_term.functor == "/" and len(goal_term.args) == 2:
+            name_term, arity_term = goal_term.args
+            if isinstance(name_term, Atom) and isinstance(arity_term, Number):
+                indicator_term = goal_term
+                key = (name_term.name, int(arity_term.value))
+        elif isinstance(goal_term, Compound):
+            indicator_term = Compound("/", (Atom(goal_term.functor), Number(len(goal_term.args))))
+            key = (goal_term.functor, len(goal_term.args))
         elif isinstance(goal_term, Atom):
-            is_builtin = (goal_term.name, 0) in builtins or goal_term.name == "!"
+            indicator_term = Compound("/", (Atom(goal_term.name), Number(0)))
+            key = (goal_term.name, 0)
 
-        if is_builtin:
-            return unify(property_term, Atom("built_in"), subst)
-        return None
+        if indicator_term is None or key is None:
+            return iter(())
+
+        properties = engine._get_predicate_properties(key)
+
+        property_terms = []
+        if "built_in" in properties:
+            property_terms.append(Atom("built_in"))
+        if "dynamic" in properties:
+            property_terms.append(Compound("dynamic", (indicator_term,)))
+        if "multifile" in properties:
+            property_terms.append(Compound("multifile", (indicator_term,)))
+        if "discontiguous" in properties:
+            property_terms.append(Compound("discontiguous", (indicator_term,)))
+        if "static" in properties:
+            property_terms.append(Compound("static", (indicator_term,)))
+
+        for term in property_terms:
+            result = unify(property_term, term, subst)
+            if result is not None:
+                yield result
 
     @staticmethod
     def _builtin_current_predicate(

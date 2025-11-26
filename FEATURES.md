@@ -80,6 +80,7 @@
 - ✅ `instantiation_error` – Raised by built-ins when required arguments are unbound
 - ✅ `type_error(Type, Culprit)` – Raised by built-ins when arguments have wrong types
 - ✅ `domain_error(Domain, Culprit)` – Raised by built-ins when values are outside valid domains
+- ✅ `permission_error(Operation, Permission, Culprit)` – Raised when attempting forbidden operations (e.g., modifying static predicates)
 - ✅ `syntax_error(Description)` – Parser throws ISO `error(syntax_error(_), _)` terms
 - ✅ `existence_error(ObjectType, Culprit)` – Raised when calling undefined predicates via `call/1`
 
@@ -120,9 +121,9 @@
 ## Directives (ISO 7.4)
 
 ### Program Directives
-- ❌ `:- dynamic/1` – Declare dynamic predicate
-- ❌ `:- multifile/1` – Declare multifile predicate
-- ❌ `:- discontiguous/1` – Declare discontiguous predicate
+- ✅ `:- dynamic/1` – Declare dynamic predicate
+- ✅ `:- multifile/1` – Declare multifile predicate
+- ✅ `:- discontiguous/1` – Declare discontiguous predicate
 - ✅ `:- initialization/1` – Specify initialization goal
 
 ### Operator Directives

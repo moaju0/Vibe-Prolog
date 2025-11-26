@@ -329,6 +329,7 @@ class TestExistenceErrorEdgeCases:
         assert 'Error' in result
 
         # Assert the predicate
+        prolog.consult_string(":- dynamic(dynamic_pred/0).")
         prolog.query_once("assertz(dynamic_pred)")
 
         # Now it should exist and succeed
