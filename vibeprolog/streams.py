@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, TextIO
 
 
@@ -10,7 +10,7 @@ class Stream:
     file_obj: TextIO
     mode: str  # 'read', 'write', or 'append'
     filename: str | None = None  # Filename if it's a file stream
-    pushback_buffer: list[str] | None = None
+    pushback_buffer: list[str] = field(default_factory=list)
 
     @property
     def is_standard_stream(self) -> bool:

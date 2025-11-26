@@ -24,6 +24,141 @@ USER_INPUT_STREAM = Atom("user_input")
 USER_OUTPUT_STREAM = Atom("user_output")
 
 
+class _TermReader:
+    """Internal term-reading state machine (top-level)."""
+    def __init__(self, stream: Stream, context: str):
+        self.stream = stream
+        self.context = context
+        self.buffer: list[str] = []
+        self.paren_depth = 0
+        self.bracket_depth = 0
+        self.brace_depth = 0
+        self.in_single_quote = False
+        self.in_double_quote = False
+        self.escape_next = False
+        self.line_comment = False
+        self.started = False
+        # Bind to the stream's pushback buffer (assumes it now exists via default_factory)
+        self.pushback_buffer = self.stream.pushback_buffer
+
+    def _next_char(self) -> str:
+        if self.pushback_buffer:
+            return self.pushback_buffer.pop()
+        return self.stream.file_obj.read(1)
+
+    def _push_back(self, ch: str) -> None:
+        if ch:
+            self.pushback_buffer.append(ch)
+
+    def read(self) -> str | None:
+        """Core loop copied from the old _read_term_text, refactored into a class."""
+        while True:
+            ch = self._next_char()
+            if ch == "":
+                if not self.buffer or not "".join(self.buffer).strip():
+                    return None
+                error_term = PrologError.syntax_error(
+                    "unexpected end of file", self.context
+                )
+                raise PrologThrow(error_term)
+
+            # Line comments
+            if self.line_comment:
+                if ch == "\n":
+                    self.line_comment = False
+                continue
+
+            if not self.in_single_quote and not self.in_double_quote:
+                if ch == "%":
+                    self.line_comment = True
+                    continue
+                if ch == "/":
+                    peek = self._next_char()
+                    if peek == "*":
+                        IOBuiltins._skip_block_comments(self._next_char, self._push_back, self.context)
+                        continue
+                    self._push_back(peek)
+
+            # Beginning of token
+            if not self.started and ch.isspace():
+                continue
+
+            self.started = True
+
+            # Quoting handling
+            if self.in_single_quote:
+                self.buffer.append(ch)
+                if self.escape_next:
+                    self.escape_next = False
+                    continue
+                if ch == "\\":
+                    self.escape_next = True
+                    continue
+                if ch == "'":
+                    self.in_single_quote = False
+                continue
+
+            if self.in_double_quote:
+                self.buffer.append(ch)
+                if self.escape_next:
+                    self.escape_next = False
+                    continue
+                if ch == "\\":
+                    self.escape_next = True
+                    continue
+                if ch == '"':
+                    self.in_double_quote = False
+                continue
+
+            if ch == "'":
+                self.buffer.append(ch)
+                self.in_single_quote = True
+                continue
+
+            if ch == '"':
+                self.buffer.append(ch)
+                self.in_double_quote = True
+                continue
+
+            # Parentheses/brackets/braces tracking
+            if ch == "(":
+                self.paren_depth += 1
+            elif ch == ")" and self.paren_depth > 0:
+                self.paren_depth -= 1
+            elif ch == "[":
+                self.bracket_depth += 1
+            elif ch == "]" and self.bracket_depth > 0:
+                self.bracket_depth -= 1
+            elif ch == "{":
+                self.brace_depth += 1
+            elif ch == "}" and self.brace_depth > 0:
+                self.brace_depth -= 1
+
+            self.buffer.append(ch)
+
+            if (
+                ch == "."
+                and self.paren_depth == 0
+                and self.bracket_depth == 0
+                and self.brace_depth == 0
+            ):
+                # After a possible full term, skip trailing layout and determine next token
+                next_non_layout, saw_layout = IOBuiltins._consume_layout(
+                    self._next_char, self._push_back, self.context
+                )
+                if next_non_layout == "":
+                    return "".join(self.buffer)
+                prev_char = self.buffer[-2] if len(self.buffer) >= 2 else ""
+                if not saw_layout and prev_char.isdigit() and (
+                    next_non_layout.isdigit()
+                    or next_non_layout in ("e", "E")
+                ):
+                    self._push_back(next_non_layout)
+                    continue
+                self._push_back(next_non_layout)
+                return "".join(self.buffer)
+
+
 @dataclass(frozen=True)
 class OperatorInfo:
     """Operator metadata for formatting terms with ignore_ops(false)."""
@@ -626,163 +761,8 @@ class IOBuiltins:
         """Read characters from stream until a full term (ending with '.') is found.
         Delegates to a dedicated _TermReader for maintainability.
         """
-        reader = IOBuiltins._TermReader(stream, context)
+        reader = _TermReader(stream, context)
         return reader.read()
-
-
-    class _TermReader:
-        """Internal term-reading state machine with a manageable interface."""
-        def __init__(self, stream: Stream, context: str):
-            self.stream = stream
-            self.context = context
-            self.buffer: list[str] = []
-            self.paren_depth = 0
-            self.bracket_depth = 0
-            self.brace_depth = 0
-            self.in_single_quote = False
-            self.in_double_quote = False
-            self.escape_next = False
-            self.block_depth = 0
-            self.line_comment = False
-            self.started = False
-
-            # Ensure pushback buffer exists (Dataclass-backed Stream should have this)
-            if self.stream.pushback_buffer is None:
-                self.stream.pushback_buffer = []
-            self.pushback_buffer = self.stream.pushback_buffer
-
-        def _next_char(self) -> str:
-            if self.pushback_buffer:
-                return self.pushback_buffer.pop()
-            return self.stream.file_obj.read(1)
-
-        def _push_back(self, ch: str) -> None:
-            if ch:
-                self.pushback_buffer.append(ch)
-
-        def read(self) -> str | None:
-            """Core loop copied from the old _read_term_text, refactored into a class."""
-            while True:
-                ch = self._next_char()
-                if ch == "":
-                    if not self.buffer or not "".join(self.buffer).strip():
-                        return None
-                    error_term = PrologError.syntax_error(
-                        "unexpected end of file", self.context
-                    )
-                    raise PrologThrow(error_term)
-
-                # Line comments
-                if self.line_comment:
-                    if ch == "\n":
-                        self.line_comment = False
-                    continue
-
-                # Block comments
-                if self.block_depth > 0:
-                    if ch == "/":
-                        peek = self._next_char()
-                        if peek == "*":
-                            self.block_depth += 1
-                            continue
-                        self._push_back(peek)
-                    if ch == "*":
-                        peek = self._next_char()
-                        if peek == "/":
-                            self.block_depth -= 1
-                            continue
-                        self._push_back(peek)
-                    continue
-
-                if not self.in_single_quote and not self.in_double_quote:
-                    if ch == "%":
-                        self.line_comment = True
-                        continue
-                    if ch == "/":
-                        peek = self._next_char()
-                        if peek == "*":
-                            self.block_depth += 1
-                            continue
-                        self._push_back(peek)
-
-                # Beginning of token
-                if not self.started and ch.isspace():
-                    continue
-
-                self.started = True
-
-                # Quoting handling
-                if self.in_single_quote:
-                    self.buffer.append(ch)
-                    if self.escape_next:
-                        self.escape_next = False
-                        continue
-                    if ch == "\\":
-                        self.escape_next = True
-                        continue
-                    if ch == "'":
-                        self.in_single_quote = False
-                    continue
-
-                if self.in_double_quote:
-                    self.buffer.append(ch)
-                    if self.escape_next:
-                        self.escape_next = False
-                        continue
-                    if ch == "\\":
-                        self.escape_next = True
-                        continue
-                    if ch == '"':
-                        self.in_double_quote = False
-                    continue
-
-                if ch == "'":
-                    self.buffer.append(ch)
-                    self.in_single_quote = True
-                    continue
-
-                if ch == '"':
-                    self.buffer.append(ch)
-                    self.in_double_quote = True
-                    continue
-
-                # Parentheses/brackets/braces tracking
-                if ch == "(":
-                    self.paren_depth += 1
-                elif ch == ")" and self.paren_depth > 0:
-                    self.paren_depth -= 1
-                elif ch == "[":
-                    self.bracket_depth += 1
-                elif ch == "]" and self.bracket_depth > 0:
-                    self.bracket_depth -= 1
-                elif ch == "{":
-                    self.brace_depth += 1
-                elif ch == "}" and self.brace_depth > 0:
-                    self.brace_depth -= 1
-
-                self.buffer.append(ch)
-
-                if (
-                    ch == "."
-                    and self.paren_depth == 0
-                    and self.bracket_depth == 0
-                    and self.brace_depth == 0
-                ):
-                    # After a possible full term, skip trailing layout and determine next token
-                    next_non_layout, saw_layout = IOBuiltins._consume_layout(
-                        self._next_char, self._push_back, self.context
-                    )
-                    if next_non_layout == "":
-                        return "".join(self.buffer)
-                    prev_char = self.buffer[-2] if len(self.buffer) >= 2 else ""
-                    if not saw_layout and prev_char.isdigit() and (
-                        next_non_layout.isdigit()
-                        or next_non_layout in ("e", "E")
-                    ):
-                        self._push_back(next_non_layout)
-                        continue
-                    self._push_back(next_non_layout)
-                    return "".join(self.buffer)
 
     @staticmethod
     def _read_and_unify_stream(
