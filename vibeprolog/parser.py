@@ -509,7 +509,7 @@ class PrologParser:
 
     def __init__(self):
         self.parser = Lark(
-            PROLOG_GRAMMAR, parser="lalr", transformer=PrologTransformer()
+            PROLOG_GRAMMAR, parser="lalr", transformer=PrologTransformer(), propagate_positions=True
         )
 
     def _strip_block_comments(self, text: str) -> tuple[str, list[tuple[int, str]]]:
@@ -602,19 +602,42 @@ class PrologParser:
         pldoc_comments.sort(key=lambda x: x[0])
         return cleaned_text, pldoc_comments
 
-    def _associate_pldoc_comments(self, items: list, comments: list[tuple[int, str]], original_text: str):
+    def _associate_pldoc_comments(self, items: list, comments: list[tuple[int, str]]):
         """Associate PlDoc comments with clauses/directives."""
         if not comments:
             return
-
-        # Simple association: each comment is associated with the next item
-        comment_idx = 0
+        # Robust association: attach each comment to the next item by source position.
+        # We rely on Lark's propagate_positions to furnish item.meta.start_pos where available.
+        # Build a list of (start_pos, item) for items that expose a start_pos via meta.
+        items_with_pos = []
         for item in items:
-            if comment_idx < len(comments):
-                if isinstance(item, Clause):
-                    item.doc = comments[comment_idx][1]
-                elif isinstance(item, Directive):
-                    item.doc = comments[comment_idx][1]
+            start_pos = None
+            if hasattr(item, 'meta') and getattr(item.meta, 'start_pos', None) is not None:
+                start_pos = item.meta.start_pos
+            items_with_pos.append((start_pos, item))
+
+        # Iterate items in order and attach preceding comments to the following item
+        comment_idx = 0
+        # Sort items by start_pos where possible
+        for pos, item in sorted(items_with_pos, key=lambda x: (x[0] if x[0] is not None else float('inf'))):
+            if comment_idx >= len(comments):
+                break
+            comment_pos, comment_text = comments[comment_idx]
+            if pos is None:
+                # If we don't have a pos, fall back to the next item
+                if isinstance(item, Clause) or isinstance(item, Directive):
+                    item.doc = comment_text
+                    comment_idx += 1
+            else:
+                if comment_pos < pos:
+                    item.doc = comment_text
+                    comment_idx += 1
+                # else, wait for a later item
+        # If any remaining comments, attach to the last item
+        if items:
+            last = items[-1]
+            while comment_idx < len(comments):
+                last.doc = comments[comment_idx][1]
                 comment_idx += 1
 
     def parse(self, text: str, context: str = "parse/1") -> list[Clause | Directive]:
@@ -623,7 +646,7 @@ class PrologParser:
             text, pldoc_comments = self._collect_pldoc_comments(text)
             parsed_items = self.parser.parse(text)
             # Associate PlDoc comments with items
-            self._associate_pldoc_comments(parsed_items, pldoc_comments, text)
+            self._associate_pldoc_comments(parsed_items, pldoc_comments)
             return parsed_items
         except (UnexpectedToken, UnexpectedCharacters) as e:
             # If the lexer/parser choked inside a char code hex escape like 0'\x4G,

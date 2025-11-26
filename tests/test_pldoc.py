@@ -3,6 +3,7 @@
 import pytest
 
 from vibeprolog import PrologInterpreter
+from vibeprolog.exceptions import PrologThrow
 
 
 class TestPlDoc:
