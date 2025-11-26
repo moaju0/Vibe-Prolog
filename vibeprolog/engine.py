@@ -10,6 +10,7 @@ from dataclasses import dataclass
 
 from vibeprolog.exceptions import PrologError, PrologThrow
 from vibeprolog.parser import Clause, Cut, List
+from vibeprolog.streams import Stream
 from vibeprolog.terms import Atom, Compound, Number, Variable
 from vibeprolog.unification import Substitution, apply_substitution, deref, unify
 from vibeprolog.utils.list_utils import list_to_python, python_to_list
@@ -19,25 +20,6 @@ BuiltinHandler: TypeAlias = Callable[
     [tuple, Substitution, "PrologEngine | None"], BuiltinResult
 ]
 BuiltinRegistry: TypeAlias = dict[tuple[str, int], BuiltinHandler]
-
-
-@dataclass(frozen=True)
-class Stream:
-    """Represents a Prolog stream (file or standard stream)."""
-    handle: Atom  # The stream handle atom
-    file_obj: Any  # Python file object or None for standard streams
-    mode: str  # 'read', 'write', or 'append'
-    filename: str | None = None  # Filename if it's a file stream
-
-    @property
-    def is_standard_stream(self) -> bool:
-        """Check if this is a standard stream (user_input, user_output, user_error)."""
-        return self.filename is None
-
-    def close(self) -> None:
-        """Close the stream if it's a file stream."""
-        if self.file_obj and not self.is_standard_stream:
-            self.file_obj.close()
 
 
 class CutException(Exception):
@@ -469,5 +451,4 @@ __all__ = [
     "BuiltinRegistry",
     "BuiltinHandler",
     "BuiltinResult",
-    "Stream",
 ]

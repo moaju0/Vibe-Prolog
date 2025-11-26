@@ -131,20 +131,17 @@ class TestStreamIO:
         assert error_term.args[0].args[0].name == "stream"
 
     def test_stream_lifecycle(self, prolog: PrologInterpreter, temp_file: str):
-        """Test complete stream lifecycle: open, verify, close."""
-        # Open file
+        """Test complete stream lifecycle: open, verify, close, then ensure closed."""
         open_result = prolog.query_once(f"open('{temp_file}', read, Stream)")
         assert open_result is not None
         stream_handle = open_result["Stream"]
-
-        # Verify stream is in registry (by trying to close it successfully)
         close_result = prolog.query_once(f"close({stream_handle})")
         assert close_result == {}
-
-        # Verify stream is removed from registry (closing again should fail)
+        # Verify closing twice errors (existence_error on second close)
         result = prolog.query_once(f"catch(close({stream_handle}), Error, true)")
         assert result is not None
-        # Should have caught an error
+        error_term = result["Error"]
+        assert error_term["error"][0]["existence_error"][0] == "stream"
 
     def test_multiple_streams(self, prolog: PrologInterpreter, temp_file: str):
         """Test opening multiple streams simultaneously."""

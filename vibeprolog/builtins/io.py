@@ -14,6 +14,7 @@ from vibeprolog.builtins import BuiltinRegistry, register_builtin
 from vibeprolog.builtins.common import BuiltinArgs, EngineContext
 from vibeprolog.exceptions import PrologError, PrologThrow
 from vibeprolog.parser import List, PrologParser
+from vibeprolog.streams import Stream
 from vibeprolog.terms import Atom, Compound, Number, Variable
 from vibeprolog.unification import Substitution, deref, unify
 from vibeprolog.utils.list_utils import list_to_python, python_to_list
@@ -602,16 +603,9 @@ class IOBuiltins:
         # Generate unique stream handle
         stream_handle = engine._generate_stream_handle()
 
-        # Create stream object
-        from vibeprolog.engine import Stream
-        stream = Stream(
-            handle=stream_handle,
-            file_obj=file_obj,
-            mode=mode,
-            filename=filename
-        )
-
-        # Add to engine's stream registry
+        # Create and register stream
+        stream = Stream(handle=stream_handle, file_obj=file_obj, mode=mode, filename=filename)
+        # Register into the engine's stream registry (add_stream is the public API)
         engine.add_stream(stream)
 
         # Unify the stream variable with the handle
