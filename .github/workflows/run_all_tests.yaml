@@ -1,0 +1,60 @@
+name: Run All Tests
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize      # new commits pushed to the PR
+      - labeled          # labels added
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'PR number to run tests for'
+        required: true
+
+jobs:
+  optional-tests:
+    # Run in two cases:
+    #  1) pull_request event AND label is present
+    #  2) workflow_dispatch event (manual trigger)
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event_name == 'pull_request' &&
+        contains(github.event.pull_request.labels.*.name, 'run-all-tests')
+      )
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Determine PR number
+        id: pr
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "number=${{ github.event.inputs.pr_number }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "number=${{ github.event.pull_request.number }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check out PR head
+        uses: actions/checkout@v4
+        with:
+          # For pull_request events, GitHub automatically sets this ref
+          # For workflow_dispatch, we build it from the PR number
+          ref: refs/pull/${{ steps.pr.outputs.number }}/head
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+      - name: Sync dependencies (locked)
+        run: uv sync --frozen
+
+      - name: Run optional test suite
+        run: uv run --frozen pytest tests/optional
+        run: pytest tests/optional
