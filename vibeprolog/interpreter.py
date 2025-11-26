@@ -10,7 +10,7 @@ from vibeprolog.exceptions import PrologError, PrologThrow
 from vibeprolog.engine import CutException, PrologEngine
 from vibeprolog.parser import PrologParser, Directive, Clause
 from vibeprolog.terms import Compound, Variable, Atom
-from vibeprolog.unification import apply_substitution
+from vibeprolog.unification import Substitution, apply_substitution
 
 
 class PrologInterpreter:
@@ -67,7 +67,6 @@ class PrologInterpreter:
 
     def _execute_initialization_goals(self):
         """Execute collected initialization goals."""
-        from vibeprolog.unification import Substitution
         try:
             for goal in self.initialization_goals:
                 # Execute the goal, but ignore solutions since initialization is for side effects

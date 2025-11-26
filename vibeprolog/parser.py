@@ -92,7 +92,8 @@ PROLOG_GRAMMAR = r"""
 
     pow_expr: primary (POW_OP primary)*
 
-    primary: compound
+    primary: operator_atom
+        | compound
         | curly_braces
         | string
         | cut
@@ -104,11 +105,13 @@ PROLOG_GRAMMAR = r"""
         | "(" term ")"
 
     compound: atom "(" args ")"
+    operator_atom: OPERATOR_ATOM
     args: comparison_term ("," comparison_term)*
 
     curly_braces: "{" term "}"
 
     COMP_OP: "=.." | "is" | "=" | "\\=" | "=:=" | "=\=" | "<" | ">" | "=<" | ">=" | "==" | "\\==" | "@<" | "@=<" | "@>" | "@>="
+    OPERATOR_ATOM: ":-"
     PREFIX_OP.3: "\\+" | "+" | "-"
     ADD_OP: "+" | "-"
     POW_OP.2: "**"
@@ -329,6 +332,9 @@ class PrologTransformer(Transformer):
     def atom(self, items):
         return Atom(str(items[0]))
 
+    def operator_atom(self, items):
+        return Atom(str(items[0]))
+
     def variable(self, items):
         var_name = str(items[0])
         # Each anonymous variable _ should be unique
@@ -513,7 +519,18 @@ class PrologParser:
         """Parse Prolog source code and return list of clauses."""
         try:
             text = self._strip_block_comments(text)
-            return self.parser.parse(text)
+            parsed_items = self.parser.parse(text)
+
+            for item in parsed_items:
+                if isinstance(item, Directive):
+                    goal = item.goal
+                    if isinstance(goal, Compound) and goal.functor == "op" and len(goal.args) == 3:
+                        error_term = PrologError.syntax_error(
+                            "op/3 directives are not supported", context
+                        )
+                        raise PrologThrow(error_term)
+
+            return parsed_items
         except (UnexpectedToken, UnexpectedCharacters) as e:
             # If the lexer/parser choked inside a char code hex escape like 0'\x4G,
             # surface the ISO-style unexpected_char error rather than the raw Lark token message.
