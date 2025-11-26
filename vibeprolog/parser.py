@@ -196,12 +196,6 @@ class PrologTransformer(Transformer):
     def directive(self, items):
         return Directive(goal=items[0])
 
-    def predicate_indicator(self, items):
-        if len(items) == 2:
-            name, arity = items
-            return PredicateIndicator(name=name, arity=arity)
-        return items[0]
-
     def predicate_indicators(self, items):
         return items
 
