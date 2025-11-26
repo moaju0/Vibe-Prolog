@@ -1,6 +1,9 @@
 """Tests for throw/1 and catch/3 exception handling."""
 
+import pytest
 from vibeprolog import PrologInterpreter
+from vibeprolog.exceptions import PrologThrow
+from vibeprolog.terms import Atom
 
 
 class TestThrowCatch:
@@ -14,16 +17,18 @@ class TestThrowCatch:
         assert result['E'] == 'oops'
 
     def test_throw_unhandled_propagation(self):
-        """Test that unhandled throw/1 fails the query (no solutions)."""
+        """Test that unhandled throw/1 raises PrologThrow."""
         prolog = PrologInterpreter()
-        result = prolog.query_once("throw(bad).")
-        assert result is None
+        with pytest.raises(PrologThrow) as exc_info:
+            prolog.query_once("throw(bad).")
+        assert exc_info.value.term == Atom("bad")
 
     def test_catch_non_matching_handler(self):
         """Test catch/3 with non-matching error pattern - should propagate."""
         prolog = PrologInterpreter()
-        result = prolog.query_once("catch((throw(oops)), err(other), writeln(handled)).")
-        assert result is None  # Should fail because oops doesn't unify with err(other)
+        with pytest.raises(PrologThrow) as exc_info:
+            prolog.query_once("catch((throw(oops)), err(other), writeln(handled)).")
+        assert exc_info.value.term == Atom("oops")
 
     def test_throw_variable_term(self):
         """Test throw/1 with variable term binding."""
@@ -69,8 +74,9 @@ class TestThrowCatch:
         """Test throw where unification in catch fails."""
         prolog = PrologInterpreter()
         # Throw a term that doesn't unify with the catcher pattern
-        result = prolog.query_once("catch((throw(atom_term)), compound(X, Y), true).")
-        assert result is None  # Should fail because atom doesn't unify with compound
+        with pytest.raises(PrologThrow) as exc_info:
+            prolog.query_once("catch((throw(atom_term)), compound(X, Y), true).")
+        assert exc_info.value.term == Atom("atom_term")
 
     def test_catch_successful_goal_no_throw(self):
         """Test catch/3 with successful goal that doesn't throw."""

@@ -64,15 +64,11 @@ class TestStreamIO:
     """Tests for stream I/O built-ins (open/3, close/1)."""
 
     @pytest.fixture
-    def temp_file(self):
-        """Create a temporary file for testing."""
-        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt') as f:
-            f.write('test content\n')
-            temp_path = f.name
-        yield temp_path
-        # Cleanup
-        if os.path.exists(temp_path):
-            os.unlink(temp_path)
+    def temp_file(self, tmp_path):
+        """Create a temporary file for testing using pytest's tmp_path fixture."""
+        file_path = tmp_path / "test.txt"
+        file_path.write_text('test content\n')
+        return str(file_path)
 
     @pytest.mark.parametrize("mode", ["read", "write", "append"])
     def test_open_file_modes(self, prolog: PrologInterpreter, temp_file: str, mode: str):
@@ -123,17 +119,16 @@ class TestStreamIO:
         assert args[0] == "stream"
         assert args[1] == "invalid_stream"
 
-    def test_close_standard_streams_fails(self, prolog: PrologInterpreter):
+    @pytest.mark.parametrize("stream_name", ["user_input", "user_output", "user_error"])
+    def test_close_standard_streams_fails(self, prolog: PrologInterpreter, stream_name: str):
         """Test that closing standard streams raises existence_error."""
-        # Try to close user_input
-        result = prolog.query_once("catch(close(user_input), Error, true)")
-        assert result is not None
-        error_term = result["Error"]
-        assert "error" in error_term
-        existence_error = error_term["error"][0]
-        assert "existence_error" in existence_error
-        args = existence_error["existence_error"]
-        assert args[0] == "stream"
+        with pytest.raises(PrologThrow) as exc_info:
+            prolog.query_once(f"close({stream_name})")
+
+        error_term = exc_info.value.term
+        assert error_term.functor == "error"
+        assert error_term.args[0].functor == "existence_error"
+        assert error_term.args[0].args[0].name == "stream"
 
     def test_stream_lifecycle(self, prolog: PrologInterpreter, temp_file: str):
         """Test complete stream lifecycle: open, verify, close."""

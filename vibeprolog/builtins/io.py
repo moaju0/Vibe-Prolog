@@ -596,10 +596,8 @@ class IOBuiltins:
             # Permission error
             error_term = PrologError.permission_error("open", "source_sink", filename_term, "open/3")
             raise PrologThrow(error_term)
-        except OSError:
-            # Generic I/O error - map to permission_error
-            error_term = PrologError.permission_error("open", "source_sink", filename_term, "open/3")
-            raise PrologThrow(error_term)
+        # Note: Do not catch generic OSError here to avoid masking the real IO error.
+        # Let unexpected OSError variants propagate for now.
 
         # Generate unique stream handle
         stream_handle = engine._generate_stream_handle()
