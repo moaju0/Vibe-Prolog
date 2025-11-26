@@ -444,3 +444,210 @@ class TestArithmeticWithFindall:
         result = prolog.query_once("findall(X, (num(X), 0 is X mod 2), Evens)")
         assert result is not None
         assert set(result['Evens']) == {2, 4}
+
+
+class TestISOArithmeticFunctions:
+    """Tests for ISO-standard arithmetic functions"""
+
+    @pytest.fixture
+    def prolog(self):
+        """Fixture to provide a fresh PrologInterpreter for each test."""
+        return PrologInterpreter()
+
+    @pytest.mark.parametrize("input_val,expected", [
+        (5, 5),
+        (3.14, 3.14),
+        (-5, 5),
+        (-3.14, 3.14),
+        (0, 0),
+    ])
+    def test_abs(self, prolog, input_val, expected):
+        """Test abs/1 with various inputs"""
+        result = prolog.query_once(f"X is abs({input_val})")
+        assert result is not None
+        assert result['X'] == expected
+
+    @pytest.mark.parametrize("left,right,expected", [
+        (5, 3, 3),
+        (10, 20, 10),
+        (-5, 3, -5),
+        (3.14, 2.71, 2.71),
+    ])
+    def test_min(self, prolog, left, right, expected):
+        """Test min/2 with various inputs"""
+        result = prolog.query_once(f"X is min({left}, {right})")
+        assert result is not None
+        assert result['X'] == expected
+
+    @pytest.mark.parametrize("left,right,expected", [
+        (5, 3, 5),
+        (10, 20, 20),
+        (-5, 3, 3),
+        (3.14, 2.71, 3.14),
+    ])
+    def test_max(self, prolog, left, right, expected):
+        """Test max/2 with various inputs"""
+        result = prolog.query_once(f"X is max({left}, {right})")
+        assert result is not None
+        assert result['X'] == expected
+
+    def test_sqrt_perfect_squares(self, prolog):
+        """Test sqrt/1 with perfect squares"""
+        result = prolog.query_once("X is sqrt(4)")
+        assert result is not None
+        assert result['X'] == 2.0
+
+        result = prolog.query_once("X is sqrt(9)")
+        assert result is not None
+        assert result['X'] == 3.0
+
+        result = prolog.query_once("X is sqrt(16)")
+        assert result is not None
+        assert result['X'] == 4.0
+
+    def test_sqrt_non_perfect_squares(self, prolog):
+        """Test sqrt/1 with non-perfect squares"""
+        result = prolog.query_once("X is sqrt(2)")
+        assert result is not None
+        assert abs(result['X'] - 1.4142135623730951) < 1e-10
+
+    def test_sqrt_zero(self, prolog):
+        """Test sqrt/1 with zero"""
+        result = prolog.query_once("X is sqrt(0)")
+        assert result is not None
+        assert result['X'] == 0.0
+
+    def test_sin_basic(self, prolog):
+        """Test sin/1 with basic values"""
+        result = prolog.query_once("X is sin(0)")
+        assert result is not None
+        assert abs(result['X']) < 1e-10
+
+        # sin(π/2) ≈ 1
+        result = prolog.query_once("X is sin(1.5707963267948966)")
+        assert result is not None
+        assert abs(result['X'] - 1.0) < 1e-10
+
+    def test_cos_basic(self, prolog):
+        """Test cos/1 with basic values"""
+        result = prolog.query_once("X is cos(0)")
+        assert result is not None
+        assert abs(result['X'] - 1.0) < 1e-10
+
+        # cos(π) ≈ -1
+        result = prolog.query_once("X is cos(3.141592653589793)")
+        assert result is not None
+        assert abs(result['X'] - (-1.0)) < 1e-10
+
+    def test_tan_basic(self, prolog):
+        """Test tan/1 with basic values"""
+        result = prolog.query_once("X is tan(0)")
+        assert result is not None
+        assert abs(result['X']) < 1e-10
+
+        # tan(π/4) ≈ 1
+        result = prolog.query_once("X is tan(0.7853981633974483)")
+        assert result is not None
+        assert abs(result['X'] - 1.0) < 1e-10
+
+    def test_exp_basic(self, prolog):
+        """Test exp/1 with basic values"""
+        result = prolog.query_once("X is exp(0)")
+        assert result is not None
+        assert abs(result['X'] - 1.0) < 1e-10
+
+        result = prolog.query_once("X is exp(1)")
+        assert result is not None
+        assert abs(result['X'] - 2.718281828459045) < 1e-10
+
+    def test_log_basic(self, prolog):
+        """Test log/1 (natural logarithm) with basic values"""
+        result = prolog.query_once("X is log(1)")
+        assert result is not None
+        assert abs(result['X']) < 1e-10
+
+        # log(e) = 1
+        result = prolog.query_once("X is log(2.718281828459045)")
+        assert result is not None
+        assert abs(result['X'] - 1.0) < 1e-10
+
+    @pytest.mark.parametrize("input_val,expected", [
+        (3.7, 3),
+        (-3.7, -4),
+        (5, 5),
+    ])
+    def test_floor(self, prolog, input_val, expected):
+        """Test floor/1 with various values"""
+        result = prolog.query_once(f"X is floor({input_val})")
+        assert result is not None
+        assert result['X'] == expected
+
+    @pytest.mark.parametrize("input_val,expected", [
+        (3.2, 4),
+        (-3.2, -3),
+        (5, 5),
+    ])
+    def test_ceiling(self, prolog, input_val, expected):
+        """Test ceiling/1 with various values"""
+        result = prolog.query_once(f"X is ceiling({input_val})")
+        assert result is not None
+        assert result['X'] == expected
+
+    @pytest.mark.parametrize("input_val,expected", [
+        (3.4, 3),
+        (3.6, 4),
+        (-3.4, -3),
+        (-3.6, -4),
+    ])
+    def test_round(self, prolog, input_val, expected):
+        """Test round/1 with various values"""
+        result = prolog.query_once(f"X is round({input_val})")
+        assert result is not None
+        assert result['X'] == expected
+
+    @pytest.mark.parametrize("input_val,expected", [
+        (5, 1),
+        (3.14, 1),
+        (-5, -1),
+        (-3.14, -1),
+        (0, 0),
+    ])
+    def test_sign(self, prolog, input_val, expected):
+        """Test sign/1 with various values"""
+        result = prolog.query_once(f"X is sign({input_val})")
+        assert result is not None
+        assert result['X'] == expected
+
+    def test_nested_math_functions(self, prolog):
+        """Test nested math function calls"""
+        # abs(min(-5, -3))
+        result = prolog.query_once("X is abs(min(-5, -3))")
+        assert result is not None
+        assert result['X'] == 5
+
+        # sqrt(abs(-16))
+        result = prolog.query_once("X is sqrt(abs(-16))")
+        assert result is not None
+        assert result['X'] == 4.0
+
+        # max(floor(3.7), ceiling(2.1))
+        result = prolog.query_once("X is max(floor(3.7), ceiling(2.1))")
+        assert result is not None
+        assert result['X'] == 3
+
+    def test_math_in_expressions(self, prolog):
+        """Test math functions in arithmetic expressions"""
+        # abs(-5) + abs(-3)
+        result = prolog.query_once("X is abs(-5) + abs(-3)")
+        assert result is not None
+        assert result['X'] == 8
+
+        # sqrt(16) * 2
+        result = prolog.query_once("X is sqrt(16) * 2")
+        assert result is not None
+        assert result['X'] == 8.0
+
+        # max(10, 20) - min(5, 3)
+        result = prolog.query_once("X is max(10, 20) - min(5, 3)")
+        assert result is not None
+        assert result['X'] == 17
