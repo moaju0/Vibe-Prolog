@@ -449,90 +449,50 @@ class TestArithmeticWithFindall:
 class TestISOArithmeticFunctions:
     """Tests for ISO-standard arithmetic functions"""
 
-    def test_abs_positive(self):
-        """Test abs/1 with positive numbers"""
-        prolog = PrologInterpreter()
+    @pytest.fixture
+    def prolog(self):
+        """Fixture to provide a fresh PrologInterpreter for each test."""
+        return PrologInterpreter()
 
-        result = prolog.query_once("X is abs(5)")
+    @pytest.mark.parametrize("input_val,expected", [
+        (5, 5),
+        (3.14, 3.14),
+        (-5, 5),
+        (-3.14, 3.14),
+        (0, 0),
+    ])
+    def test_abs(self, prolog, input_val, expected):
+        """Test abs/1 with various inputs"""
+        result = prolog.query_once(f"X is abs({input_val})")
         assert result is not None
-        assert result['X'] == 5
+        assert result['X'] == expected
 
-        result = prolog.query_once("X is abs(3.14)")
+    @pytest.mark.parametrize("left,right,expected", [
+        (5, 3, 3),
+        (10, 20, 10),
+        (-5, 3, -5),
+        (3.14, 2.71, 2.71),
+    ])
+    def test_min(self, prolog, left, right, expected):
+        """Test min/2 with various inputs"""
+        result = prolog.query_once(f"X is min({left}, {right})")
         assert result is not None
-        assert result['X'] == 3.14
+        assert result['X'] == expected
 
-    def test_abs_negative(self):
-        """Test abs/1 with negative numbers"""
-        prolog = PrologInterpreter()
-
-        result = prolog.query_once("X is abs(-5)")
+    @pytest.mark.parametrize("left,right,expected", [
+        (5, 3, 5),
+        (10, 20, 20),
+        (-5, 3, 3),
+        (3.14, 2.71, 3.14),
+    ])
+    def test_max(self, prolog, left, right, expected):
+        """Test max/2 with various inputs"""
+        result = prolog.query_once(f"X is max({left}, {right})")
         assert result is not None
-        assert result['X'] == 5
+        assert result['X'] == expected
 
-        result = prolog.query_once("X is abs(-3.14)")
-        assert result is not None
-        assert result['X'] == 3.14
-
-    def test_abs_zero(self):
-        """Test abs/1 with zero"""
-        prolog = PrologInterpreter()
-
-        result = prolog.query_once("X is abs(0)")
-        assert result is not None
-        assert result['X'] == 0
-
-    def test_min_integers(self):
-        """Test min/2 with integers"""
-        prolog = PrologInterpreter()
-
-        result = prolog.query_once("X is min(5, 3)")
-        assert result is not None
-        assert result['X'] == 3
-
-        result = prolog.query_once("X is min(10, 20)")
-        assert result is not None
-        assert result['X'] == 10
-
-        result = prolog.query_once("X is min(-5, 3)")
-        assert result is not None
-        assert result['X'] == -5
-
-    def test_min_floats(self):
-        """Test min/2 with floats"""
-        prolog = PrologInterpreter()
-
-        result = prolog.query_once("X is min(3.14, 2.71)")
-        assert result is not None
-        assert result['X'] == 2.71
-
-    def test_max_integers(self):
-        """Test max/2 with integers"""
-        prolog = PrologInterpreter()
-
-        result = prolog.query_once("X is max(5, 3)")
-        assert result is not None
-        assert result['X'] == 5
-
-        result = prolog.query_once("X is max(10, 20)")
-        assert result is not None
-        assert result['X'] == 20
-
-        result = prolog.query_once("X is max(-5, 3)")
-        assert result is not None
-        assert result['X'] == 3
-
-    def test_max_floats(self):
-        """Test max/2 with floats"""
-        prolog = PrologInterpreter()
-
-        result = prolog.query_once("X is max(3.14, 2.71)")
-        assert result is not None
-        assert result['X'] == 3.14
-
-    def test_sqrt_perfect_squares(self):
+    def test_sqrt_perfect_squares(self, prolog):
         """Test sqrt/1 with perfect squares"""
-        prolog = PrologInterpreter()
-
         result = prolog.query_once("X is sqrt(4)")
         assert result is not None
         assert result['X'] == 2.0
@@ -545,26 +505,20 @@ class TestISOArithmeticFunctions:
         assert result is not None
         assert result['X'] == 4.0
 
-    def test_sqrt_non_perfect_squares(self):
+    def test_sqrt_non_perfect_squares(self, prolog):
         """Test sqrt/1 with non-perfect squares"""
-        prolog = PrologInterpreter()
-
         result = prolog.query_once("X is sqrt(2)")
         assert result is not None
         assert abs(result['X'] - 1.4142135623730951) < 1e-10
 
-    def test_sqrt_zero(self):
+    def test_sqrt_zero(self, prolog):
         """Test sqrt/1 with zero"""
-        prolog = PrologInterpreter()
-
         result = prolog.query_once("X is sqrt(0)")
         assert result is not None
         assert result['X'] == 0.0
 
-    def test_sin_basic(self):
+    def test_sin_basic(self, prolog):
         """Test sin/1 with basic values"""
-        prolog = PrologInterpreter()
-
         result = prolog.query_once("X is sin(0)")
         assert result is not None
         assert abs(result['X']) < 1e-10
@@ -574,10 +528,8 @@ class TestISOArithmeticFunctions:
         assert result is not None
         assert abs(result['X'] - 1.0) < 1e-10
 
-    def test_cos_basic(self):
+    def test_cos_basic(self, prolog):
         """Test cos/1 with basic values"""
-        prolog = PrologInterpreter()
-
         result = prolog.query_once("X is cos(0)")
         assert result is not None
         assert abs(result['X'] - 1.0) < 1e-10
@@ -587,10 +539,8 @@ class TestISOArithmeticFunctions:
         assert result is not None
         assert abs(result['X'] - (-1.0)) < 1e-10
 
-    def test_tan_basic(self):
+    def test_tan_basic(self, prolog):
         """Test tan/1 with basic values"""
-        prolog = PrologInterpreter()
-
         result = prolog.query_once("X is tan(0)")
         assert result is not None
         assert abs(result['X']) < 1e-10
@@ -600,10 +550,8 @@ class TestISOArithmeticFunctions:
         assert result is not None
         assert abs(result['X'] - 1.0) < 1e-10
 
-    def test_exp_basic(self):
+    def test_exp_basic(self, prolog):
         """Test exp/1 with basic values"""
-        prolog = PrologInterpreter()
-
         result = prolog.query_once("X is exp(0)")
         assert result is not None
         assert abs(result['X'] - 1.0) < 1e-10
@@ -612,10 +560,8 @@ class TestISOArithmeticFunctions:
         assert result is not None
         assert abs(result['X'] - 2.718281828459045) < 1e-10
 
-    def test_log_basic(self):
+    def test_log_basic(self, prolog):
         """Test log/1 (natural logarithm) with basic values"""
-        prolog = PrologInterpreter()
-
         result = prolog.query_once("X is log(1)")
         assert result is not None
         assert abs(result['X']) < 1e-10
@@ -625,94 +571,55 @@ class TestISOArithmeticFunctions:
         assert result is not None
         assert abs(result['X'] - 1.0) < 1e-10
 
-    def test_floor_basic(self):
+    @pytest.mark.parametrize("input_val,expected", [
+        (3.7, 3),
+        (-3.7, -4),
+        (5, 5),
+    ])
+    def test_floor(self, prolog, input_val, expected):
         """Test floor/1 with various values"""
-        prolog = PrologInterpreter()
-
-        result = prolog.query_once("X is floor(3.7)")
+        result = prolog.query_once(f"X is floor({input_val})")
         assert result is not None
-        assert result['X'] == 3
+        assert result['X'] == expected
 
-        result = prolog.query_once("X is floor(-3.7)")
-        assert result is not None
-        assert result['X'] == -4
-
-        result = prolog.query_once("X is floor(5)")
-        assert result is not None
-        assert result['X'] == 5
-
-    def test_ceiling_basic(self):
+    @pytest.mark.parametrize("input_val,expected", [
+        (3.2, 4),
+        (-3.2, -3),
+        (5, 5),
+    ])
+    def test_ceiling(self, prolog, input_val, expected):
         """Test ceiling/1 with various values"""
-        prolog = PrologInterpreter()
-
-        result = prolog.query_once("X is ceiling(3.2)")
+        result = prolog.query_once(f"X is ceiling({input_val})")
         assert result is not None
-        assert result['X'] == 4
+        assert result['X'] == expected
 
-        result = prolog.query_once("X is ceiling(-3.2)")
-        assert result is not None
-        assert result['X'] == -3
-
-        result = prolog.query_once("X is ceiling(5)")
-        assert result is not None
-        assert result['X'] == 5
-
-    def test_round_basic(self):
+    @pytest.mark.parametrize("input_val,expected", [
+        (3.4, 3),
+        (3.6, 4),
+        (-3.4, -3),
+        (-3.6, -4),
+    ])
+    def test_round(self, prolog, input_val, expected):
         """Test round/1 with various values"""
-        prolog = PrologInterpreter()
-
-        result = prolog.query_once("X is round(3.4)")
+        result = prolog.query_once(f"X is round({input_val})")
         assert result is not None
-        assert result['X'] == 3
+        assert result['X'] == expected
 
-        result = prolog.query_once("X is round(3.6)")
+    @pytest.mark.parametrize("input_val,expected", [
+        (5, 1),
+        (3.14, 1),
+        (-5, -1),
+        (-3.14, -1),
+        (0, 0),
+    ])
+    def test_sign(self, prolog, input_val, expected):
+        """Test sign/1 with various values"""
+        result = prolog.query_once(f"X is sign({input_val})")
         assert result is not None
-        assert result['X'] == 4
+        assert result['X'] == expected
 
-        result = prolog.query_once("X is round(-3.4)")
-        assert result is not None
-        assert result['X'] == -3
-
-        result = prolog.query_once("X is round(-3.6)")
-        assert result is not None
-        assert result['X'] == -4
-
-    def test_sign_positive(self):
-        """Test sign/1 with positive numbers"""
-        prolog = PrologInterpreter()
-
-        result = prolog.query_once("X is sign(5)")
-        assert result is not None
-        assert result['X'] == 1
-
-        result = prolog.query_once("X is sign(3.14)")
-        assert result is not None
-        assert result['X'] == 1
-
-    def test_sign_negative(self):
-        """Test sign/1 with negative numbers"""
-        prolog = PrologInterpreter()
-
-        result = prolog.query_once("X is sign(-5)")
-        assert result is not None
-        assert result['X'] == -1
-
-        result = prolog.query_once("X is sign(-3.14)")
-        assert result is not None
-        assert result['X'] == -1
-
-    def test_sign_zero(self):
-        """Test sign/1 with zero"""
-        prolog = PrologInterpreter()
-
-        result = prolog.query_once("X is sign(0)")
-        assert result is not None
-        assert result['X'] == 0
-
-    def test_nested_math_functions(self):
+    def test_nested_math_functions(self, prolog):
         """Test nested math function calls"""
-        prolog = PrologInterpreter()
-
         # abs(min(-5, -3))
         result = prolog.query_once("X is abs(min(-5, -3))")
         assert result is not None
@@ -728,10 +635,8 @@ class TestISOArithmeticFunctions:
         assert result is not None
         assert result['X'] == 3
 
-    def test_math_in_expressions(self):
+    def test_math_in_expressions(self, prolog):
         """Test math functions in arithmetic expressions"""
-        prolog = PrologInterpreter()
-
         # abs(-5) + abs(-3)
         result = prolog.query_once("X is abs(-5) + abs(-3)")
         assert result is not None
