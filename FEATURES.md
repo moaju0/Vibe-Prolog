@@ -184,6 +184,19 @@
 - ✅ String syntax (double and single quoted)
 - ✅ Operator syntax with proper precedence
 
+## Module System
+
+- ✅ `:- module/2` – Module declaration with export list. Modules are recorded in `PrologInterpreter.modules`.
+- ✅ `Module:Goal` – Module-qualified calls are parsed and supported (syntax `Module:Goal`).
+- ✅ Export list enforcement for module-qualified calls: non-exported predicates raise a permission error when accessed from outside the module.
+- ✅ Predicate scoping: clauses are associated with their defining module (clauses receive a `module` attribute) and module-local predicates are stored under `Module.predicates`.
+- ✅ `current_module/1` – Enumerate loaded modules (built-in in `vibeprolog.builtins.reflection`).
+- ✅ `module_property/2` – Query module exports and (where available) the source file.
+- ✅ Built-ins remain accessible from all modules.
+- ⚠️ `use_module/1,2` imports are not implemented in this change (deferred).
+- ⚠️ Non-qualified goal resolution inside clause bodies currently uses global resolution; module-aware resolution for clause bodies is planned (see issue).
+- ⚠️ Dynamic/multifile interactions across modules are supported minimally and may need further tests and refinement.
+
 ## Execution Model
 - ✅ Robinson-style unification
 - ✅ Occurs check (prevents cyclic terms)
