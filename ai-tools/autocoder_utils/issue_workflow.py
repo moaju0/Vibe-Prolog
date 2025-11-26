@@ -275,19 +275,10 @@ def create_pr(issue_number: str, model: str) -> None:
     )
 
 
-def parse_issue_number(argv: Sequence[str]) -> str:
-    if len(argv) < 2 or argv[1] in {"-h", "--help"}:
-        script_name = Path(argv[0]).name if argv else "fix-issue"
-        print(f"Usage: {script_name} <issue-number>", file=sys.stderr)
-        raise SystemExit(1)
-    return argv[1]
-
-
-def run_issue_workflow(argv: Sequence[str], config: IssueWorkflowConfig) -> None:
+def run_issue_workflow(issue_number: str, config: IssueWorkflowConfig) -> None:
     check_commands_available(config.required_cmds())
     ensure_env()
 
-    issue_number = parse_issue_number(argv)
     issue_content = get_issue_content(issue_number)
     tool_input = issue_content
     if config.input_instruction:

@@ -50,10 +50,6 @@ class PRCommentWorkflowConfig:
     """Optional preamble prepended to the tool input."""
 
 
-def _argv_or_sys(argv: Sequence[str] | None) -> Sequence[str]:
-    return argv if argv is not None else sys.argv
-
-
 def get_pr_info(owner: str, repo: str, pr_number: str) -> dict:
     """
     Check that the PR exists and return basic info, including headRefName.
@@ -414,7 +410,7 @@ def resolve_pr_from_current_branch() -> tuple[str, str, str]:
     return base_owner, base_repo, pr_number
 
 
-def run_pr_comment_workflow(argv: Sequence[str] | None, config: PRCommentWorkflowConfig) -> None:
+def run_pr_comment_workflow(pr_number_arg: str | None, config: PRCommentWorkflowConfig) -> None:
     """Common workflow for addressing PR comments with any tool."""
     required_commands = ["gh", "llm"]
     if config.tool_cmd is not None:
@@ -422,19 +418,13 @@ def run_pr_comment_workflow(argv: Sequence[str] | None, config: PRCommentWorkflo
     check_commands_available(required_commands)
     ensure_env()
 
-    args = _argv_or_sys(argv)
-    if len(args) > 1 and args[1] in {"-h", "--help"}:
-        print(f"Usage: {args[0]} [pr-number]", file=sys.stderr)
-        raise SystemExit(1)
-
-    pr_number = args[1] if len(args) > 1 else None
-
     repo_root = get_repo_root()
     os.chdir(repo_root)
 
-    if pr_number is None:
+    if pr_number_arg is None:
         owner, repo, pr_number = resolve_pr_from_current_branch()
     else:
+        pr_number = pr_number_arg
         owner, repo = get_owner_repo()
 
     pr_info = get_pr_info(owner, repo, pr_number)
@@ -461,7 +451,7 @@ def run_pr_comment_workflow(argv: Sequence[str] | None, config: PRCommentWorkflo
 
 
 def address_pr_comments_with_kilocode(
-    argv: Sequence[str] | None = None, timeout_seconds: int | None = 1200
+    pr_number: str | None = None, timeout_seconds: int | None = 1200
 ) -> None:
     """Address PR comments using Kilocode."""
     config = PRCommentWorkflowConfig(
@@ -469,11 +459,11 @@ def address_pr_comments_with_kilocode(
         tool_cmd=["kilocode", "--auto"],
         timeout_seconds=timeout_seconds,
     )
-    run_pr_comment_workflow(argv, config)
+    run_pr_comment_workflow(pr_number, config)
 
 
 def address_pr_comments_with_claude(
-    argv: Sequence[str] | None = None, timeout_seconds: int | None = 180
+    pr_number: str | None = None, timeout_seconds: int | None = 180
 ) -> None:
     """Address PR comments using Claude Code in headless mode."""
     # Determine session directory (prefer ./paige relative to cwd)
@@ -492,11 +482,11 @@ def address_pr_comments_with_claude(
         session_dir=session_dir,
         use_json_output=True,
     )
-    run_pr_comment_workflow(argv, config)
+    run_pr_comment_workflow(pr_number, config)
 
 
 def address_pr_comments_with_codex(
-    argv: Sequence[str] | None = None, timeout_seconds: int | None = 180
+    pr_number: str | None = None, timeout_seconds: int | None = 180
 ) -> None:
     """Address PR comments using the Codex CLI headless mode."""
     config = PRCommentWorkflowConfig(
@@ -516,4 +506,4 @@ def address_pr_comments_with_codex(
             "your updates before finishing."
         ),
     )
-    run_pr_comment_workflow(argv, config)
+    run_pr_comment_workflow(pr_number, config)

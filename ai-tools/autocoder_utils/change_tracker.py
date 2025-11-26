@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import json
 import re
 import shutil
@@ -8,10 +9,6 @@ import sys
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Sequence
-
-
-def _argv_or_sys(argv: Sequence[str] | None) -> Sequence[str]:
-    return argv if argv is not None else sys.argv
 
 
 def find_most_recent_change_file(changes_dir: Path) -> datetime | None:
@@ -391,11 +388,26 @@ def format_changes_markdown(
     return "\n".join(lines)
 
 
+def _parser_inputs(argv: Sequence[str] | None) -> tuple[list[str] | None, str | None]:
+    if argv is None:
+        return None, None
+    args = list(argv)
+    if not args:
+        return [], None
+    prog = Path(args[0]).name
+    return args[1:], prog
+
+
 def generate_changelog(argv: Sequence[str] | None = None) -> None:
     """
     Main entry point for the change tracker.
     """
-    _argv_or_sys(argv)  # allows optional argv for parity with other commands
+    arg_list, prog = _parser_inputs(argv)
+    parser = argparse.ArgumentParser(
+        prog=prog,
+        description="Generate a markdown changelog from git, GitHub issues, and PRs.",
+    )
+    parser.parse_args(arg_list)
     repo_root = Path.cwd()
     changes_dir = repo_root / "changes"
 
