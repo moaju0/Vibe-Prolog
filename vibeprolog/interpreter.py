@@ -31,6 +31,7 @@ class PrologInterpreter:
         self.initialization_goals = []
         self.predicate_properties: dict[tuple[str, int], set[str]] = {}
         self._predicate_sources: dict[tuple[str, int], set[str]] = {}
+        self.predicate_docs: dict[tuple[str, int], str] = {}
         self._consult_counter = 0
         self._builtins_seeded = False
 
@@ -61,6 +62,7 @@ class PrologInterpreter:
                 self.argv,
                 self.predicate_properties,
                 self._predicate_sources,
+                self.predicate_docs,
             )
             self._builtins_seeded = True
 
@@ -75,8 +77,22 @@ class PrologInterpreter:
                 last_predicate = self._add_clause(
                     item, source_name, closed_predicates, last_predicate
                 )
+                # Store PlDoc if present
+                if item.doc:
+                    head = item.head
+                    if isinstance(head, Compound):
+                        key = (head.functor, len(head.args))
+                    elif isinstance(head, Atom):
+                        key = (head.name, 0)
+                    else:
+                        continue
+                    self.predicate_docs[key] = item.doc
             elif isinstance(item, Directive):
                 self._handle_directive(item, closed_predicates)
+                # Store PlDoc for directives if needed
+                if item.doc:
+                    # For now, ignore directive docs
+                    pass
 
     def _handle_directive(
         self, directive: Directive, closed_predicates: set[tuple[str, int]]
@@ -262,7 +278,7 @@ class PrologInterpreter:
             raise PrologThrow(error_term)
         self._process_items(items, source_name)
         self.engine = PrologEngine(
-            self.clauses, self.argv, self.predicate_properties, self._predicate_sources
+            self.clauses, self.argv, self.predicate_properties, self._predicate_sources, self.predicate_docs
         )
         self._execute_initialization_goals()
 
@@ -299,7 +315,7 @@ class PrologInterpreter:
         if self.engine is None:
             # Initialize empty engine for built-in predicates
             self.engine = PrologEngine(
-                self.clauses, self.argv, self.predicate_properties, self._predicate_sources
+                self.clauses, self.argv, self.predicate_properties, self._predicate_sources, self.predicate_docs
             )
 
         # Parse the query

@@ -161,6 +161,7 @@
 - ✅ Line comments (`%`)
 - ✅ Block comments (`/* */`) - fully implemented with nesting support
 - ✅ Nested block comments
+- ✅ PlDoc comments (`%%`, `/** */`, `/*! */`) - SWI-Prolog style documentation comments with `predicate_documentation/2` built-in for inspection
 
 ### Special Syntax
 - ✅ Curly braces `{Term}` (sugar for `{}(Term)`)

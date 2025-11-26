@@ -35,6 +35,7 @@ class PrologEngine:
         argv: list[str] | None = None,
         predicate_properties: dict[tuple[str, int], set[str]] | None = None,
         predicate_sources: dict[tuple[str, int], set[str]] | None = None,
+        predicate_docs: dict[tuple[str, int], str] | None = None,
     ):
         self.clauses = clauses
         self.argv = argv or []
@@ -47,6 +48,9 @@ class PrologEngine:
         )
         self.predicate_sources: dict[tuple[str, int], set[str]] = (
             predicate_sources if predicate_sources is not None else {}
+        )
+        self.predicate_docs: dict[tuple[str, int], str] = (
+            predicate_docs if predicate_docs is not None else {}
         )
         self._initialize_builtin_properties()
         # Index of user-defined predicates for O(1) existence checks

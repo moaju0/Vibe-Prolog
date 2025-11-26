@@ -42,6 +42,7 @@ class Clause:
 
     head: Compound
     body: list[Compound] | None = None  # None for facts
+    doc: str | None = None  # PlDoc documentation
 
     def is_fact(self):
         return self.body is None
@@ -55,6 +56,7 @@ class Directive:
     """A Prolog directive (e.g., :- initialization(goal).)."""
 
     goal: Any  # The directive term, e.g., initialization(goal)
+    doc: str | None = None  # PlDoc documentation
 
 
 @dataclass
@@ -510,25 +512,43 @@ class PrologParser:
             PROLOG_GRAMMAR, parser="lalr", transformer=PrologTransformer()
         )
 
-    def _strip_block_comments(self, text: str) -> str:
-        """Strip block comments from text, handling nesting and quoted strings."""
+    def _strip_block_comments(self, text: str) -> tuple[str, list[tuple[int, str]]]:
+        """Strip block comments from text, handling nesting and quoted strings.
+        Returns cleaned text and list of (position, pldoc_comment) tuples."""
         result = []
+        pldoc_comments = []
         i = 0
         in_single_quote = False
         in_double_quote = False
         escape_next = False
         while i < len(text):
-            if not in_single_quote and not in_double_quote and text.startswith('/*', i):
+            if not in_single_quote and not in_double_quote and (text.startswith('/*', i) or text.startswith('/**', i) or text.startswith('/*!', i)):
+                comment_start = i
                 depth = 1
-                i += 2
+                if text.startswith('/**', i) or text.startswith('/*!', i):
+                    i += 3  # Skip /** or /*!
+                    is_pldoc = True
+                else:
+                    i += 2  # Skip /*
+                    is_pldoc = False
+                comment_content = []
                 while i < len(text) and depth > 0:
                     if text.startswith('/*', i):
                         depth += 1
                         i += 2
                     elif text.startswith('*/', i):
                         depth -= 1
-                        i += 2
+                        if depth == 0:
+                            # End of comment
+                            if is_pldoc:
+                                pldoc_comments.append((comment_start, ''.join(comment_content)))
+                            i += 2
+                            break
+                        else:
+                            i += 2
                     else:
+                        if is_pldoc:
+                            comment_content.append(text[i])
                         i += 1
                 if depth > 0:
                     raise ValueError("Unterminated block comment")
@@ -547,13 +567,63 @@ class PrologParser:
                 in_double_quote = not in_double_quote
 
             i += 1
-        return ''.join(result)
+        return ''.join(result), pldoc_comments
+
+    def _collect_pldoc_comments(self, text: str) -> tuple[str, list[tuple[int, str]]]:
+        """Collect PlDoc comments and return cleaned text with positions."""
+        # Collect %% line comments
+        lines = text.split('\n')
+        pldoc_comments = []
+        cleaned_lines = []
+        for line_no, line in enumerate(lines):
+            stripped = line.strip()
+            if stripped.startswith('%%'):
+                # Calculate position in original text
+                pos = sum(len(l) + 1 for l in lines[:line_no])  # +1 for \n
+                comment = stripped[2:]  # Keep whitespace
+                pldoc_comments.append((pos, comment))
+                cleaned_lines.append('')  # Remove the line
+            else:
+                cleaned_lines.append(line)
+        cleaned_text = '\n'.join(cleaned_lines)
+
+        # Collect block comments
+        cleaned_text, block_comments = self._strip_block_comments(cleaned_text)
+
+        # Clean up block comment content
+        cleaned_block_comments = []
+        for pos, content in block_comments:
+            # For PlDoc, keep the content as is (preserve formatting)
+            cleaned_block_comments.append((pos, content))
+
+        pldoc_comments.extend(cleaned_block_comments)
+
+        # Sort by position
+        pldoc_comments.sort(key=lambda x: x[0])
+        return cleaned_text, pldoc_comments
+
+    def _associate_pldoc_comments(self, items: list, comments: list[tuple[int, str]], original_text: str):
+        """Associate PlDoc comments with clauses/directives."""
+        if not comments:
+            return
+
+        # Simple association: each comment is associated with the next item
+        comment_idx = 0
+        for item in items:
+            if comment_idx < len(comments):
+                if isinstance(item, Clause):
+                    item.doc = comments[comment_idx][1]
+                elif isinstance(item, Directive):
+                    item.doc = comments[comment_idx][1]
+                comment_idx += 1
 
     def parse(self, text: str, context: str = "parse/1") -> list[Clause | Directive]:
         """Parse Prolog source code and return list of clauses."""
         try:
-            text = self._strip_block_comments(text)
+            text, pldoc_comments = self._collect_pldoc_comments(text)
             parsed_items = self.parser.parse(text)
+            # Associate PlDoc comments with items
+            self._associate_pldoc_comments(parsed_items, pldoc_comments, text)
             return parsed_items
         except (UnexpectedToken, UnexpectedCharacters) as e:
             # If the lexer/parser choked inside a char code hex escape like 0'\x4G,
@@ -584,7 +654,7 @@ class PrologParser:
         """Parse a single Prolog term."""
         try:
             # Add a period to make it a valid clause
-            text = self._strip_block_comments(f"dummy({text}).")
+            text, _ = self._collect_pldoc_comments(f"dummy({text}).")
             result = self.parser.parse(text)
             if result and isinstance(result[0], Clause):
                 compound = result[0].head
