@@ -217,13 +217,11 @@
 ## High-Priority Gaps and Deviations
 
 ### Critical Missing Features
-1. **File I/O**: Essential for practical Prolog programs
-2. **Dynamic Declarations**: `dynamic/1`, `multifile/1` for module system
-3. **Operator Definition**: `op/3` for custom operators
+1. **Operator Definition**: `:- op/3` for defining custom operators.
+2. **Character I/O**: `get_char/1`, `put_char/1` for character-level stream manipulation.
 
 ### Significant Deviations
-1. **Error Reporting**: Now fully ISO-compliant with structured error terms and systematic error reporting in built-ins
-2. **Character Code Syntax**: Some advanced character code forms not supported
+1. **Character Code Syntax**: Some advanced character code forms not supported.
 
 ### Parser Limitations
 1. **Hex Character Codes**: `0'\xHH` syntax now supported with optional trailing backslash for compatibility
