@@ -780,13 +780,14 @@ class TestISOAssertRetract:
     def test_assert_and_query(self):
         # Conformity: N/A
         prolog = PrologInterpreter()
+        prolog.consult_string(":- dynamic(p/1).")
         prolog.query_once("assert(p(a))")  # Execute assert as a query
         assert prolog.has_solution("p(a)")
 
     def test_retract(self):
         # Conformity: N/A
         prolog = PrologInterpreter()
-        prolog.consult_string("p(a). p(b). p(c).")
+        prolog.consult_string(":- dynamic(p/1).\np(a). p(b). p(c).")
         assert prolog.has_solution("p(a)")
         prolog.query_once("retract(p(a))")  # Execute retract as a query
         assert not prolog.has_solution("p(a)")
@@ -795,7 +796,7 @@ class TestISOAssertRetract:
     def test_retract_backtracking(self):
         # Conformity: N/A
         prolog = PrologInterpreter()
-        prolog.consult_string("p(1). p(2). p(3).")
+        prolog.consult_string(":- dynamic(p/1).\np(1). p(2). p(3).")
         # Retract should backtrack over all matching clauses
         results = list(prolog.query("retract(p(X))"))
         assert len(results) == 3

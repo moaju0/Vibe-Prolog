@@ -12,7 +12,7 @@ class TestAbolishBasic:
         prolog = PrologInterpreter()
 
         # Add some clauses for foo/2 using consult_string
-        prolog.consult_string("foo(a, b). foo(c, d). foo(X, Y) :- X = test.")
+        prolog.consult_string(":- dynamic(foo/2).\nfoo(a, b). foo(c, d). foo(X, Y) :- X = test.")
 
         # Verify clauses exist
         assert prolog.has_solution("foo(a, b)")
@@ -20,6 +20,7 @@ class TestAbolishBasic:
         assert prolog.has_solution("foo(test, Y)")
 
         # Add unrelated predicate
+        prolog.consult_string(":- dynamic(bar/1).")
         prolog.query_once("assert(bar(x)).")
         assert prolog.has_solution("bar(x)")
 
@@ -40,10 +41,12 @@ class TestAbolishBasic:
         prolog = PrologInterpreter()
 
         # Abolish non-existent predicate
+        prolog.consult_string(":- dynamic(nonexistent/1).")
         result = prolog.query_once("abolish(nonexistent/1).")
         assert result == {}  # Should succeed
 
         # Add a clause, abolish it, then abolish again
+        prolog.consult_string(":- dynamic(test_pred/1).")
         prolog.query_once("assert(test_pred(item)).")
         assert prolog.has_solution("test_pred(item)")
 
@@ -59,6 +62,7 @@ class TestAbolishBasic:
         prolog = PrologInterpreter()
 
         # Add zero-arity predicate
+        prolog.consult_string(":- dynamic(my_pred/0).")
         prolog.query_once("assert(my_pred).")
         assert prolog.has_solution("my_pred")
 
@@ -78,6 +82,7 @@ class TestAbolishCurrentPredicate:
         prolog = PrologInterpreter()
 
         # Add user-defined predicate
+        prolog.consult_string(":- dynamic(user_pred/1).")
         prolog.query_once("assert(user_pred(a)).")
         prolog.query_once("assert(user_pred(b)).")
 
@@ -103,7 +108,12 @@ class TestAbolishClauseInteraction:
         prolog = PrologInterpreter()
 
         # Add clauses using consult_string
-        prolog.consult_string("fact_pred. rule_pred(X) :- X = value.")
+        prolog.consult_string("""
+            :- dynamic(fact_pred/0).
+            :- dynamic(rule_pred/1).
+            fact_pred.
+            rule_pred(X) :- X = value.
+        """)
 
         # Verify clause/2 works
         assert prolog.has_solution("clause(fact_pred, true)")
@@ -150,16 +160,13 @@ class TestAbolishInputValidation:
         """Test that built-in predicates cannot be abolished."""
         prolog = PrologInterpreter()
 
-        # These should succeed without effect (built-ins are protected)
-        result = prolog.query_once("abolish(write/1).")
-        assert result == {}
+        assert prolog.has_solution(
+            "catch(abolish(write/1), error(permission_error(modify, static_procedure, write/1), _), true)"
+        )
 
-        result = prolog.query_once("abolish(abolish/1).")
-        assert result == {}
-
-        # Built-ins should still work
-        assert prolog.has_solution("current_predicate(write/1)")
-        assert prolog.has_solution("current_predicate(abolish/1)")
+        assert prolog.has_solution(
+            "catch(abolish(abolish/1), error(permission_error(modify, static_procedure, abolish/1), _), true)"
+        )
 
 
 class TestAbolishBuiltinProperties:
@@ -174,6 +181,7 @@ class TestAbolishBuiltinProperties:
     def test_abolish_deterministic(self):
         """Test that abolish is deterministic (single solution)."""
         prolog = PrologInterpreter()
+        prolog.consult_string(":- dynamic(nonexistent/1).")
         results = list(prolog.query("abolish(nonexistent/1)."))
         assert len(results) == 1
         assert results[0] == {}

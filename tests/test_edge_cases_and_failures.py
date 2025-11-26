@@ -165,6 +165,7 @@ class TestAssertFailures:
     def test_assert_complex_clause(self):
         """Test assert/1 with a complex clause."""
         prolog = PrologInterpreter()
+        prolog.consult_string(":- dynamic(parent/2).")
         assert prolog.has_solution("assert(parent(alice, bob))")
         # Now query the asserted fact
         assert prolog.has_solution("parent(alice, bob)")
@@ -172,6 +173,7 @@ class TestAssertFailures:
     def test_assert_multiple_facts(self):
         """Test assert/1 with multiple facts."""
         prolog = PrologInterpreter()
+        prolog.consult_string(":- dynamic(parent/2).")
         # Assert multiple facts
         assert prolog.has_solution("assert(parent(alice, bob))")
         assert prolog.has_solution("assert(parent(bob, charlie))")
@@ -227,6 +229,7 @@ class TestRetractEdgeCases:
         """Test retract/1 with a variable to enumerate facts."""
         prolog = PrologInterpreter()
         prolog.consult_string("""
+            :- dynamic(color/1).
             color(red).
             color(blue).
             color(green).

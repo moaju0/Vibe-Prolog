@@ -310,6 +310,7 @@ class TestDatabaseModification:
     def test_assert_fact(self):
         """Test assert/1 adding a fact."""
         prolog = PrologInterpreter()
+        prolog.consult_string(":- dynamic(foo/1).")
         assert not prolog.has_solution("foo(bar)")
         prolog.query_once("assert(foo(bar)).")
         assert prolog.has_solution("foo(bar)")
@@ -317,6 +318,7 @@ class TestDatabaseModification:
     def test_assert_multiple_facts(self):
         """Test assert/1 adding multiple facts."""
         prolog = PrologInterpreter()
+        prolog.consult_string(":- dynamic(num/1).")
         prolog.query_once("assert(num(1)).")
         prolog.query_once("assert(num(2)).")
         prolog.query_once("assert(num(3)).")
@@ -341,7 +343,7 @@ class TestDatabaseModification:
     def test_retract_fact(self):
         """Test retract/1 removing a fact."""
         prolog = PrologInterpreter()
-        prolog.consult_string("foo(bar). foo(baz).")
+        prolog.consult_string(":- dynamic(foo/1).\nfoo(bar). foo(baz).")
 
         assert prolog.has_solution("foo(bar)")
         prolog.query_once("retract(foo(bar)).")
@@ -351,7 +353,7 @@ class TestDatabaseModification:
     def test_retract_with_variable(self):
         """Test retract/1 with variable."""
         prolog = PrologInterpreter()
-        prolog.consult_string("num(1). num(2). num(3).")
+        prolog.consult_string(":- dynamic(num/1).\nnum(1). num(2). num(3).")
 
         result = prolog.query_once("retract(num(X)).")
         assert result is not None
@@ -361,7 +363,7 @@ class TestDatabaseModification:
     def test_retract_all(self):
         """Test retracting multiple facts."""
         prolog = PrologInterpreter()
-        prolog.consult_string("num(1). num(2). num(3).")
+        prolog.consult_string(":- dynamic(num/1).\nnum(1). num(2). num(3).")
 
         # Retract all num facts
         while prolog.has_solution("retract(num(_))"):
@@ -604,6 +606,7 @@ class TestIntegration:
     def test_assert_and_findall(self):
         """Test dynamic database with findall."""
         prolog = PrologInterpreter()
+        prolog.consult_string(":- dynamic(num/1).")
         prolog.query_once("assert(num(1)).")
         prolog.query_once("assert(num(2)).")
         prolog.query_once("assert(num(3)).")

@@ -68,6 +68,26 @@ class PrologError:
         return PrologError._create_error_with_context(error_term, context)
 
     @staticmethod
+    def permission_error(
+        operation: str, permission_type: str, culprit: Any, context: str | None = None
+    ) -> "Compound":
+        """Create a permission_error term.
+
+        Args:
+            operation: The attempted operation (e.g., 'modify')
+            permission_type: The type of permission denied (e.g., 'static_procedure')
+            culprit: The offending value
+            context: Name of the predicate that caused the error
+
+        Returns:
+            error(permission_error(Operation, PermissionType, Culprit), context(Predicate))
+        """
+        error_term = Compound(
+            'permission_error', (Atom(operation), Atom(permission_type), culprit)
+        )
+        return PrologError._create_error_with_context(error_term, context)
+
+    @staticmethod
     def syntax_error(description: str, context: str | None = None) -> "Compound":
         """Create a syntax_error term.
 

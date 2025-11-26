@@ -29,13 +29,26 @@ class CutException(Exception):
 class PrologEngine:
     """Prolog inference engine."""
 
-    def __init__(self, clauses: list[Clause], argv: list[str] | None = None):
+    def __init__(
+        self,
+        clauses: list[Clause],
+        argv: list[str] | None = None,
+        predicate_properties: dict[tuple[str, int], set[str]] | None = None,
+        predicate_sources: dict[tuple[str, int], set[str]] | None = None,
+    ):
         self.clauses = clauses
         self.argv = argv or []
         self.call_depth = 0
         self.max_depth = 1000  # Prevent infinite recursion
         self._fresh_var_counter = 0
         self._builtin_registry = self._build_builtin_registry()
+        self.predicate_properties: dict[tuple[str, int], set[str]] = (
+            predicate_properties if predicate_properties is not None else {}
+        )
+        self.predicate_sources: dict[tuple[str, int], set[str]] = (
+            predicate_sources if predicate_sources is not None else {}
+        )
+        self._initialize_builtin_properties()
         # Index of user-defined predicates for O(1) existence checks
         self._predicate_index: set[tuple[str, int]] = self._build_predicate_index()
         # Stream management
@@ -175,6 +188,17 @@ class PrologEngine:
 
         return registry
 
+    def _initialize_builtin_properties(self) -> None:
+        """Mark built-in predicates as static and built_in."""
+
+        for key in self._builtin_registry.keys():
+            properties = self.predicate_properties.setdefault(key, set())
+            properties.update({"static", "built_in"})
+
+        cut_key = ("!", 0)
+        properties = self.predicate_properties.setdefault(cut_key, set())
+        properties.update({"static", "built_in"})
+
     def _build_predicate_index(self) -> set[tuple[str, int]]:
         """Build an index of all user-defined predicates for fast existence checks.
 
@@ -195,6 +219,8 @@ class PrologEngine:
     ) -> None:
         """Compatibility helper for legacy tests registering ad-hoc built-ins."""
         registry[(functor, arity)] = self._wrap_builtin_handler(handler)
+        properties = self.predicate_properties.setdefault((functor, arity), set())
+        properties.update({"static", "built_in"})
 
     def _wrap_builtin_handler(self, handler: Callable) -> BuiltinHandler:
         """Ensure builtin handlers conform to the 3-argument calling convention."""
@@ -382,6 +408,33 @@ class PrologEngine:
             error_term = PrologError.existence_error("procedure", indicator, context)
             raise PrologThrow(error_term)
 
+    def _indicator_from_key(self, functor: str, arity: int) -> Compound:
+        """Create a predicate indicator compound from a key tuple."""
+
+        return Compound("/", (Atom(functor), Number(arity)))
+
+    def _get_predicate_properties(self, key: tuple[str, int]) -> set[str]:
+        """Return the property set for a predicate, defaulting to static."""
+
+        properties = self.predicate_properties.setdefault(key, set())
+        if not properties:
+            properties.add("static")
+        if "dynamic" in properties and "static" in properties:
+            properties.discard("static")
+        return properties
+
+    def _ensure_dynamic_permission(self, key: tuple[str, int], context: str) -> None:
+        """Raise permission_error if predicate is not dynamic."""
+
+        functor, arity = key
+        properties = self._get_predicate_properties(key)
+        if "dynamic" not in properties:
+            indicator = self._indicator_from_key(functor, arity)
+            error_term = PrologError.permission_error(
+                "modify", "static_procedure", indicator, context
+            )
+            raise PrologThrow(error_term)
+
     def _add_predicate_to_index(self, clause: Clause) -> None:
         """Add a predicate to the index after asserting a clause.
 
@@ -393,6 +446,12 @@ class PrologEngine:
             self._predicate_index.add((head.functor, len(head.args)))
         elif isinstance(head, Atom):
             self._predicate_index.add((head.name, 0))
+
+    def _record_predicate_source(self, key: tuple[str, int], source: str) -> None:
+        """Track which source provided clauses for a predicate."""
+
+        sources = self.predicate_sources.setdefault(key, set())
+        sources.add(source)
 
     def _remove_predicate_from_index_if_empty(self, functor: str, arity: int) -> None:
         """Remove a predicate from the index if no clauses remain for it.

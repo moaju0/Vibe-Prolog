@@ -3,13 +3,20 @@
 import io
 import sys
 from pathlib import Path
+from typing import Any
 
 from lark.exceptions import LarkError
 
 from vibeprolog.exceptions import PrologError, PrologThrow
 from vibeprolog.engine import CutException, PrologEngine
-from vibeprolog.parser import PrologParser, Directive, Clause
-from vibeprolog.terms import Compound, Variable, Atom
+from vibeprolog.parser import (
+    Clause,
+    Directive,
+    PredicateIndicator,
+    PredicatePropertyDirective,
+    PrologParser,
+)
+from vibeprolog.terms import Atom, Compound, Number, Variable
 from vibeprolog.unification import Substitution, apply_substitution
 
 
@@ -22,6 +29,10 @@ class PrologInterpreter:
         self._argv: list[str] = argv or []
         self.engine = None
         self.initialization_goals = []
+        self.predicate_properties: dict[tuple[str, int], set[str]] = {}
+        self._predicate_sources: dict[tuple[str, int], set[str]] = {}
+        self._consult_counter = 0
+        self._builtins_seeded = False
 
     @property
     def argv(self) -> list[str]:
@@ -41,17 +52,41 @@ class PrologInterpreter:
         error_term = PrologError.syntax_error(str(exc), location)
         raise PrologThrow(error_term)
 
-    def _process_items(self, items: list):
+    def _ensure_builtin_properties(self) -> None:
+        """Seed predicate_properties with built-ins for directive validation."""
+
+        if not self._builtins_seeded:
+            PrologEngine(
+                self.clauses,
+                self.argv,
+                self.predicate_properties,
+                self._predicate_sources,
+            )
+            self._builtins_seeded = True
+
+    def _process_items(self, items: list, source_name: str):
         """Process parsed clauses and directives."""
+        self._ensure_builtin_properties()
+        closed_predicates: set[tuple[str, int]] = set()
+        last_predicate: tuple[str, int] | None = None
+
         for item in items:
             if isinstance(item, Clause):
-                self.clauses.append(item)
+                last_predicate = self._add_clause(
+                    item, source_name, closed_predicates, last_predicate
+                )
             elif isinstance(item, Directive):
-                self._handle_directive(item)
+                self._handle_directive(item, closed_predicates)
 
-    def _handle_directive(self, directive: Directive):
+    def _handle_directive(
+        self, directive: Directive, closed_predicates: set[tuple[str, int]]
+    ):
         """Handle a directive."""
         goal = directive.goal
+
+        if isinstance(goal, PredicatePropertyDirective):
+            self._handle_predicate_property_directive(goal, closed_predicates)
+            return
 
         # Reject unsupported directives
         if isinstance(goal, Compound) and goal.functor == "op" and len(goal.args) == 3:
@@ -74,6 +109,135 @@ class PrologInterpreter:
             self.initialization_goals.append(init_goal)
         # Other directives can be added here
 
+    def _handle_predicate_property_directive(
+        self, directive: PredicatePropertyDirective, closed_predicates: set[tuple[str, int]]
+    ) -> None:
+        """Apply a predicate property directive."""
+
+        context = f"{directive.property}/1"
+        for indicator in directive.indicators:
+            key = self._validate_predicate_indicator(indicator, context)
+            properties = self.predicate_properties.setdefault(key, set())
+
+            if "built_in" in properties and directive.property == "dynamic":
+                indicator_term = self._indicator_from_key(key)
+                error_term = PrologError.permission_error(
+                    "modify", "static_procedure", indicator_term, context
+                )
+                raise PrologThrow(error_term)
+
+            if directive.property == "dynamic":
+                properties.discard("static")
+                properties.add("dynamic")
+            else:
+                properties.add(directive.property)
+                if "dynamic" not in properties:
+                    properties.add("static")
+
+            if directive.property == "discontiguous" and key in closed_predicates:
+                closed_predicates.discard(key)
+
+    def _validate_predicate_indicator(
+        self, indicator: PredicateIndicator | Any, context: str
+    ) -> tuple[str, int]:
+        """Validate a predicate indicator term."""
+
+        if isinstance(indicator, PredicateIndicator):
+            name_term = indicator.name
+            arity_term = indicator.arity
+        elif (
+            isinstance(indicator, Compound)
+            and indicator.functor == "/"
+            and len(indicator.args) == 2
+        ):
+            name_term, arity_term = indicator.args
+        else:
+            error_term = PrologError.type_error("predicate_indicator", indicator, context)
+            raise PrologThrow(error_term)
+
+        if isinstance(name_term, Variable) or isinstance(arity_term, Variable):
+            error_term = PrologError.instantiation_error(context)
+            raise PrologThrow(error_term)
+
+        if not isinstance(name_term, Atom):
+            error_term = PrologError.type_error("atom", name_term, context)
+            raise PrologThrow(error_term)
+
+        if not isinstance(arity_term, Number):
+            error_term = PrologError.type_error("integer", arity_term, context)
+            raise PrologThrow(error_term)
+
+        if not isinstance(arity_term.value, int):
+            error_term = PrologError.type_error("integer", arity_term, context)
+            raise PrologThrow(error_term)
+
+        if arity_term.value < 0:
+            error_term = PrologError.domain_error("not_less_than_zero", arity_term, context)
+            raise PrologThrow(error_term)
+
+        return name_term.name, int(arity_term.value)
+
+    def _indicator_from_key(self, key: tuple[str, int]) -> Compound:
+        name, arity = key
+        return Compound("/", (Atom(name), Number(arity)))
+
+    def _add_clause(
+        self,
+        clause: Clause,
+        source_name: str,
+        closed_predicates: set[tuple[str, int]],
+        last_predicate: tuple[str, int] | None,
+    ) -> tuple[str, int] | None:
+        """Insert a clause while enforcing predicate properties."""
+
+        head = clause.head
+        if isinstance(head, Compound):
+            key = (head.functor, len(head.args))
+        elif isinstance(head, Atom):
+            key = (head.name, 0)
+        else:
+            return last_predicate
+
+        properties = self.predicate_properties.setdefault(key, {"static"})
+        if "dynamic" in properties:
+            properties.discard("static")
+
+        if "built_in" in properties:
+            indicator = self._indicator_from_key(key)
+            error_term = PrologError.permission_error(
+                "modify", "static_procedure", indicator, "consult/1"
+            )
+            raise PrologThrow(error_term)
+
+        sources = self._predicate_sources.setdefault(key, set())
+        if sources and source_name not in sources and "multifile" not in properties:
+            indicator = self._indicator_from_key(key)
+            error_term = PrologError.permission_error(
+                "modify", "static_procedure", indicator, "consult/1"
+            )
+            raise PrologThrow(error_term)
+
+        if (
+            key in closed_predicates
+            and "discontiguous" not in properties
+            and source_name in sources
+        ):
+            indicator = self._indicator_from_key(key)
+            error_term = PrologError.permission_error(
+                "modify", "static_procedure", indicator, "consult/1"
+            )
+            raise PrologThrow(error_term)
+
+        if last_predicate is not None and last_predicate != key:
+            last_properties = self.predicate_properties.get(last_predicate, {"static"})
+            if "discontiguous" not in last_properties:
+                closed_predicates.add(last_predicate)
+
+        self.clauses.append(clause)
+        sources.add(source_name)
+
+        return key
+
     def _execute_initialization_goals(self):
         """Execute collected initialization goals."""
         try:
@@ -84,7 +248,7 @@ class PrologInterpreter:
         finally:
             self.initialization_goals.clear()  # Clear after execution
 
-    def _consult_code(self, prolog_code: str):
+    def _consult_code(self, prolog_code: str, source_name: str):
         """
         Process Prolog code: parse, process items, create engine, and run initialization goals.
 
@@ -96,8 +260,10 @@ class PrologInterpreter:
         except (ValueError, LarkError) as exc:
             error_term = PrologError.syntax_error(str(exc), "consult/1")
             raise PrologThrow(error_term)
-        self._process_items(items)
-        self.engine = PrologEngine(self.clauses, self.argv)
+        self._process_items(items, source_name)
+        self.engine = PrologEngine(
+            self.clauses, self.argv, self.predicate_properties, self._predicate_sources
+        )
         self._execute_initialization_goals()
 
     def consult(self, filepath: str | Path):
@@ -105,11 +271,15 @@ class PrologInterpreter:
         filepath = Path(filepath)
         with open(filepath, "r") as f:
             content = f.read()
-        self._consult_code(content)
+        self._consult_counter += 1
+        source_name = f"file:{filepath}#{self._consult_counter}"
+        self._consult_code(content, source_name)
 
     def consult_string(self, prolog_code: str):
         """Load Prolog clauses from a string."""
-        self._consult_code(prolog_code)
+        self._consult_counter += 1
+        source_name = f"string:{self._consult_counter}"
+        self._consult_code(prolog_code, source_name)
 
     def query(
         self, query_str: str, limit: int | None = None, capture_output: bool = False
@@ -128,7 +298,9 @@ class PrologInterpreter:
         """
         if self.engine is None:
             # Initialize empty engine for built-in predicates
-            self.engine = PrologEngine(self.clauses, self.argv)
+            self.engine = PrologEngine(
+                self.clauses, self.argv, self.predicate_properties, self._predicate_sources
+            )
 
         # Parse the query
         goals = self._parse_query(query_str)
