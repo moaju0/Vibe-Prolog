@@ -102,7 +102,7 @@ test_predicate(f).
     def test_malformed_pldoc_unterminated(self):
         """Test malformed PlDoc with unterminated block comment."""
         prolog = PrologInterpreter()
-        with pytest.raises(Exception):  # Should raise syntax error
+        with pytest.raises(PrologThrow):  # Should raise syntax error
             prolog.consult_string("""
 /** Unterminated comment
 test_predicate(g).
@@ -121,9 +121,8 @@ test_predicate(h).
     def test_pldoc_before_directive(self):
         """Test PlDoc before directives (should be ignored for now)."""
         prolog = PrologInterpreter()
-        prolog.consult_string("""
-%% Module documentation
-:- dynamic(test_predicate/1).
-""")
-        # Should not crash, but no doc stored for directives yet
-        assert True
+        prolog.consult_string("""\n%% Module documentation\n:- dynamic(test_predicate/1).\ntest_predicate(a).\n""")
+        # The doc should be associated with the directive, not the predicate.
+        # Since directive docs are ignored for now, the predicate should have no doc.
+        result = prolog.query_once("predicate_documentation(test_predicate/1, Doc)")
+        assert result is None
