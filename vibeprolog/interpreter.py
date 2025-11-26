@@ -52,6 +52,15 @@ class PrologInterpreter:
     def _handle_directive(self, directive: Directive):
         """Handle a directive."""
         goal = directive.goal
+
+        # Reject unsupported directives
+        if isinstance(goal, Compound) and goal.functor == "op" and len(goal.args) == 3:
+            error_term = PrologError.syntax_error(
+                "op/3 directives are not supported", "consult/1"
+            )
+            raise PrologThrow(error_term)
+
+        # Handle supported directives
         if isinstance(goal, Compound) and goal.functor == "initialization" and len(goal.args) == 1:
             init_goal = goal.args[0]
             # Validate the goal
@@ -75,23 +84,13 @@ class PrologInterpreter:
         finally:
             self.initialization_goals.clear()  # Clear after execution
 
-    def consult(self, filepath: str | Path):
-        """Load Prolog clauses from a file."""
-        filepath = Path(filepath)
-        with open(filepath, "r") as f:
-            content = f.read()
+    def _consult_code(self, prolog_code: str):
+        """
+        Process Prolog code: parse, process items, create engine, and run initialization goals.
 
-        try:
-            items = self.parser.parse(content, "consult/1")
-        except (ValueError, LarkError) as exc:
-            error_term = PrologError.syntax_error(str(exc), "consult/1")
-            raise PrologThrow(error_term)
-        self._process_items(items)
-        self.engine = PrologEngine(self.clauses, self.argv)
-        self._execute_initialization_goals()
-
-    def consult_string(self, prolog_code: str):
-        """Load Prolog clauses from a string."""
+        Args:
+            prolog_code: String containing Prolog code to process
+        """
         try:
             items = self.parser.parse(prolog_code, "consult/1")
         except (ValueError, LarkError) as exc:
@@ -100,6 +99,17 @@ class PrologInterpreter:
         self._process_items(items)
         self.engine = PrologEngine(self.clauses, self.argv)
         self._execute_initialization_goals()
+
+    def consult(self, filepath: str | Path):
+        """Load Prolog clauses from a file."""
+        filepath = Path(filepath)
+        with open(filepath, "r") as f:
+            content = f.read()
+        self._consult_code(content)
+
+    def consult_string(self, prolog_code: str):
+        """Load Prolog clauses from a string."""
+        self._consult_code(prolog_code)
 
     def query(
         self, query_str: str, limit: int | None = None, capture_output: bool = False

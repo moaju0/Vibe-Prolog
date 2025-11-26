@@ -160,9 +160,12 @@ class TestOperatorPrecedence:
 
     def test_op_directive_rejected(self):
         """Test that :- op/3 directive is rejected"""
-        parser = PrologParser()
-        with pytest.raises(Exception):
-            parser.parse(":- op(500, xfx, foo).")
+        from vibeprolog import PrologInterpreter
+        from vibeprolog.exceptions import PrologThrow
+
+        prolog = PrologInterpreter()
+        with pytest.raises(PrologThrow):
+            prolog.consult_string(":- op(500, xfx, foo).")
 
 
 class TestCutAndNegation:
@@ -443,6 +446,8 @@ class TestNegativeCases:
 
     def test_invalid_op_declaration(self):
         """Test invalid op/3 declaration syntax"""
-        parser = PrologParser()
-        with pytest.raises(Exception):
-            parser.parse(":- op(foo, bar, baz).")
+        from vibeprolog import PrologInterpreter
+
+        prolog = PrologInterpreter()
+        with pytest.raises(PrologThrow):
+            prolog.consult_string(":- op(foo, bar, baz).")

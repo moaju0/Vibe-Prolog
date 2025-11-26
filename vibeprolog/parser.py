@@ -520,16 +520,6 @@ class PrologParser:
         try:
             text = self._strip_block_comments(text)
             parsed_items = self.parser.parse(text)
-
-            for item in parsed_items:
-                if isinstance(item, Directive):
-                    goal = item.goal
-                    if isinstance(goal, Compound) and goal.functor == "op" and len(goal.args) == 3:
-                        error_term = PrologError.syntax_error(
-                            "op/3 directives are not supported", context
-                        )
-                        raise PrologThrow(error_term)
-
             return parsed_items
         except (UnexpectedToken, UnexpectedCharacters) as e:
             # If the lexer/parser choked inside a char code hex escape like 0'\x4G,
