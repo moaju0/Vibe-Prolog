@@ -565,14 +565,15 @@ class IOBuiltins:
 
         filename_term, mode_term, stream_var = args
 
-        # Check that arguments are instantiated
+        # Validate argument types
+        engine._check_instantiated(filename_term, subst, "open/3")
+        engine._check_type(filename_term, Atom, "atom", subst, "open/3")
+        engine._check_instantiated(mode_term, subst, "open/3")
+        engine._check_type(mode_term, Atom, "atom", subst, "open/3")
+
+        # Arguments are valid, now get their Python values
         filename_term = deref(filename_term, subst)
         mode_term = deref(mode_term, subst)
-
-        if not isinstance(filename_term, Atom):
-            return None
-        if not isinstance(mode_term, Atom):
-            return None
 
         filename = filename_term.name
         mode = mode_term.name
@@ -624,10 +625,11 @@ class IOBuiltins:
             return None
 
         stream_term = args[0]
-        stream_term = deref(stream_term, subst)
 
-        if not isinstance(stream_term, Atom):
-            return None
+        engine._check_instantiated(stream_term, subst, "close/1")
+        engine._check_type(stream_term, Atom, "stream_or_alias", subst, "close/1")
+
+        stream_term = deref(stream_term, subst)
 
         # Check if it's a standard stream - these cannot be closed
         if stream_term.name in ("user_input", "user_output", "user_error"):

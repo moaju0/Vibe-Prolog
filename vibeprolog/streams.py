@@ -7,7 +7,7 @@ class Stream:
     """Lightweight stream descriptor used by the engine's stream registry."""
     handle: Any       # typically an Atom or similar identifier
     file_obj: TextIO
-    mode: str          # 'read' or 'write'
+    mode: str          # 'read', 'write', or 'append'
     filename: str | None = None  # Filename if it's a file stream
 
     @property
