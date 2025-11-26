@@ -506,16 +506,15 @@ class PrologParser:
         except (UnexpectedToken, UnexpectedCharacters) as e:
             # If the lexer/parser choked inside a char code hex escape like 0'\x4G,
             # surface the ISO-style unexpected_char error rather than the raw Lark token message.
-            last_token = getattr(e, "token_history", None)
-            if last_token:
-                last_token = last_token[-1]
+            token_history = getattr(e, "token_history", None)
+            if token_history:
+                last_token = token_history[-1]
                 if getattr(last_token, "type", None) == "CHAR_CODE" and str(last_token).startswith(
                     "0'\\x"
                 ):
                     error_term = PrologError.syntax_error("unexpected_char", context)
                     raise PrologThrow(error_term)
-            error_term = PrologError.syntax_error(str(e), context)
-            raise PrologThrow(error_term)
+            raise
         except LarkError as e:
             # Convert Lark parse error to Prolog syntax_error
             error_term = PrologError.syntax_error(str(e), context)
