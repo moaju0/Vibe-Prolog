@@ -38,3 +38,22 @@ jobs:
         run: |
           uv run pytest tests/test_additional_builtins.py -v
 
+      - name: Run parser hex escape tests
+        run: |
+          uv run pytest tests/test_parser.py::TestCharacterCodeHexEscapes -v
+
+      - name: Run parser error handling tests
+        run: |
+          uv run pytest tests/test_parser_error_handling.py -v
+
+      - name: Run parser string/escape tests
+        run: |
+          uv run pytest tests/test_parser_strings.py -v
+
+      - name: Run parser compatibility tests
+        run: |
+          uv run pytest tests/test_parser_compatibility.py -v
+
+      - name: Run edge case regression tests
+        run: |
+          uv run pytest tests/test_edge_cases_and_failures.py -v

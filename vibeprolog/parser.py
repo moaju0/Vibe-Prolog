@@ -3,7 +3,7 @@
 import re
 
 from lark import Lark, Transformer
-from lark.exceptions import LarkError
+from lark.exceptions import LarkError, UnexpectedCharacters, UnexpectedToken
 from dataclasses import dataclass
 from typing import Any
 
@@ -129,7 +129,8 @@ PROLOG_GRAMMAR = r"""
 
     // Character codes: 0'X where X is any character (must come before NUMBER)
     // Patterns: 0'a (simple char), 0'\\ (backslash), 0'\' (quote), 0''' (doubled quote), 0'\xHH (hex)
-    CHAR_CODE.5: /0'(\\x[0-9a-fA-F]+\\?|\\\\\\\\|\\\\['tnr]|''|[^'\\])/ | /\d+'.'/
+    // Allow broader alphanumerics after \\x so lexer does not reject malformed hex sequences that should become syntax errors
+    CHAR_CODE.5: /0'(\\x[0-9a-zA-Z]+\\?|\\\\\\\\|\\\\['tnr]|''|[^'\\])/ | /\d+'.'/
 
     // Scientific notation, hex, octal, binary, base'digits
     NUMBER.4: /-?0x[0-9a-fA-F]+/i
@@ -513,6 +514,22 @@ class PrologParser:
         try:
             text = self._strip_block_comments(text)
             return self.parser.parse(text)
+        except (UnexpectedToken, UnexpectedCharacters) as e:
+            # If the lexer/parser choked inside a char code hex escape like 0'\x4G,
+            # surface the ISO-style unexpected_char error rather than the raw Lark token message.
+            last_token = getattr(e, "token_history", None)
+            if last_token:
+                last_token = last_token[-1]
+                if getattr(last_token, "type", None) == "CHAR_CODE" and str(last_token).startswith(
+                    "0'\\x"
+                ):
+                    error_term = PrologError.syntax_error("unexpected_char", context)
+                    raise PrologThrow(error_term)
+            error_term = PrologError.syntax_error(str(e), context)
+            # We handle these specific Lark errors here so they are normalized to
+            # `PrologThrow` before control leaves the try; otherwise the outer
+            # `LarkError` handler never runs and tests break.
+            raise PrologThrow(error_term)
         except LarkError as e:
             # Convert Lark parse error to Prolog syntax_error
             error_term = PrologError.syntax_error(str(e), context)

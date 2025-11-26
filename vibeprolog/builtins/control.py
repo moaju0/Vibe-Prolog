@@ -11,6 +11,7 @@ from typing import Iterator
 from vibeprolog.builtins import BuiltinRegistry, register_builtin
 from vibeprolog.builtins.common import BuiltinArgs, EngineContext, iter_empty
 from vibeprolog.parser import Compound
+from vibeprolog.terms import Atom
 from vibeprolog.unification import Substitution, deref, unify
 
 
@@ -98,7 +99,13 @@ class ControlBuiltins:
     def _builtin_call(
         args: BuiltinArgs, subst: Substitution, engine: EngineContext
     ) -> Iterator[Substitution]:
+        # ISO standard: call/1 with a variable should raise instantiation_error
+        engine._check_instantiated(args[0], subst, "call/1")
         goal = deref(args[0], subst)
+        # ISO standard: call/1 with non-callable should raise type_error
+        engine._check_type(goal, (Compound, Atom), "callable", subst, "call/1")
+        # Check if the predicate exists before calling it
+        engine._check_predicate_exists(goal, "call/1")
         yield from engine._solve_goals([goal], subst)
 
     @staticmethod

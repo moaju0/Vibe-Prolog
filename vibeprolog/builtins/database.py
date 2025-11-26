@@ -88,6 +88,9 @@ class DatabaseBuiltins:
         else:
             engine.clauses.append(new_clause)
 
+        # Update the predicate index
+        engine._add_predicate_to_index(new_clause)
+
         return subst
 
     @staticmethod
@@ -96,6 +99,8 @@ class DatabaseBuiltins:
     ) -> Iterator[Substitution]:
         clause_term = deref(args[0], subst)
         matches = []
+        retracted_predicates = set()  # Track predicates that were retracted
+
         for i, clause in enumerate(engine.clauses):
             renamed_clause = engine._rename_variables(clause)
 
@@ -113,10 +118,20 @@ class DatabaseBuiltins:
             new_subst = unify(clause_term, clause_as_term, subst)
             if new_subst is not None:
                 matches.append((i, new_subst))
+                # Track which predicate is being retracted
+                head = clause.head
+                if isinstance(head, Compound):
+                    retracted_predicates.add((head.functor, len(head.args)))
+                elif isinstance(head, Atom):
+                    retracted_predicates.add((head.name, 0))
 
         for i, new_subst in reversed(matches):
             engine.clauses.pop(i)
             yield new_subst
+
+        # Update the index for retracted predicates
+        for functor, arity in retracted_predicates:
+            engine._remove_predicate_from_index_if_empty(functor, arity)
 
     @staticmethod
     def _builtin_abolish(
@@ -147,19 +162,26 @@ class DatabaseBuiltins:
         name = name_term.name
 
         clauses_to_keep = []
+        had_clauses = False  # Track if any clauses were removed
         for clause in engine.clauses:
             head = clause.head
             matches = False
             if isinstance(head, Compound):
                 if head.functor == name and len(head.args) == arity:
                     matches = True
+                    had_clauses = True
             elif isinstance(head, Atom):
                 if head.name == name and arity == 0:
                     matches = True
+                    had_clauses = True
 
             if not matches:
                 clauses_to_keep.append(clause)
         engine.clauses = clauses_to_keep
+
+        # Update the index if clauses were removed
+        if had_clauses:
+            engine._predicate_index.discard((name, arity))
 
         return subst
 

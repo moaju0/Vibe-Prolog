@@ -81,7 +81,7 @@
 - ✅ `type_error(Type, Culprit)` – Raised by built-ins when arguments have wrong types
 - ✅ `domain_error(Domain, Culprit)` – Raised by built-ins when values are outside valid domains
 - ✅ `syntax_error(Description)` – Parser throws ISO `error(syntax_error(_), _)` terms
-- ❌ `existence_error(ObjectType, Culprit)` – Not implemented
+- ✅ `existence_error(ObjectType, Culprit)` – Raised when calling undefined predicates via `call/1`
 
 ### Input/Output (ISO 8.11-8.12)
 - ✅ `write/1` – Write term
@@ -149,7 +149,9 @@
 ### Number Literals
 - ✅ Decimal integers
 - ✅ Binary (`0b`), octal (`0o`), hexadecimal (`0x`)
+- ✅ Case-insensitive binary/octal/hex prefixes
 - ✅ Scientific notation
+- ✅ Leading-dot and trailing-zero floats
 - ✅ Floating point
 - ✅ Base-qualified numbers (`16'ff`, `2'abcd` - base'digits syntax)
 
@@ -200,7 +202,6 @@
 1. **File I/O**: Essential for practical Prolog programs
 2. **Dynamic Declarations**: `dynamic/1`, `multifile/1` for module system
 3. **Operator Definition**: `op/3` for custom operators
-4. **Existence Errors**: `existence_error(ObjectType, Culprit)` not implemented
 
 ### Significant Deviations
 1. **Error Reporting**: Now fully ISO-compliant with structured error terms and systematic error reporting in built-ins

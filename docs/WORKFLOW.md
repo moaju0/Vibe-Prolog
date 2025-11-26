@@ -29,6 +29,31 @@ Be sure to include the following in each issue
 Don't include estimates or line numbers
 ```
 
+### Grooming issues
+
+```
+use `gh issue` to inspect issue <issue number>.
+
+Can we split this into multiple issues?
+```
+
+[response]
+
+what would be in each of the issues?
+
+```
+Use the `gh issue` tool and create these issues.
+
+Note which ones block others
+
+Provide comprehensive instructions for how to implement these changes.
+
+Make sure each issue contains instructions to update FEATURES.md and to provide comprehensive test coverage. 
+
+No estimates or line numbers should be provided
+```
+
+
 ## Prioritise work
 
 These use my `paige-manage-github` CLI which isn't in this project. 

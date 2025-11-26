@@ -560,6 +560,211 @@ class TestBaseDigits:
             parser.parse("num(16'@).")
 
 
+class TestScientificNotation:
+    """Tests for scientific notation number parsing."""
+
+    def test_basic_scientific_forms(self):
+        parser = PrologParser()
+
+        clauses = parser.parse("num(1e5).")
+        assert isinstance(clauses[0].head.args[0], Number)
+        assert clauses[0].head.args[0].value == 1e5
+
+        clauses = parser.parse("num(1.5e10).")
+        assert isinstance(clauses[0].head.args[0], Number)
+        assert clauses[0].head.args[0].value == 1.5e10
+
+        clauses = parser.parse("num(2.5E-3).")
+        assert isinstance(clauses[0].head.args[0], Number)
+        assert clauses[0].head.args[0].value == pytest.approx(0.0025)
+
+    def test_negative_exponents(self):
+        parser = PrologParser()
+
+        clauses = parser.parse("num(1e-10).")
+        assert isinstance(clauses[0].head.args[0], Number)
+        assert clauses[0].head.args[0].value == pytest.approx(1e-10)
+
+        clauses = parser.parse("num(1.23e-45).")
+        assert isinstance(clauses[0].head.args[0], Number)
+        assert clauses[0].head.args[0].value == pytest.approx(1.23e-45)
+
+    def test_positive_exponents(self):
+        parser = PrologParser()
+
+        clauses = parser.parse("num(1e+5).")
+        assert isinstance(clauses[0].head.args[0], Number)
+        assert clauses[0].head.args[0].value == 1e5
+
+        clauses = parser.parse("num(1.0E+10).")
+        assert isinstance(clauses[0].head.args[0], Number)
+        assert clauses[0].head.args[0].value == 1.0e10
+
+    def test_invalid_scientific_notation(self):
+        parser = PrologParser()
+
+        with pytest.raises(PrologThrow):
+            parser.parse("num(1e).")
+        with pytest.raises(PrologThrow):
+            parser.parse("num(1.5e).")
+        with pytest.raises(PrologThrow):
+            parser.parse("num(1.5e+).")
+
+        # Ensure non-numeric tokens are not misinterpreted as scientific notation
+        clauses = parser.parse("num(e5).")
+        assert isinstance(clauses[0].head.args[0], Atom)
+
+
+class TestStandardPrefixes:
+    """Tests for standard number prefixes (hex, octal, binary)."""
+
+    @pytest.mark.parametrize("literal, expected", [
+        ("0xFF", 255),
+        ("0x10", 16),
+        ("0xABC", 0xABC),
+        ("-0x1A", -0x1A),
+    ])
+    def test_hexadecimal_numbers(self, literal, expected):
+        parser = PrologParser()
+        clauses = parser.parse(f"num({literal}).")
+        assert isinstance(clauses[0].head.args[0], Number)
+        assert clauses[0].head.args[0].value == expected
+
+    def test_octal_numbers(self):
+        parser = PrologParser()
+
+        clauses = parser.parse("num(0o77).")
+        assert clauses[0].head.args[0].value == 0o77
+
+        clauses = parser.parse("num(0o123).")
+        assert clauses[0].head.args[0].value == 0o123
+
+        clauses = parser.parse("num(0o7).")
+        assert clauses[0].head.args[0].value == 0o7
+
+        clauses = parser.parse("num(-0o10).")
+        assert clauses[0].head.args[0].value == -0o10
+
+    def test_binary_numbers(self):
+        parser = PrologParser()
+
+        clauses = parser.parse("num(0b1010).")
+        assert clauses[0].head.args[0].value == 0b1010
+
+        clauses = parser.parse("num(0b11111111).")
+        assert clauses[0].head.args[0].value == 0b11111111
+
+        clauses = parser.parse("num(0b1).")
+        assert clauses[0].head.args[0].value == 1
+
+        clauses = parser.parse("num(-0b101).")
+        assert clauses[0].head.args[0].value == -0b101
+
+    def test_case_insensitive_prefixes(self):
+        parser = PrologParser()
+
+        clauses = parser.parse("num(0XFF).")
+        assert clauses[0].head.args[0].value == 255
+
+        clauses = parser.parse("num(0O77).")
+        assert clauses[0].head.args[0].value == 0o77
+
+        clauses = parser.parse("num(0B1010).")
+        assert clauses[0].head.args[0].value == 0b1010
+
+    def test_invalid_standard_prefixes(self):
+        parser = PrologParser()
+
+        with pytest.raises(PrologThrow):
+            parser.parse("num(0xZZ).")
+        with pytest.raises(PrologThrow):
+            parser.parse("num(0o99).")
+        with pytest.raises(PrologThrow):
+            parser.parse("num(0b22).")
+        with pytest.raises(PrologThrow):
+            parser.parse("num(0xG).")
+
+
+class TestFloatEdgeCases:
+    """Tests for float parsing edge cases."""
+
+    def test_extreme_float_ranges(self):
+        parser = PrologParser()
+
+        clauses = parser.parse("num(1.79e308).")
+        assert isinstance(clauses[0].head.args[0], Number)
+        assert clauses[0].head.args[0].value == pytest.approx(1.79e308)
+
+        clauses = parser.parse("num(5e-324).")
+        assert isinstance(clauses[0].head.args[0], Number)
+        assert clauses[0].head.args[0].value == pytest.approx(5e-324)
+
+    def test_leading_dot_notation(self):
+        parser = PrologParser()
+
+        for literal, expected in [(".5", 0.5), (".123", 0.123), (".999", 0.999)]:
+            clauses = parser.parse(f"num({literal}).")
+            assert isinstance(clauses[0].head.args[0], Number)
+            assert clauses[0].head.args[0].value == pytest.approx(expected)
+
+    def test_trailing_zeros(self):
+        parser = PrologParser()
+
+        for literal, expected in [("1.0", 1.0), ("2.00", 2.0), ("3.140000", 3.14)]:
+            clauses = parser.parse(f"num({literal}).")
+            assert isinstance(clauses[0].head.args[0], Number)
+            assert clauses[0].head.args[0].value == pytest.approx(expected)
+
+    def test_invalid_float_formats(self):
+        parser = PrologParser()
+
+        with pytest.raises(PrologThrow):
+            parser.parse("num(1.2.3).")
+        with pytest.raises(PrologThrow):
+            parser.parse("num(.).")
+
+
+class TestNumericContexts:
+    """Tests that numbers work correctly in various Prolog contexts."""
+
+    def test_numbers_in_arithmetic_expression(self):
+        prolog = PrologInterpreter()
+        result = prolog.query_once("X is 5 + 3.14.")
+        assert result is not None
+        assert result["X"] == pytest.approx(8.14)
+
+    def test_numbers_in_lists(self):
+        parser = PrologParser()
+        clauses = parser.parse("nums([1, 2.5, 0xFF, 1e5]).")
+        lst = clauses[0].head.args[0]
+        assert isinstance(lst, List)
+        values = [element.value for element in lst.elements]
+        assert values == [1, 2.5, 255, 100000.0]
+
+    def test_numbers_in_compound_terms(self):
+        parser = PrologParser()
+        clauses = parser.parse("foo(42, 3.14, 0x10).")
+        args = clauses[0].head.args
+        assert [arg.value for arg in args] == [42, pytest.approx(3.14), 16]
+
+    def test_numbers_in_comparisons(self):
+        prolog = PrologInterpreter()
+        assert prolog.has_solution("5 < 10.")
+        assert prolog.has_solution("3.14 =:= 3.14.")
+
+    def test_numbers_with_variables(self):
+        parser = PrologParser()
+        clauses = parser.parse("calc(X, 5).")
+        assert isinstance(clauses[0].head.args[0], Variable)
+        assert isinstance(clauses[0].head.args[1], Number)
+        assert clauses[0].head.args[1].value == 5
+
+        prolog = PrologInterpreter()
+        bindings = prolog.query_once("[H|T] = [1,2,3].")
+        assert bindings is not None
+        assert bindings["H"] == 1
+        assert bindings["T"] == [2, 3]
+
 class TestCharacterCodeHexEscapes:
     """Tests for ISO/SWI-style 0'\\xHH character code escapes."""
 
@@ -610,7 +815,7 @@ class TestCharacterCodeHexEscapes:
 
     def test_hex_escape_rejects_non_hex_digit(self):
         parser = PrologParser()
-        with pytest.raises(PrologThrow, match="unexpected_char"):
+        with pytest.raises(PrologThrow, match="syntax_error"):
             parser.parse("code(0'\\x4G).")
 
 
