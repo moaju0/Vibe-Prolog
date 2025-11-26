@@ -13,12 +13,14 @@ from vibeprolog.builtins import BuiltinRegistry, register_builtin
 from vibeprolog.builtins.common import BuiltinArgs, EngineContext
 from vibeprolog.exceptions import PrologError, PrologThrow
 from vibeprolog.parser import List, PrologParser
-from vibeprolog.operators import OperatorInfo
+from vibeprolog.operators import OperatorInfo, OperatorTable
 from vibeprolog.streams import Stream
 from vibeprolog.terms import Atom, Compound, Number, Variable
 from vibeprolog.unification import Substitution, deref, unify
 from vibeprolog.utils.list_utils import list_to_python, python_to_list
 from vibeprolog.utils.term_utils import term_to_string
+
+_DEFAULT_OPERATOR_TABLE = OperatorTable()
 
 USER_INPUT_STREAM = Atom("user_input")
 USER_OUTPUT_STREAM = Atom("user_output")
@@ -588,10 +590,7 @@ class IOBuiltins:
 
     @staticmethod
     def _lookup_operator(functor: str, arity: int, operator_table) -> OperatorInfo | None:
-        table = operator_table
-        if table is None:
-            from vibeprolog.operators import OperatorTable as _OperatorTable
-            table = _OperatorTable()
+        table = operator_table if operator_table is not None else _DEFAULT_OPERATOR_TABLE
         matches = table.get_matching(functor)
         if arity == 1:
             for info in matches:

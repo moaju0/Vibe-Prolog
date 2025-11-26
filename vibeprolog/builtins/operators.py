@@ -28,22 +28,8 @@ class OperatorBuiltins:
         spec_term = deref(spec_term, subst)
         name_term = deref(name_term, subst)
 
-        if any(isinstance(t, Variable) for t in (precedence_term, spec_term, name_term)):
-            error_term = PrologError.instantiation_error("op/3")
-            raise PrologThrow(error_term)
-
-        if not isinstance(precedence_term, Number):
-            error_term = PrologError.type_error("integer", precedence_term, "op/3")
-            raise PrologThrow(error_term)
-        if not isinstance(precedence_term.value, int):
-            error_term = PrologError.type_error("integer", precedence_term, "op/3")
-            raise PrologThrow(error_term)
-
-        # OperatorTable handles spec/name validation and permission errors
-        try:
-            engine.operator_table.define(precedence_term.value, spec_term, name_term, "op/3")
-        except PrologThrow:
-            raise
+        # OperatorTable handles validation and permission errors
+        engine.operator_table.define(precedence_term, spec_term, name_term, "op/3")
 
         return subst
 

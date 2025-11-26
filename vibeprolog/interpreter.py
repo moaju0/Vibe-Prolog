@@ -109,19 +109,7 @@ class PrologInterpreter:
         # Reject unsupported directives
         if isinstance(goal, Compound) and goal.functor == "op" and len(goal.args) == 3:
             prec_term, spec_term, name_term = goal.args
-            if isinstance(prec_term, Variable) or isinstance(spec_term, Variable) or isinstance(name_term, Variable):
-                error_term = PrologError.instantiation_error("op/3")
-                raise PrologThrow(error_term)
-            if not isinstance(prec_term, Number):
-                error_term = PrologError.type_error("integer", prec_term, "op/3")
-                raise PrologThrow(error_term)
-            if not isinstance(prec_term.value, int):
-                error_term = PrologError.type_error("integer", prec_term, "op/3")
-                raise PrologThrow(error_term)
-            try:
-                self.operator_table.define(prec_term.value, spec_term, name_term, "op/3")
-            except PrologThrow:
-                raise
+            self.operator_table.define(prec_term, spec_term, name_term, "op/3")
             return
 
         # Handle supported directives

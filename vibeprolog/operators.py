@@ -92,26 +92,36 @@ class OperatorTable:
     def lookup(self, name: str, spec: str) -> OperatorInfo | None:
         return self._table.get((name, spec))
 
-    def define(self, precedence: int, spec_term, name_term, context: str) -> None:
+    def define(self, precedence_term, spec_term, name_term, context: str) -> None:
         """Apply op/3 directive semantics."""
-        precedence_value = self._parse_precedence(precedence, context)
+        precedence_value = self._parse_precedence(precedence_term, context)
         spec = self._parse_specifier(spec_term, context)
         names = self._parse_operator_names(name_term, context)
 
         for name in names:
             self._define_single(precedence_value, spec, name, context)
 
-    def _parse_precedence(self, precedence: int, context: str) -> int:
-        if not isinstance(precedence, int):
-            error_term = PrologError.type_error("integer", Number(precedence), context)
+    def _parse_precedence(self, precedence_term, context: str) -> int:
+        if isinstance(precedence_term, Variable):
+            error_term = PrologError.instantiation_error(context)
             raise PrologThrow(error_term)
+        if not isinstance(precedence_term, Number):
+            error_term = PrologError.type_error("integer", precedence_term, context)
+            raise PrologThrow(error_term)
+        if not isinstance(precedence_term.value, int):
+            error_term = PrologError.type_error("integer", precedence_term, context)
+            raise PrologThrow(error_term)
+        precedence = precedence_term.value
         if precedence < 0 or precedence > 1200:
-            error_term = PrologError.domain_error("operator_priority", Number(precedence), context)
+            error_term = PrologError.domain_error("operator_priority", precedence_term, context)
             raise PrologThrow(error_term)
         return precedence
 
     def _parse_specifier(self, spec_term, context: str) -> str:
         valid_specs = {"xfx", "xfy", "yfx", "fx", "fy", "xf", "yf"}
+        if isinstance(spec_term, Variable):
+            error_term = PrologError.instantiation_error(context)
+            raise PrologThrow(error_term)
         if not isinstance(spec_term, Atom):
             error_term = PrologError.type_error("atom", spec_term, context)
             raise PrologThrow(error_term)
@@ -122,6 +132,9 @@ class OperatorTable:
         return spec
 
     def _parse_operator_names(self, name_term, context: str) -> list[str]:
+        if isinstance(name_term, Variable):
+            error_term = PrologError.instantiation_error(context)
+            raise PrologThrow(error_term)
         if isinstance(name_term, Atom):
             return [name_term.name]
         if isinstance(name_term, List):
