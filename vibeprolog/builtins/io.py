@@ -624,12 +624,6 @@ class IOBuiltins:
         if functor in {":-", "?-"}:
             return f"{left} {functor} {right}"
         if functor and functor[0].isalpha():
-            # Avoid unnecessary parentheses around operands for readability
-            def _strip_parens(text: str) -> str:
-                return text[1:-1] if text.startswith("(") and text.endswith(")") else text
-
-            left = _strip_parens(left)
-            right = _strip_parens(right)
             return f"{left} {functor} {right}"
         if functor == ",":
             return f"{left},{right}"
