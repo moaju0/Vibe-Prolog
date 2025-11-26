@@ -222,9 +222,9 @@ you should be aware of:
 
 - File/stream I/O predicates (`see/1`, `read/1`, `open/3`, etc.) and character
   I/O helpers are stubbed or missing.
-- Directive handling (`dynamic/1`, `multifile/1`, `op/3`, etc.) is not
-  implemented, so programs that rely on dynamic declarations or custom
-  operators are rejected.
+- Directive handling (`dynamic/1`, `multifile/1`, `op/3`, etc.) now wires
+  predicate properties and operator table updates, but the parser still applies
+  only the built-in operator set when reading source code.
 - ISO error term infrastructure (`error(ErrorType, Context)` along with
   `instantiation_error`, `type_error`, etc.) still needs work; most built-ins
   fail silently instead of raising structured errors.

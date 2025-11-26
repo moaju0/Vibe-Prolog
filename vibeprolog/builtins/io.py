@@ -5,7 +5,6 @@ Implements basic output predicates including formatted printing.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Any, Callable
 
 from lark.exceptions import LarkError
@@ -14,6 +13,7 @@ from vibeprolog.builtins import BuiltinRegistry, register_builtin
 from vibeprolog.builtins.common import BuiltinArgs, EngineContext
 from vibeprolog.exceptions import PrologError, PrologThrow
 from vibeprolog.parser import List, PrologParser
+from vibeprolog.operators import OperatorInfo
 from vibeprolog.streams import Stream
 from vibeprolog.terms import Atom, Compound, Number, Variable
 from vibeprolog.unification import Substitution, deref, unify
@@ -148,53 +148,6 @@ class _TermReader:
                     continue
                 self._push_back(next_non_layout)
                 return "".join(self.buffer)
-
-
-@dataclass(frozen=True)
-class OperatorInfo:
-    """Operator metadata for formatting terms with ignore_ops(false)."""
-
-    precedence: int
-    spec: str  # e.g., yfx, xfy, xfx, fy, fx
-
-    @property
-    def is_prefix(self) -> bool:
-        return len(self.spec) == 2
-
-
-# Default ISO-ish operator table for rendering terms when ignore_ops(false).
-OPERATOR_TABLE: dict[tuple[str, int], OperatorInfo] = {
-    (";", 2): OperatorInfo(1100, "xfy"),
-    ("->", 2): OperatorInfo(1050, "xfy"),
-    (",", 2): OperatorInfo(1000, "xfy"),
-    ("\\+", 1): OperatorInfo(900, "fy"),
-    ("=..", 2): OperatorInfo(700, "xfx"),
-    ("is", 2): OperatorInfo(700, "xfx"),
-    ("=", 2): OperatorInfo(700, "xfx"),
-    ("\\=", 2): OperatorInfo(700, "xfx"),
-    ("=:=", 2): OperatorInfo(700, "xfx"),
-    ("=\\=", 2): OperatorInfo(700, "xfx"),
-    ("<", 2): OperatorInfo(700, "xfx"),
-    (">", 2): OperatorInfo(700, "xfx"),
-    ("=<", 2): OperatorInfo(700, "xfx"),
-    (">=", 2): OperatorInfo(700, "xfx"),
-    ("==", 2): OperatorInfo(700, "xfx"),
-    ("\\==", 2): OperatorInfo(700, "xfx"),
-    ("@<", 2): OperatorInfo(700, "xfx"),
-    ("@=<", 2): OperatorInfo(700, "xfx"),
-    ("@>", 2): OperatorInfo(700, "xfx"),
-    ("@>=", 2): OperatorInfo(700, "xfx"),
-    ("+", 2): OperatorInfo(500, "yfx"),
-    ("-", 2): OperatorInfo(500, "yfx"),
-    ("*", 2): OperatorInfo(400, "yfx"),
-    ("/", 2): OperatorInfo(400, "yfx"),
-    ("//", 2): OperatorInfo(400, "yfx"),
-    ("mod", 2): OperatorInfo(400, "yfx"),
-    ("**", 2): OperatorInfo(200, "xfx"),
-    ("+", 1): OperatorInfo(200, "fy"),
-    ("-", 1): OperatorInfo(200, "fy"),
-    (":-", 2): OperatorInfo(1200, "xfx"),
-}
 
 class IOBuiltins:
     """Built-ins for standard output and formatting."""
@@ -488,8 +441,10 @@ class IOBuiltins:
                     quoted = isinstance(val, Atom) and val.name == "true"
 
         # Convert term to string
+        operator_table = _engine.operator_table if _engine is not None else None
+
         output_str = IOBuiltins._term_to_chars_string(
-            term, subst, ignore_ops, numbervars, quoted
+            term, subst, ignore_ops, numbervars, quoted, operator_table=operator_table
         )
 
         # Convert string to list of character atoms
@@ -506,6 +461,7 @@ class IOBuiltins:
         numbervars: bool,
         quoted: bool,
         parent_prec: int = 1200,
+        operator_table=None,
     ) -> str:
         """Convert a term to string with specified options."""
         term = deref(term, subst)
@@ -552,7 +508,7 @@ class IOBuiltins:
             # Handle list elements
             elements_str = [
                 IOBuiltins._term_to_chars_string(
-                    e, subst, ignore_ops, numbervars, quoted, 1200
+                    e, subst, ignore_ops, numbervars, quoted, 1200, operator_table
                 )
                 for e in term.elements
             ]
@@ -562,7 +518,7 @@ class IOBuiltins:
                 isinstance(term.tail, List) and not term.tail.elements and term.tail.tail is None
             ):
                 tail_str = IOBuiltins._term_to_chars_string(
-                    term.tail, subst, ignore_ops, numbervars, quoted, 1200
+                    term.tail, subst, ignore_ops, numbervars, quoted, 1200, operator_table
                 )
                 return f"[{','.join(elements_str)}|{tail_str}]"
 
@@ -571,7 +527,7 @@ class IOBuiltins:
         if isinstance(term, Compound):
             if not ignore_ops:
                 operator_rendered = IOBuiltins._format_operator_term(
-                    term, subst, ignore_ops, numbervars, quoted, parent_prec
+                    term, subst, ignore_ops, numbervars, quoted, parent_prec, operator_table
                 )
                 if operator_rendered is not None:
                     return operator_rendered
@@ -582,7 +538,7 @@ class IOBuiltins:
                 return term.functor
             args_str = ','.join(
                 IOBuiltins._term_to_chars_string(
-                    arg, subst, ignore_ops, numbervars, quoted, 1200
+                    arg, subst, ignore_ops, numbervars, quoted, 1200, operator_table
                 )
                 for arg in term.args
             )
@@ -602,31 +558,52 @@ class IOBuiltins:
         numbervars: bool,
         quoted: bool,
         parent_prec: int,
+        operator_table,
     ) -> str | None:
-        info = OPERATOR_TABLE.get((term.functor, len(term.args)))
-        if info is None:
+        op_info = IOBuiltins._lookup_operator(term.functor, len(term.args), operator_table)
+        if op_info is None:
             return None
 
-        if info.is_prefix:
-            arg_limit = IOBuiltins._child_precedence_limit(info, "right")
+        if op_info.is_prefix:
+            arg_limit = IOBuiltins._child_precedence_limit(op_info, "right")
             arg_str = IOBuiltins._term_to_chars_string(
-                term.args[0], subst, ignore_ops, numbervars, quoted, arg_limit
+                term.args[0], subst, ignore_ops, numbervars, quoted, arg_limit, operator_table
             )
             rendered = IOBuiltins._render_prefix(term.functor, arg_str)
         else:
-            left_limit = IOBuiltins._child_precedence_limit(info, "left")
-            right_limit = IOBuiltins._child_precedence_limit(info, "right")
+            left_limit = IOBuiltins._child_precedence_limit(op_info, "left")
+            right_limit = IOBuiltins._child_precedence_limit(op_info, "right")
             left_str = IOBuiltins._term_to_chars_string(
-                term.args[0], subst, ignore_ops, numbervars, quoted, left_limit
+                term.args[0], subst, ignore_ops, numbervars, quoted, left_limit, operator_table
             )
             right_str = IOBuiltins._term_to_chars_string(
-                term.args[1], subst, ignore_ops, numbervars, quoted, right_limit
+                term.args[1], subst, ignore_ops, numbervars, quoted, right_limit, operator_table
             )
             rendered = IOBuiltins._render_infix(term.functor, left_str, right_str)
 
-        if info.precedence > parent_prec:
+        # Do not wrap at top-level (1200). Wrap when inside a parent (parent_prec < 1200) or when parent_prec is tighter.
+        if op_info.precedence > parent_prec:
+            return f"({rendered})"
+        if op_info.precedence == parent_prec and parent_prec < 1200:
             return f"({rendered})"
         return rendered
+
+    @staticmethod
+    def _lookup_operator(functor: str, arity: int, operator_table) -> OperatorInfo | None:
+        table = operator_table
+        if table is None:
+            from vibeprolog.operators import OperatorTable as _OperatorTable
+            table = _OperatorTable()
+        matches = table.get_matching(functor)
+        if arity == 1:
+            for info in matches:
+                if info.is_prefix or info.is_postfix:
+                    return info
+        elif arity == 2:
+            for info in matches:
+                if info.is_infix:
+                    return info
+        return None
 
     @staticmethod
     def _child_precedence_limit(info: OperatorInfo, position: str) -> int:
@@ -647,6 +624,12 @@ class IOBuiltins:
         if functor in {":-", "?-"}:
             return f"{left} {functor} {right}"
         if functor and functor[0].isalpha():
+            # Avoid unnecessary parentheses around operands for readability
+            def _strip_parens(text: str) -> str:
+                return text[1:-1] if text.startswith("(") and text.endswith(")") else text
+
+            left = _strip_parens(left)
+            right = _strip_parens(right)
             return f"{left} {functor} {right}"
         if functor == ",":
             return f"{left},{right}"
@@ -851,7 +834,12 @@ class IOBuiltins:
         filename_term = deref(filename_term, subst)
         mode_term = deref(mode_term, subst)
 
-        filename = filename_term.name
+        # Normalize potential escaped control characters (e.g., Windows paths parsed as \t)
+        filename = (
+            filename_term.name.replace("\t", "\\t")
+            .replace("\n", "\\n")
+            .replace("\r", "\\r")
+        )
         mode = mode_term.name
 
         # Validate mode

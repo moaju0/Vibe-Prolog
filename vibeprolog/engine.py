@@ -10,6 +10,7 @@ from dataclasses import dataclass
 
 from vibeprolog.exceptions import PrologError, PrologThrow
 from vibeprolog.parser import Clause, Cut, List
+from vibeprolog.operators import OperatorTable
 from vibeprolog.streams import Stream
 from vibeprolog.terms import Atom, Compound, Number, Variable
 from vibeprolog.unification import Substitution, apply_substitution, deref, unify
@@ -36,13 +37,13 @@ class PrologEngine:
         predicate_properties: dict[tuple[str, int], set[str]] | None = None,
         predicate_sources: dict[tuple[str, int], set[str]] | None = None,
         predicate_docs: dict[tuple[str, int], str] | None = None,
+        operator_table: OperatorTable | None = None,
     ):
         self.clauses = clauses
         self.argv = argv or []
         self.call_depth = 0
         self.max_depth = 1000  # Prevent infinite recursion
         self._fresh_var_counter = 0
-        self._builtin_registry = self._build_builtin_registry()
         self.predicate_properties: dict[tuple[str, int], set[str]] = (
             predicate_properties if predicate_properties is not None else {}
         )
@@ -52,6 +53,8 @@ class PrologEngine:
         self.predicate_docs: dict[tuple[str, int], str] = (
             predicate_docs if predicate_docs is not None else {}
         )
+        self.operator_table: OperatorTable = operator_table or OperatorTable()
+        self._builtin_registry = self._build_builtin_registry()
         self._initialize_builtin_properties()
         # Index of user-defined predicates for O(1) existence checks
         self._predicate_index: set[tuple[str, int]] = self._build_predicate_index()
@@ -170,6 +173,7 @@ class PrologEngine:
             higher_order,
             io,
             list_ops,
+            operators,
             reflection,
             term_manipulation,
             type_tests,
@@ -187,6 +191,7 @@ class PrologEngine:
             exceptions.ExceptionBuiltins,
             reflection.ReflectionBuiltins,
             higher_order.HigherOrderBuiltins,
+            operators.OperatorBuiltins,
         ]:
             module.register(registry, self)
 

@@ -17,7 +17,7 @@ The following predicates were implemented to support ISO conformity testing:
 
 2. **`write_term_to_chars/3`** - Convert Prolog terms to character lists with formatting options
    - Location: `vibeprolog/builtins/io.py`
-   - Status: ⚠️ Partially functional (operator precedence and spacing not fully implemented)
+   - Status: Partial. Uses the operator table for precedence and associativity; some spacing/parentheses edge cases may remain.
    - Supported options:
      - `ignore_ops(true/false)` - Write in canonical form
      - `numbervars(true/false)` - Convert `$VAR(N)` to variable names (A, B, C, ...)
@@ -57,7 +57,7 @@ The following syntax features are not supported by the parser, preventing many I
 1. **Hex escape sequences in atoms**: `'\\x41\\'` (character code in hex)
 2. **Parenthesized operators**: `(-)` (minus operator as a term)
 3. **Character code arithmetic**: `0'\\x41\\` (hex character codes)
-4. **Directive syntax**: `:- initialization(goal)` directive not parsed
+4. **Dynamic operator parsing**: `op/3` updates the operator table and `current_op/3` reports it, but the parser still uses only the built-in operator set (custom operators require canonical functor syntax)
 5. **Complex operator expressions**: Some edge cases with operator precedence
 
 These limitations mean the full ISO conformity test suite (276 tests) cannot be loaded into the interpreter, as the test file itself won't parse.
@@ -67,8 +67,7 @@ These limitations mean the full ISO conformity test suite (276 tests) cannot be 
 The following predicates are used extensively by ISO conformity tests but are not yet implemented:
 
 #### Critical (used in 40+ tests each)
-- `op/3` - Define custom operators
-- `current_op/3` - Query operator definitions
+- None (operator predicates implemented; parser still limited to built-in operators)
 
 #### Important (used in 10+ tests each)
 - `char_code/2` - Character/code conversion
@@ -85,22 +84,15 @@ The following predicates are used extensively by ISO conformity tests but are no
 
 The current `write_term_to_chars/3` implementation has these limitations:
 
-1. **Operator precedence**: Does not handle operator spacing and precedence correctly
-   - Example: Should distinguish between `-a` and `- a`, `-(1)` and `- (1)`
-   - Currently writes all compound terms in canonical functor(args) form
-
-2. **Special operator syntax**: Does not recognize when to use operator syntax vs canonical form
-   - Example: Should write `1+2` instead of `+(1,2)` when `ignore_ops(false)`
-
-3. **Parenthesization**: Does not add parentheses based on operator precedence
-   - Example: Should write `a*(b+c)` not `a*b+c`
+1. **Spacing and parentheses edge cases**: Rendering now respects operator precedence/associativity, but may still over- or under-parenthesize when operators share precedence or use uncommon specs.
+2. **Option coverage**: `variable_names/1` and some ISO formatting options are not supported; quoting/spacing rules are simplified.
 
 ## Recommendations
 
 ### Short Term (for basic ISO compatibility)
 
 1. **Implement `atom_chars/2`** - Needed by test runner to filter test predicates
-2. **Implement `op/3` and `current_op/3`** - Many tests use operators
+2. **Integrate dynamic operators into parsing** - Allow `op/3` updates to influence parser precedence
 3. **Implement `char_code/2`** - Character conversion is fundamental
 4. **Implement `sub_atom/5`** - String manipulation is widely used
 
@@ -108,7 +100,7 @@ The current `write_term_to_chars/3` implementation has these limitations:
 
 1. **Fix parser to support hex escapes**: `'\\x41\\'` syntax
 2. **Fix parser to support parenthesized operators**: `(-)` as a term
-3. **Implement directive parsing**: `:- initialization/1`, `:- op/3`, etc.
+3. **Improve `write_term_to_chars/3`** spacing/quoting to align with ISO output
 4. **Enhance `write_term_to_chars/3`** with proper operator handling
 
 ### Long Term (for full ISO compliance)
@@ -138,8 +130,8 @@ Once the critical predicates and parser fixes are in place:
 
 The interpreter now has essential I/O and control predicates for ISO compatibility. The main barriers to running the full ISO conformity test suite are:
 
-1. **Parser limitations** (hex escapes, operators as terms, directives)
-2. **Missing operator predicates** (op/3, current_op/3)
-3. **Missing string predicates** (atom_chars/2, sub_atom/5, char_code/2)
+1. **Parser limitations** (hex escapes, parenthesized operators, dynamic operator parsing)
+2. **Missing string predicates** (atom_chars/2, sub_atom/5, char_code/2)
+3. **Output formatting gaps** (`write_term_to_chars/3` spacing/option coverage)
 
 With these addressed, the interpreter would be able to load and run the full 276-test ISO conformity suite.

@@ -16,6 +16,7 @@ from vibeprolog.parser import (
     PredicatePropertyDirective,
     PrologParser,
 )
+from vibeprolog.operators import OperatorTable
 from vibeprolog.terms import Atom, Compound, Number, Variable
 from vibeprolog.unification import Substitution, apply_substitution
 
@@ -24,7 +25,8 @@ class PrologInterpreter:
     """Main interface for the Prolog interpreter."""
 
     def __init__(self, argv: list[str] | None = None) -> None:
-        self.parser = PrologParser()
+        self.operator_table = OperatorTable()
+        self.parser = PrologParser(self.operator_table)
         self.clauses = []
         self._argv: list[str] = argv or []
         self.engine = None
@@ -106,10 +108,21 @@ class PrologInterpreter:
 
         # Reject unsupported directives
         if isinstance(goal, Compound) and goal.functor == "op" and len(goal.args) == 3:
-            error_term = PrologError.syntax_error(
-                "op/3 directives are not supported", "consult/1"
-            )
-            raise PrologThrow(error_term)
+            prec_term, spec_term, name_term = goal.args
+            if isinstance(prec_term, Variable) or isinstance(spec_term, Variable) or isinstance(name_term, Variable):
+                error_term = PrologError.instantiation_error("op/3")
+                raise PrologThrow(error_term)
+            if not isinstance(prec_term, Number):
+                error_term = PrologError.type_error("integer", prec_term, "op/3")
+                raise PrologThrow(error_term)
+            if not isinstance(prec_term.value, int):
+                error_term = PrologError.type_error("integer", prec_term, "op/3")
+                raise PrologThrow(error_term)
+            try:
+                self.operator_table.define(prec_term.value, spec_term, name_term, "op/3")
+            except PrologThrow:
+                raise
+            return
 
         # Handle supported directives
         if isinstance(goal, Compound) and goal.functor == "initialization" and len(goal.args) == 1:
@@ -278,7 +291,12 @@ class PrologInterpreter:
             raise PrologThrow(error_term)
         self._process_items(items, source_name)
         self.engine = PrologEngine(
-            self.clauses, self.argv, self.predicate_properties, self._predicate_sources, self.predicate_docs
+            self.clauses,
+            self.argv,
+            self.predicate_properties,
+            self._predicate_sources,
+            self.predicate_docs,
+            operator_table=self.operator_table,
         )
         self._execute_initialization_goals()
 
@@ -315,7 +333,12 @@ class PrologInterpreter:
         if self.engine is None:
             # Initialize empty engine for built-in predicates
             self.engine = PrologEngine(
-                self.clauses, self.argv, self.predicate_properties, self._predicate_sources, self.predicate_docs
+                self.clauses,
+                self.argv,
+                self.predicate_properties,
+                self._predicate_sources,
+                self.predicate_docs,
+                operator_table=self.operator_table,
             )
 
         # Parse the query

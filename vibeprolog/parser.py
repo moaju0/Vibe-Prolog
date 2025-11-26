@@ -512,10 +512,12 @@ class PrologTransformer(Transformer):
 class PrologParser:
     """Parse Prolog source code."""
 
-    def __init__(self):
+    def __init__(self, operator_table=None):
         self.parser = Lark(
             PROLOG_GRAMMAR, parser="lalr", propagate_positions=True
         )
+        # operator_table is reserved for future dynamic operator parsing; currently unused
+        self.operator_table = operator_table
 
     def _strip_block_comments(self, text: str) -> tuple[str, list[tuple[int, str]]]:
         """Strip block comments from text, handling nesting and quoted strings.
