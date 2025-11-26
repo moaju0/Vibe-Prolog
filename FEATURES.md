@@ -91,7 +91,7 @@
 - ✅ `format/2`, `format/3` – Formatted output
 - ✅ `read_from_chars/2` – Parse term from character list/string
 - ⚠️ `write_term_to_chars/3` – Write term to character list with options (basic implementation, operator handling incomplete)
-- ❌ `read/1` – Read term from input
+- ✅ `read/1`, `read/2` – Read term from input streams
 - ❌ `get_char/1` – Read character from input
 - ❌ `put_char/1` – Write character to output
 - ✅ `open/3` – Open file stream

@@ -6,7 +6,7 @@ Implements basic output predicates including formatted printing.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Callable
 
 from lark.exceptions import LarkError
 
@@ -99,6 +99,8 @@ class IOBuiltins:
         register_builtin(registry, "current_output", 1, IOBuiltins._builtin_current_output)
         register_builtin(registry, "open", 3, IOBuiltins._builtin_open)
         register_builtin(registry, "close", 1, IOBuiltins._builtin_close)
+        register_builtin(registry, "read", 1, IOBuiltins._builtin_read)
+        register_builtin(registry, "read", 2, IOBuiltins._builtin_read_from_stream)
 
     @staticmethod
     def _builtin_write(
@@ -548,6 +550,282 @@ class IOBuiltins:
 
         # Everything else needs quoting (e.g., starts with uppercase, contains spaces, looks like a number).
         return True
+
+    @staticmethod
+    def _consume_layout(
+        next_char: Callable[[], str], push_back: Callable[[str], None], context: str
+    ) -> tuple[str, bool]:
+        """Skip layout and comments after a period and return the next char.
+
+        Returns a tuple of (next_char, saw_layout) where saw_layout is True if any
+        whitespace or comments were skipped before encountering the character.
+        """
+
+        saw_layout = False
+        while True:
+            ch = next_char()
+            if ch == "":
+                return "", saw_layout
+
+            if ch.isspace():
+                saw_layout = True
+                continue
+
+            if ch == "%":
+                # Skip line comment
+                saw_layout = True
+                while True:
+                    comment_char = next_char()
+                    if comment_char in ("", "\n"):
+                        break
+                continue
+
+            if ch == "/":
+                peek = next_char()
+                if peek == "*":
+                    saw_layout = True
+                    depth = 1
+                    while depth > 0:
+                        comment_char = next_char()
+                        if comment_char == "":
+                            error_term = PrologError.syntax_error(
+                                "Unterminated block comment", context
+                            )
+                            raise PrologThrow(error_term)
+                        if comment_char == "/":
+                            nested_peek = next_char()
+                            if nested_peek == "*":
+                                depth += 1
+                                continue
+                            push_back(nested_peek)
+                        elif comment_char == "*":
+                            nested_peek = next_char()
+                            if nested_peek == "/":
+                                depth -= 1
+                                continue
+                            push_back(nested_peek)
+                    continue
+                push_back(peek)
+                return ch, saw_layout
+
+            return ch, saw_layout
+
+    @staticmethod
+    def _read_term_text(stream: Stream, context: str) -> str | None:
+        """Read characters from stream until a full term (ending with '.') is found.
+
+        Returns the term text including the trailing period, or None on EOF
+        before any term content.
+        """
+
+        buffer: list[str] = []
+        paren_depth = 0
+        bracket_depth = 0
+        brace_depth = 0
+        in_single_quote = False
+        in_double_quote = False
+        escape_next = False
+        block_depth = 0
+        line_comment = False
+        started = False
+
+        if not hasattr(stream, "pushback_buffer") or stream.pushback_buffer is None:
+            stream.pushback_buffer = []
+
+        def next_char() -> str:
+            if stream.pushback_buffer:
+                return stream.pushback_buffer.pop()
+            return stream.file_obj.read(1)
+
+        def push_back(ch: str) -> None:
+            if ch:
+                stream.pushback_buffer.append(ch)
+
+        while True:
+            ch = next_char()
+            if ch == "":
+                if not buffer or not "".join(buffer).strip():
+                    return None
+                error_term = PrologError.syntax_error(
+                    "unexpected end of file", context
+                )
+                raise PrologThrow(error_term)
+
+            if line_comment:
+                if ch == "\n":
+                    line_comment = False
+                continue
+
+            if block_depth > 0:
+                if ch == "/":
+                    peek = next_char()
+                    if peek == "*":
+                        block_depth += 1
+                        continue
+                    push_back(peek)
+                if ch == "*":
+                    peek = next_char()
+                    if peek == "/":
+                        block_depth -= 1
+                        continue
+                    push_back(peek)
+                continue
+
+            if not in_single_quote and not in_double_quote:
+                if ch == "%":
+                    line_comment = True
+                    if not started:
+                        continue
+                    continue
+                if ch == "/":
+                    peek = next_char()
+                    if peek == "*":
+                        block_depth += 1
+                        if not started:
+                            continue
+                        continue
+                    push_back(peek)
+
+            if not started and ch.isspace():
+                continue
+
+            started = True
+
+            if in_single_quote:
+                buffer.append(ch)
+                if escape_next:
+                    escape_next = False
+                    continue
+                if ch == "\\":
+                    escape_next = True
+                    continue
+                if ch == "'":
+                    in_single_quote = False
+                continue
+
+            if in_double_quote:
+                buffer.append(ch)
+                if escape_next:
+                    escape_next = False
+                    continue
+                if ch == "\\":
+                    escape_next = True
+                    continue
+                if ch == '"':
+                    in_double_quote = False
+                continue
+
+            if ch == "'":
+                buffer.append(ch)
+                in_single_quote = True
+                continue
+
+            if ch == '"':
+                buffer.append(ch)
+                in_double_quote = True
+                continue
+
+            if ch == "(":
+                paren_depth += 1
+            elif ch == ")" and paren_depth > 0:
+                paren_depth -= 1
+            elif ch == "[":
+                bracket_depth += 1
+            elif ch == "]" and bracket_depth > 0:
+                bracket_depth -= 1
+            elif ch == "{":
+                brace_depth += 1
+            elif ch == "}" and brace_depth > 0:
+                brace_depth -= 1
+
+            buffer.append(ch)
+
+            if (
+                ch == "."
+                and paren_depth == 0
+                and bracket_depth == 0
+                and brace_depth == 0
+            ):
+                next_non_layout, saw_layout = IOBuiltins._consume_layout(
+                    next_char, push_back, context
+                )
+                if next_non_layout == "":
+                    return "".join(buffer)
+                prev_char = buffer[-2] if len(buffer) >= 2 else ""
+                if not saw_layout and prev_char.isdigit() and (
+                    next_non_layout.isdigit()
+                    or next_non_layout in ("e", "E")
+                ):
+                    push_back(next_non_layout)
+                    continue
+                push_back(next_non_layout)
+                return "".join(buffer)
+
+    @staticmethod
+    def _read_and_unify_stream(
+        stream: Stream, term_arg: Any, subst: Substitution, context: str
+    ) -> Substitution | None:
+        term_text = IOBuiltins._read_term_text(stream, context)
+        if term_text is None:
+            return unify(term_arg, Atom("end_of_file"), subst)
+
+        cleaned = term_text.strip()
+        if cleaned.endswith("."):
+            cleaned = cleaned[:-1].strip()
+
+        try:
+            parser = PrologParser()
+            parsed_term = parser.parse_term(cleaned, context)
+            return unify(term_arg, parsed_term, subst)
+        except (ValueError, LarkError, PrologThrow) as exc:
+            if isinstance(exc, PrologThrow):
+                raise exc
+            error_term = PrologError.syntax_error(str(exc), context)
+            raise PrologThrow(error_term)
+
+    @staticmethod
+    def _builtin_read(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext | None
+    ) -> Substitution | None:
+        if engine is None:
+            return None
+
+        term_arg = args[0]
+        stream = engine.get_stream(USER_INPUT_STREAM)
+        if stream is None:
+            error_term = PrologError.existence_error("stream", USER_INPUT_STREAM, "read/1")
+            raise PrologThrow(error_term)
+
+        if stream.mode not in ("read", "append"):
+            error_term = PrologError.permission_error("input", "stream", stream.handle, "read/1")
+            raise PrologThrow(error_term)
+
+        return IOBuiltins._read_and_unify_stream(stream, term_arg, subst, "read/1")
+
+    @staticmethod
+    def _builtin_read_from_stream(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext | None
+    ) -> Substitution | None:
+        if engine is None:
+            return None
+
+        stream_term, term_arg = args
+
+        engine._check_instantiated(stream_term, subst, "read/2")
+        engine._check_type(stream_term, Atom, "stream_or_alias", subst, "read/2")
+
+        stream_term = deref(stream_term, subst)
+
+        stream = engine.get_stream(stream_term)
+        if stream is None:
+            error_term = PrologError.existence_error("stream", stream_term, "read/2")
+            raise PrologThrow(error_term)
+
+        if stream.mode not in ("read", "append"):
+            error_term = PrologError.permission_error("input", "stream", stream_term, "read/2")
+            raise PrologThrow(error_term)
+
+        return IOBuiltins._read_and_unify_stream(stream, term_arg, subst, "read/2")
 
     @staticmethod
     def _builtin_open(
