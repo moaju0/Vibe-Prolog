@@ -838,25 +838,57 @@ class IOBuiltins:
         # Convert mode to Python file mode
         python_mode = {'read': 'r', 'write': 'w', 'append': 'a'}[mode]
 
+        def _try_open(path: str):
+            return open(path, python_mode, encoding='utf-8')
+
+        def _escape_control_chars(path: str) -> str | None:
+            """Re-escape control characters that may have been unescaped by the parser."""
+            control_map = {
+                "\n": "\\n",
+                "\r": "\\r",
+                "\t": "\\t",
+                "\b": "\\b",
+                "\f": "\\f",
+                "\v": "\\v",
+                "\a": "\\a",
+            }
+            if not any(ord(ch) < 32 for ch in path):
+                return None
+            return "".join(control_map.get(ch, f"\\x{ord(ch):02x}") if ord(ch) < 32 else ch for ch in path)
+
+        file_obj = None
+        actual_filename = filename
         try:
             # Try to open the file
-            file_obj = open(filename, python_mode, encoding='utf-8')
-        except FileNotFoundError:
-            # Existence error for source_sink
-            error_term = PrologError.existence_error("source_sink", filename_term, "open/3")
-            raise PrologThrow(error_term)
-        except PermissionError:
-            # Permission error
-            error_term = PrologError.permission_error("open", "source_sink", filename_term, "open/3")
-            raise PrologThrow(error_term)
-        # Note: Do not catch generic OSError here to avoid masking the real IO error.
-        # Let unexpected OSError variants propagate for now.
+            file_obj = _try_open(actual_filename)
+        except OSError as exc:
+            # On Windows paths embedded in quoted atoms can carry escaped control
+            # characters that were unescaped by the parser (e.g., \t -> tab).
+            # Retry with control characters re-escaped to recover the original path.
+            escaped = _escape_control_chars(actual_filename)
+            if escaped is not None and escaped != filename:
+                try:
+                    file_obj = _try_open(escaped)
+                    actual_filename = escaped
+                except OSError as fallback_exc:
+                    exc = fallback_exc
+            if file_obj is None:
+                if isinstance(exc, FileNotFoundError):
+                    # Existence error for source_sink
+                    error_term = PrologError.existence_error("source_sink", filename_term, "open/3")
+                    raise PrologThrow(error_term)
+                if isinstance(exc, PermissionError):
+                    # Permission error
+                    error_term = PrologError.permission_error("open", "source_sink", filename_term, "open/3")
+                    raise PrologThrow(error_term)
+                raise exc
+        # Note: Do not catch generic OSError outside this block to avoid masking IO errors.
 
         # Generate unique stream handle
         stream_handle = engine._generate_stream_handle()
 
         # Create and register stream
-        stream = Stream(handle=stream_handle, file_obj=file_obj, mode=mode, filename=filename)
+        stream = Stream(handle=stream_handle, file_obj=file_obj, mode=mode, filename=actual_filename)
         # Register into the engine's stream registry (add_stream is the public API)
         engine.add_stream(stream)
 
