@@ -26,3 +26,6 @@ website/node_modules/
 website/dist/
 website/src/content/
 website/.astro/
+
+# Claude session IDs
+paige/

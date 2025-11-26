@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+from pathlib import Path
 from typing import Sequence
 
 from .address_pr_comments import address_pr_comments_with_kilocode as _address_pr_comments_with_kilocode
@@ -24,11 +25,23 @@ def fix_issue_with_kilocode(argv: Sequence[str] | None = None) -> None:
 
 
 def fix_issue_with_claude(argv: Sequence[str] | None = None) -> None:
-    """CLI wrapper for the claude issue workflow."""
+    """CLI wrapper for the claude issue workflow with headless mode."""
+    # Determine session directory (prefer ./paige relative to cwd)
+    session_dir = Path.cwd() / "paige"
+
     config = IssueWorkflowConfig(
-        tool_cmd=["claude", "-p", "fix this issue", "--permission-mode", "acceptEdits"],
+        tool_cmd=[
+            "claude",
+            "-p",
+            "fix this issue",
+            "--permission-mode",
+            "acceptEdits",
+        ],
         branch_prefix="fix-claude",
         default_commit_message="Update from claude",
+        timeout_seconds=180,  # 3 minutes
+        session_dir=session_dir,
+        use_json_output=True,
     )
     run_issue_workflow(_argv(argv), config)
 

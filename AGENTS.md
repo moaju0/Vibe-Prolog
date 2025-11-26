@@ -8,6 +8,9 @@ These goals are what we are working towards in this project:
 
 # Coding rules
 - Follow PEP8
+  - **All imports must be at the top of the file** (after module docstring, before other code)
+  - Never use `import` statements inside functions or methods
+  - Group imports: standard library, third-party, local (separated by blank lines)
 - Run all tests before pushing a PR
 
 # Prolog Interpreter - Development Guide
@@ -146,6 +149,8 @@ This is standard ISO prolog implementation. The parser should parse standard pro
 ## Code Style
 
 - Follow PEP 8 for Python code
+  - **Imports**: Always place all imports at the top of the file, never inside functions
+  - **Import order**: Group standard library, third-party, then local imports (separated by blank lines)
 - Use type hints where helpful
 - Add docstrings to all public methods
 - Keep functions focused and testable

@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import json
+import re
+import subprocess
 import sys
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Sequence
@@ -25,6 +28,9 @@ class IssueWorkflowConfig:
     branch_suffix: str = "-"
     required_commands: Sequence[str] | None = None
     pr_model: str = "gpt-5-nano"
+    timeout_seconds: int | None = None
+    session_dir: Path | None = None
+    use_json_output: bool = False
 
     def required_cmds(self) -> list[str]:
         """Commands that must be present before executing the workflow."""
@@ -96,7 +102,113 @@ def create_branch_name(issue_number: str, issue_content: str, config: IssueWorkf
 
 
 def run_tool(issue_content: str, config: IssueWorkflowConfig) -> None:
-    run(list(config.tool_cmd), input_text=issue_content, capture_output=False)
+    """Run the configured tool with optional timeout and session management."""
+    cmd = list(config.tool_cmd)
+
+    # Add JSON output flag if configured
+    if config.use_json_output and "--output" not in cmd:
+        cmd.extend(["--output", "json"])
+
+    # If no timeout, run normally
+    if config.timeout_seconds is None:
+        run(cmd, input_text=issue_content, capture_output=False)
+        return
+
+    # Run with timeout
+    try:
+        process = subprocess.Popen(
+            cmd,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+
+        # Send input and wait with timeout
+        try:
+            stdout, stderr = process.communicate(input=issue_content, timeout=config.timeout_seconds)
+
+            # If using JSON output, try to parse and display
+            if stdout:
+                if config.use_json_output:
+                    try:
+                        result = json.loads(stdout)
+                        # Extract session ID if present
+                        if isinstance(result, dict) and "session_id" in result:
+                            session_id = result["session_id"]
+                            if config.session_dir:
+                                save_session_id(session_id, config.session_dir)
+                                print(f"Session ID saved: {session_id}")
+                        print(json.dumps(result, indent=2))
+                    except json.JSONDecodeError:
+                        print(stdout)
+                else:
+                    print(stdout)
+
+            if stderr:
+                print(stderr, file=sys.stderr)
+
+            if process.returncode != 0:
+                raise SystemExit(f"Tool failed with exit code {process.returncode}")
+
+        except subprocess.TimeoutExpired:
+            # Kill the process
+            process.kill()
+            stdout_data, stderr_data = process.communicate()
+
+            session_id = extract_session_id_from_output(stdout_data, stderr_data)
+
+            if session_id:
+                if config.session_dir:
+                    save_session_id(session_id, config.session_dir)
+                print(f"\n⏱️  Timeout after {config.timeout_seconds}s. Session ID: {session_id}", file=sys.stderr)
+                print(f"Resume with: claude --session-id {session_id}", file=sys.stderr)
+            else:
+                print(f"\n⏱️  Timeout after {config.timeout_seconds}s. No session ID found.", file=sys.stderr)
+
+            raise SystemExit(124)  # Standard timeout exit code
+
+    except FileNotFoundError:
+        raise SystemExit(f"Command not found: {cmd[0]}")
+
+
+def save_session_id(session_id: str, session_dir: Path) -> None:
+    """Save a session ID to the session directory."""
+    session_dir.mkdir(parents=True, exist_ok=True)
+    timestamp = time.strftime("%Y%m%d_%H%M%S")
+    session_file = session_dir / f"session_{timestamp}_{session_id}.txt"
+    session_file.write_text(f"{session_id}\n")
+
+
+def extract_session_id_from_output(stdout: str, stderr: str) -> str | None:
+    """Try to extract session ID from command output."""
+    combined = stdout + "\n" + stderr
+
+    # Try to parse as JSON first
+    for stream_content in (stdout, stderr):
+        if not stream_content:
+            continue
+        try:
+            data = json.loads(stream_content)
+            if isinstance(data, dict) and "session_id" in data:
+                return str(data["session_id"])
+        except (json.JSONDecodeError, ValueError):
+            pass
+
+    # Look for common session ID patterns
+    # Match patterns like "session-xxxxx" or "Session ID: xxxxx"
+    patterns = [
+        r'session[_-]id[:\s]+([a-zA-Z0-9_-]+)',
+        r'session[:\s]+([a-zA-Z0-9_-]+)',
+        r'"session_id"[:\s]+"([^"]+)"',
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, combined, re.IGNORECASE)
+        if match:
+            return match.group(1)
+
+    return None
 
 
 def create_commit_if_needed(default_message: str) -> None:
