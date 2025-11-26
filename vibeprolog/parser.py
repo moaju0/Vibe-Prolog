@@ -524,7 +524,7 @@ class PrologParser:
             for item in parsed_items:
                 if isinstance(item, Directive):
                     goal = item.goal
-                    if isinstance(goal, Compound) and goal.functor == "op":
+                    if isinstance(goal, Compound) and goal.functor == "op" and len(goal.args) == 3:
                         error_term = PrologError.syntax_error(
                             "op/3 directives are not supported", context
                         )
