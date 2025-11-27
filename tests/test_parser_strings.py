@@ -66,6 +66,12 @@ class TestSingleQuotedStrings:
         clauses = parser.parse(code)
         for clause in clauses:
             prolog.engine.clauses.append(clause)
+            # Update the predicate index
+            prolog.engine._add_predicate_to_index(clause)
+            # Update module predicates
+            key = (clause.head.functor, len(clause.head.args))
+            mod = prolog.modules["user"]
+            mod.predicates.setdefault(key, []).append(clause)
 
         # Query both
         result1 = prolog.query_once("fact1(X).")
