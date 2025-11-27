@@ -161,10 +161,7 @@ class PrologEngine:
 
             # Skip clauses that are in the current_module (already tried) or other modules
             clause_module = getattr(clause, 'module', 'user')
-            if clause_module != 'user' and clause_module != current_module:
-                continue
-            # Also skip if already handled by module predicate search
-            if clause_module == current_module:
+            if clause_module != 'user' or clause_module == current_module:
                 continue
 
             renamed_clause = self._rename_variables(clause)

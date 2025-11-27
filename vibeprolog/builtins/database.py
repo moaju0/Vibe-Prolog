@@ -163,9 +163,16 @@ class DatabaseBuiltins:
             if hasattr(engine, 'interpreter') and engine.interpreter:
                 module_name = getattr(clause, 'module', 'user')
                 mod = engine.interpreter.modules.get(module_name)
-                if mod and key in mod.predicates:
-                    if clause in mod.predicates[key]:
-                        mod.predicates[key].remove(clause)
+                head = clause.head
+                clause_key = None
+                if isinstance(head, Compound):
+                    clause_key = (head.functor, len(head.args))
+                elif isinstance(head, Atom):
+                    clause_key = (head.name, 0)
+
+                if mod and clause_key and clause_key in mod.predicates:
+                    if clause in mod.predicates[clause_key]:
+                        mod.predicates[clause_key].remove(clause)
             yield new_subst
 
         # Update the index for retracted predicates
