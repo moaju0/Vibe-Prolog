@@ -13,7 +13,7 @@ import math
 from typing import TYPE_CHECKING, Any
 
 from vibeprolog.builtins import BuiltinRegistry, register_builtin
-from vibeprolog.builtins.common import BuiltinArgs, EngineContext
+from vibeprolog.builtins.common import BuiltinArgs
 from vibeprolog.exceptions import PrologError, PrologThrow
 from vibeprolog.parser import Compound, Number
 from vibeprolog.terms import Variable
@@ -82,7 +82,7 @@ class ArithmeticBuiltins:
     """Built-ins for arithmetic evaluation and comparison."""
 
     @staticmethod
-    def register(registry: BuiltinRegistry, _engine: EngineContext | None) -> None:
+    def register(registry: BuiltinRegistry, _engine: Any | None) -> None:
         """Register arithmetic predicate handlers into the registry."""
         register_builtin(registry, "is", 2, ArithmeticBuiltins._builtin_is)
         for op in ["=:=", r"=\=", "<", ">", "=<", ">="]:
@@ -146,6 +146,9 @@ class ArithmeticBuiltins:
         except PrologThrow:
             # Re-raise Prolog errors
             raise
+        except Exception:
+            # Unexpected errors - convert to evaluation error
+            raise PrologThrow(PrologError.evaluation_error("error", f"{op}/2"))
 
     @staticmethod
     def _evaluate_arithmetic(
@@ -169,10 +172,10 @@ class ArithmeticBuiltins:
         expr = deref(expr, subst)
 
         # Check for instantiation
-        _check_instantiated(expr, subst, engine, predicate)
+        _check_instantiated(expr, subst, predicate)
 
         # Check if evaluable (valid arithmetic expression)
-        _check_evaluable(expr, subst, engine, predicate)
+        _check_evaluable(expr, subst, predicate)
 
         # Numbers evaluate to themselves
         if isinstance(expr, Number):
@@ -297,17 +300,5 @@ class ArithmeticBuiltins:
                 raise ValueError(f"Unknown binary operator: {functor}")
 
         raise ValueError(f"Invalid arity for {functor}")
-
-    # Keep the old method for backward compatibility during transition
-    @staticmethod
-    def _eval_arithmetic(
-        expr: Any, subst: Substitution, engine: PrologEngine
-    ) -> int | float | None:
-        """Legacy method - use _evaluate_arithmetic instead."""
-        try:
-            return ArithmeticBuiltins._evaluate_arithmetic(expr, subst, engine)
-        except PrologThrow:
-            return None
-
 
 __all__ = ["ArithmeticBuiltins"]
