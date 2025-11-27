@@ -12,21 +12,36 @@ from vibeprolog.engine import CutException, PrologEngine
 from vibeprolog.parser import (
     Clause,
     Directive,
+    List as ParserList,
     PredicateIndicator,
     PredicatePropertyDirective,
     PrologParser,
 )
+from vibeprolog.operators import OperatorTable
 from vibeprolog.terms import Atom, Compound, Number, Variable
 from vibeprolog.unification import Substitution, apply_substitution
 from vibeprolog.dcg import expand_dcg_clause
+
+
+class Module:
+    def __init__(self, name: str, exports: set[tuple[str, int]] | None):
+        self.name = name
+        self.exports = exports if exports is not None else set()
+        self.predicates: dict[tuple[str, int], list] = {}
+        self.file: str | None = None
 
 
 class PrologInterpreter:
     """Main interface for the Prolog interpreter."""
 
     def __init__(self, argv: list[str] | None = None) -> None:
-        self.parser = PrologParser()
+        self.operator_table = OperatorTable()
+        self.parser = PrologParser(self.operator_table)
         self.clauses = []
+        # Module system
+        self.modules: dict[str, "Module"] = {}
+        self.current_module: str = "user"
+
         self._argv: list[str] = argv or []
         self.engine = None
         self.initialization_goals = []
@@ -58,13 +73,15 @@ class PrologInterpreter:
         """Seed predicate_properties with built-ins for directive validation."""
 
         if not self._builtins_seeded:
-            PrologEngine(
+            eng = PrologEngine(
                 self.clauses,
                 self.argv,
                 self.predicate_properties,
                 self._predicate_sources,
                 self.predicate_docs,
             )
+            # Expose interpreter to engine for module introspection
+            eng.interpreter = self
             self._builtins_seeded = True
 
     def _process_items(self, items: list, source_name: str):
@@ -89,6 +106,9 @@ class PrologInterpreter:
                 else:
                     processed_clause = item
 
+                # Associate clause with current module context
+                processed_clause.module = self.current_module
+
                 last_predicate = self._add_clause(
                     processed_clause, source_name, closed_predicates, last_predicate
                 )
@@ -103,17 +123,53 @@ class PrologInterpreter:
                         continue
                     self.predicate_docs[key] = processed_clause.doc
             elif isinstance(item, Directive):
-                self._handle_directive(item, closed_predicates)
+                self._handle_directive(item, closed_predicates, source_name)
                 # Store PlDoc for directives if needed
                 if item.doc:
                     # For now, ignore directive docs
                     pass
 
     def _handle_directive(
-        self, directive: Directive, closed_predicates: set[tuple[str, int]]
+        self, directive: Directive, closed_predicates: set[tuple[str, int]], source_name=None
     ):
         """Handle a directive."""
         goal = directive.goal
+
+        # Module declaration: :- module(Name, Exports).
+        if isinstance(goal, Compound) and goal.functor == "module" and len(goal.args) == 2:
+            name_term, exports_term = goal.args
+            # Validate name
+            if not isinstance(name_term, Atom):
+                error_term = PrologError.type_error("atom", name_term, "module/2")
+                raise PrologThrow(error_term)
+            module_name = name_term.name
+
+            # Parse export list (should be a List AST)
+            exports = set()
+            file_source = source_name
+
+            if isinstance(exports_term, ParserList):
+                for elt in exports_term.elements:
+                    # Each elt should be Name/Arity (Compound "/")
+                    if isinstance(elt, Compound) and elt.functor == "/" and len(elt.args) == 2:
+                        name_arg, arity_arg = elt.args
+                        if not isinstance(name_arg, Atom) or not isinstance(arity_arg, Number):
+                            error_term = PrologError.type_error("predicate_indicator", elt, "module/2")
+                            raise PrologThrow(error_term)
+                        exports.add((name_arg.name, int(arity_arg.value)))
+                    else:
+                        error_term = PrologError.type_error("predicate_indicator", elt, "module/2")
+                        raise PrologThrow(error_term)
+            else:
+                error_term = PrologError.type_error("list", exports_term, "module/2")
+                raise PrologThrow(error_term)
+
+            # Create Module object and set current module context
+            mod = Module(module_name, exports)
+            mod.file = file_source
+            self.modules[module_name] = mod
+            self.current_module = module_name
+            return
 
         if isinstance(goal, PredicatePropertyDirective):
             self._handle_predicate_property_directive(goal, closed_predicates)
@@ -121,10 +177,9 @@ class PrologInterpreter:
 
         # Reject unsupported directives
         if isinstance(goal, Compound) and goal.functor == "op" and len(goal.args) == 3:
-            error_term = PrologError.syntax_error(
-                "op/3 directives are not supported", "consult/1"
-            )
-            raise PrologThrow(error_term)
+            prec_term, spec_term, name_term = goal.args
+            self.operator_table.define(prec_term, spec_term, name_term, "op/3")
+            return
 
         # Handle supported directives
         if isinstance(goal, Compound) and goal.functor == "initialization" and len(goal.args) == 1:
@@ -267,6 +322,13 @@ class PrologInterpreter:
         self.clauses.append(clause)
         sources.add(source_name)
 
+        # Register clause under module if present
+        module_name = getattr(clause, "module", "user")
+        self.modules.setdefault(module_name, Module(module_name, set()))
+
+        mod = self.modules[module_name]
+        mod.predicates.setdefault(key, []).append(clause)
+
         return key
 
     def _execute_initialization_goals(self):
@@ -291,10 +353,22 @@ class PrologInterpreter:
         except (ValueError, LarkError) as exc:
             error_term = PrologError.syntax_error(str(exc), "consult/1")
             raise PrologThrow(error_term)
+        # Reset module context to `user` at start of a consult
+        self.current_module = "user"
+        # Ensure a default user module exists
+        self.modules.setdefault("user", Module("user", None))
+
         self._process_items(items, source_name)
         self.engine = PrologEngine(
-            self.clauses, self.argv, self.predicate_properties, self._predicate_sources, self.predicate_docs
+            self.clauses,
+            self.argv,
+            self.predicate_properties,
+            self._predicate_sources,
+            self.predicate_docs,
+            operator_table=self.operator_table,
         )
+        # Expose interpreter to engine for module-aware resolution
+        self.engine.interpreter = self
         self._execute_initialization_goals()
 
     def consult(self, filepath: str | Path):
@@ -330,8 +404,14 @@ class PrologInterpreter:
         if self.engine is None:
             # Initialize empty engine for built-in predicates
             self.engine = PrologEngine(
-                self.clauses, self.argv, self.predicate_properties, self._predicate_sources, self.predicate_docs
+                self.clauses,
+                self.argv,
+                self.predicate_properties,
+                self._predicate_sources,
+                self.predicate_docs,
+                operator_table=self.operator_table,
             )
+            self.engine.interpreter = self
 
         # Parse the query
         goals = self._parse_query(query_str)
@@ -347,6 +427,9 @@ class PrologInterpreter:
 
         # Execute query
         solutions = []
+        # Preserve current module context for the engine
+        if hasattr(self, "engine") and self.engine is not None:
+            self.engine.current_module = self.current_module
         try:
             for i, subst in enumerate(self.engine.query(goals)):
                 if limit is not None and i >= limit:

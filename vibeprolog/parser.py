@@ -107,10 +107,13 @@ PROLOG_GRAMMAR = r"""
 
     and_term: comparison_term ("," comparison_term)*
 
-    comparison_term: prefix_term (COMP_OP prefix_term)?
+    comparison_term: module_term (COMP_OP module_term)?
 
     prefix_term: PREFIX_OP prefix_term  -> prefix_op
         | expr
+
+    // Module qualification operator (right-associative, xfy)
+    module_term: prefix_term (":" module_term)?
 
     expr: add_expr
 
@@ -272,6 +275,14 @@ class PrologTransformer(Transformer):
         # items[0] is the operator, items[1] is the term
         op, term = items
         return Compound(str(op), (term,))
+
+    def module_term(self, items):
+        # Module qualification: left:right (right-associative)
+        if len(items) == 1:
+            return items[0]
+        left = items[0]
+        right = items[1]
+        return Compound(":", (left, right))
 
     def expr(self, items):
         return items[0]
@@ -519,10 +530,12 @@ class PrologTransformer(Transformer):
 class PrologParser:
     """Parse Prolog source code."""
 
-    def __init__(self):
+    def __init__(self, operator_table=None):
         self.parser = Lark(
             PROLOG_GRAMMAR, parser="lalr", propagate_positions=True
         )
+        # operator_table is reserved for future dynamic operator parsing; currently unused
+        self.operator_table = operator_table
 
     def _strip_block_comments(self, text: str) -> tuple[str, list[tuple[int, str]]]:
         """Strip block comments from text, handling nesting and quoted strings.

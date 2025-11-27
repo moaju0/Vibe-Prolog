@@ -105,7 +105,7 @@
 - ✅ `nl/0` – Write newline
 - ✅ `format/2`, `format/3` – Formatted output
 - ✅ `read_from_chars/2` – Parse term from character list/string
-- ⚠️ `write_term_to_chars/3` – Write term to character list with options (basic implementation, operator handling incomplete)
+- ⚠️ `write_term_to_chars/3` – Write term to character list with options (respects operator table; spacing/edge cases remain)
 - ✅ `read/1`, `read/2` – Read term from input streams
 - ✅ `get_char/1` – Read character from input
 - ✅ `put_char/1` – Write character to output
@@ -158,7 +158,7 @@
 - ✅ `:- initialization/1` – Specify initialization goal
 
 ### Operator Directives
-- ❌ `:- op/3` – Define operator
+- ⚠️ `:- op/3` – Define operator (registry + current_op/3; parser still uses built-in operator syntax)
 - ❌ `:- char_conversion/2` – Define character conversion
 
 ## Syntactic Constructs (ISO 6)
@@ -200,6 +200,19 @@
 - ✅ String syntax (double and single quoted)
 - ✅ Operator syntax with proper precedence
 
+## Module System
+
+- ✅ `:- module/2` – Module declaration with export list. Modules are recorded in `PrologInterpreter.modules`.
+- ✅ `Module:Goal` – Module-qualified calls are parsed and supported (syntax `Module:Goal`).
+- ✅ Export list enforcement for module-qualified calls: non-exported predicates raise a permission error when accessed from outside the module.
+- ✅ Predicate scoping: clauses are associated with their defining module (clauses receive a `module` attribute) and module-local predicates are stored under `Module.predicates`.
+- ✅ `current_module/1` – Enumerate loaded modules (built-in in `vibeprolog.builtins.reflection`).
+- ✅ `module_property/2` – Query module exports and (where available) the source file.
+- ✅ Built-ins remain accessible from all modules.
+- ⚠️ `use_module/1,2` imports are not implemented in this change (deferred).
+- ⚠️ Non-qualified goal resolution inside clause bodies currently uses global resolution; module-aware resolution for clause bodies is planned (see issue).
+- ⚠️ Dynamic/multifile interactions across modules are supported minimally and may need further tests and refinement.
+
 ## Execution Model
 - ✅ Robinson-style unification
 - ✅ Occurs check (prevents cyclic terms)
@@ -233,8 +246,8 @@
 ## High-Priority Gaps and Deviations
 
 ### Critical Missing Features
-1. **Operator Definition**: `:- op/3` for defining custom operators.
-2. **Character I/O**: `get_char/1`, `put_char/1` for character-level stream manipulation.
+1. **Dynamic Operator Parsing**: `op/3` updates the operator table and current_op/3, but parsing still uses the built-in operator set (custom operators require canonical functor syntax).
+2. **Character Conversion**: `char_conversion/2` not implemented.
 
 ### Significant Deviations
 1. **Character Code Syntax**: Some advanced character code forms not supported.
@@ -242,6 +255,6 @@
 ### Parser Limitations
 1. **Hex Character Codes**: `0'\xHH` syntax now supported with optional trailing backslash for compatibility
 2. **SWI-Style Dict Syntax**: `tag{a:1}` syntax not supported
-3. **Operator Definition**: `:- op/3` directive rejected (not implemented)
+3. **Operator Definition**: `:- op/3` updates the table but parser does not apply custom operators (only built-ins parse as operators)
 4. **Unary Minus Precedence**: In some cases, unary minus may bind differently than expected (e.g., `-X + Y` parses as `-(X + Y)`)
 5. **Base'char'number Syntax**: `Base'char'number` syntax (e.g., `16'mod'2`) intentionally not implemented - extremely obscure ISO feature with ambiguous semantics and no practical use

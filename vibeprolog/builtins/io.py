@@ -5,7 +5,6 @@ Implements basic output predicates including formatted printing.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Any, Callable
 
 from lark.exceptions import LarkError
@@ -14,11 +13,14 @@ from vibeprolog.builtins import BuiltinRegistry, register_builtin
 from vibeprolog.builtins.common import BuiltinArgs, EngineContext
 from vibeprolog.exceptions import PrologError, PrologThrow
 from vibeprolog.parser import List, PrologParser
+from vibeprolog.operators import OperatorInfo, OperatorTable
 from vibeprolog.streams import Stream
 from vibeprolog.terms import Atom, Compound, Number, Variable
 from vibeprolog.unification import Substitution, deref, unify
 from vibeprolog.utils.list_utils import list_to_python, python_to_list
 from vibeprolog.utils.term_utils import term_to_string
+
+_DEFAULT_OPERATOR_TABLE = OperatorTable()
 
 USER_INPUT_STREAM = Atom("user_input")
 USER_OUTPUT_STREAM = Atom("user_output")
@@ -148,53 +150,6 @@ class _TermReader:
                     continue
                 self._push_back(next_non_layout)
                 return "".join(self.buffer)
-
-
-@dataclass(frozen=True)
-class OperatorInfo:
-    """Operator metadata for formatting terms with ignore_ops(false)."""
-
-    precedence: int
-    spec: str  # e.g., yfx, xfy, xfx, fy, fx
-
-    @property
-    def is_prefix(self) -> bool:
-        return len(self.spec) == 2
-
-
-# Default ISO-ish operator table for rendering terms when ignore_ops(false).
-OPERATOR_TABLE: dict[tuple[str, int], OperatorInfo] = {
-    (";", 2): OperatorInfo(1100, "xfy"),
-    ("->", 2): OperatorInfo(1050, "xfy"),
-    (",", 2): OperatorInfo(1000, "xfy"),
-    ("\\+", 1): OperatorInfo(900, "fy"),
-    ("=..", 2): OperatorInfo(700, "xfx"),
-    ("is", 2): OperatorInfo(700, "xfx"),
-    ("=", 2): OperatorInfo(700, "xfx"),
-    ("\\=", 2): OperatorInfo(700, "xfx"),
-    ("=:=", 2): OperatorInfo(700, "xfx"),
-    ("=\\=", 2): OperatorInfo(700, "xfx"),
-    ("<", 2): OperatorInfo(700, "xfx"),
-    (">", 2): OperatorInfo(700, "xfx"),
-    ("=<", 2): OperatorInfo(700, "xfx"),
-    (">=", 2): OperatorInfo(700, "xfx"),
-    ("==", 2): OperatorInfo(700, "xfx"),
-    ("\\==", 2): OperatorInfo(700, "xfx"),
-    ("@<", 2): OperatorInfo(700, "xfx"),
-    ("@=<", 2): OperatorInfo(700, "xfx"),
-    ("@>", 2): OperatorInfo(700, "xfx"),
-    ("@>=", 2): OperatorInfo(700, "xfx"),
-    ("+", 2): OperatorInfo(500, "yfx"),
-    ("-", 2): OperatorInfo(500, "yfx"),
-    ("*", 2): OperatorInfo(400, "yfx"),
-    ("/", 2): OperatorInfo(400, "yfx"),
-    ("//", 2): OperatorInfo(400, "yfx"),
-    ("mod", 2): OperatorInfo(400, "yfx"),
-    ("**", 2): OperatorInfo(200, "xfx"),
-    ("+", 1): OperatorInfo(200, "fy"),
-    ("-", 1): OperatorInfo(200, "fy"),
-    (":-", 2): OperatorInfo(1200, "xfx"),
-}
 
 class IOBuiltins:
     """Built-ins for standard output and formatting."""
@@ -488,8 +443,10 @@ class IOBuiltins:
                     quoted = isinstance(val, Atom) and val.name == "true"
 
         # Convert term to string
+        operator_table = _engine.operator_table if _engine is not None else None
+
         output_str = IOBuiltins._term_to_chars_string(
-            term, subst, ignore_ops, numbervars, quoted
+            term, subst, ignore_ops, numbervars, quoted, operator_table=operator_table
         )
 
         # Convert string to list of character atoms
@@ -506,6 +463,7 @@ class IOBuiltins:
         numbervars: bool,
         quoted: bool,
         parent_prec: int = 1200,
+        operator_table=None,
     ) -> str:
         """Convert a term to string with specified options."""
         term = deref(term, subst)
@@ -552,7 +510,7 @@ class IOBuiltins:
             # Handle list elements
             elements_str = [
                 IOBuiltins._term_to_chars_string(
-                    e, subst, ignore_ops, numbervars, quoted, 1200
+                    e, subst, ignore_ops, numbervars, quoted, 1200, operator_table
                 )
                 for e in term.elements
             ]
@@ -562,7 +520,7 @@ class IOBuiltins:
                 isinstance(term.tail, List) and not term.tail.elements and term.tail.tail is None
             ):
                 tail_str = IOBuiltins._term_to_chars_string(
-                    term.tail, subst, ignore_ops, numbervars, quoted, 1200
+                    term.tail, subst, ignore_ops, numbervars, quoted, 1200, operator_table
                 )
                 return f"[{','.join(elements_str)}|{tail_str}]"
 
@@ -571,7 +529,7 @@ class IOBuiltins:
         if isinstance(term, Compound):
             if not ignore_ops:
                 operator_rendered = IOBuiltins._format_operator_term(
-                    term, subst, ignore_ops, numbervars, quoted, parent_prec
+                    term, subst, ignore_ops, numbervars, quoted, parent_prec, operator_table
                 )
                 if operator_rendered is not None:
                     return operator_rendered
@@ -582,7 +540,7 @@ class IOBuiltins:
                 return term.functor
             args_str = ','.join(
                 IOBuiltins._term_to_chars_string(
-                    arg, subst, ignore_ops, numbervars, quoted, 1200
+                    arg, subst, ignore_ops, numbervars, quoted, 1200, operator_table
                 )
                 for arg in term.args
             )
@@ -602,31 +560,47 @@ class IOBuiltins:
         numbervars: bool,
         quoted: bool,
         parent_prec: int,
+        operator_table,
     ) -> str | None:
-        info = OPERATOR_TABLE.get((term.functor, len(term.args)))
-        if info is None:
+        op_info = IOBuiltins._lookup_operator(term.functor, len(term.args), operator_table)
+        if op_info is None:
             return None
 
-        if info.is_prefix:
-            arg_limit = IOBuiltins._child_precedence_limit(info, "right")
+        if op_info.is_prefix:
+            arg_limit = IOBuiltins._child_precedence_limit(op_info, "right")
             arg_str = IOBuiltins._term_to_chars_string(
-                term.args[0], subst, ignore_ops, numbervars, quoted, arg_limit
+                term.args[0], subst, ignore_ops, numbervars, quoted, arg_limit, operator_table
             )
             rendered = IOBuiltins._render_prefix(term.functor, arg_str)
         else:
-            left_limit = IOBuiltins._child_precedence_limit(info, "left")
-            right_limit = IOBuiltins._child_precedence_limit(info, "right")
+            left_limit = IOBuiltins._child_precedence_limit(op_info, "left")
+            right_limit = IOBuiltins._child_precedence_limit(op_info, "right")
             left_str = IOBuiltins._term_to_chars_string(
-                term.args[0], subst, ignore_ops, numbervars, quoted, left_limit
+                term.args[0], subst, ignore_ops, numbervars, quoted, left_limit, operator_table
             )
             right_str = IOBuiltins._term_to_chars_string(
-                term.args[1], subst, ignore_ops, numbervars, quoted, right_limit
+                term.args[1], subst, ignore_ops, numbervars, quoted, right_limit, operator_table
             )
             rendered = IOBuiltins._render_infix(term.functor, left_str, right_str)
 
-        if info.precedence > parent_prec:
+        # Wrap only when the current operator binds looser than the parent context.
+        if op_info.precedence > parent_prec:
             return f"({rendered})"
         return rendered
+
+    @staticmethod
+    def _lookup_operator(functor: str, arity: int, operator_table) -> OperatorInfo | None:
+        table = operator_table if operator_table is not None else _DEFAULT_OPERATOR_TABLE
+        matches = table.get_matching(functor)
+        if arity == 1:
+            for info in matches:
+                if info.is_prefix or info.is_postfix:
+                    return info
+        elif arity == 2:
+            for info in matches:
+                if info.is_infix:
+                    return info
+        return None
 
     @staticmethod
     def _child_precedence_limit(info: OperatorInfo, position: str) -> int:
@@ -863,25 +837,57 @@ class IOBuiltins:
         # Convert mode to Python file mode
         python_mode = {'read': 'r', 'write': 'w', 'append': 'a'}[mode]
 
+        def _try_open(path: str):
+            return open(path, python_mode, encoding='utf-8')
+
+        def _escape_control_chars(path: str) -> str | None:
+            """Re-escape control characters that may have been unescaped by the parser."""
+            control_map = {
+                "\n": "\\n",
+                "\r": "\\r",
+                "\t": "\\t",
+                "\b": "\\b",
+                "\f": "\\f",
+                "\v": "\\v",
+                "\a": "\\a",
+            }
+            if not any(ord(ch) < 32 for ch in path):
+                return None
+            return "".join(control_map.get(ch, f"\\x{ord(ch):02x}") if ord(ch) < 32 else ch for ch in path)
+
+        file_obj = None
+        actual_filename = filename
         try:
             # Try to open the file
-            file_obj = open(filename, python_mode, encoding='utf-8')
-        except FileNotFoundError:
-            # Existence error for source_sink
-            error_term = PrologError.existence_error("source_sink", filename_term, "open/3")
-            raise PrologThrow(error_term)
-        except PermissionError:
-            # Permission error
-            error_term = PrologError.permission_error("open", "source_sink", filename_term, "open/3")
-            raise PrologThrow(error_term)
-        # Note: Do not catch generic OSError here to avoid masking the real IO error.
-        # Let unexpected OSError variants propagate for now.
+            file_obj = _try_open(actual_filename)
+        except OSError as exc:
+            # On Windows paths embedded in quoted atoms can carry escaped control
+            # characters that were unescaped by the parser (e.g., \t -> tab).
+            # Retry with control characters re-escaped to recover the original path.
+            escaped = _escape_control_chars(actual_filename)
+            if escaped is not None and escaped != filename:
+                try:
+                    file_obj = _try_open(escaped)
+                    actual_filename = escaped
+                except OSError as fallback_exc:
+                    exc = fallback_exc
+            if file_obj is None:
+                if isinstance(exc, FileNotFoundError):
+                    # Existence error for source_sink
+                    error_term = PrologError.existence_error("source_sink", filename_term, "open/3")
+                    raise PrologThrow(error_term)
+                if isinstance(exc, PermissionError):
+                    # Permission error
+                    error_term = PrologError.permission_error("open", "source_sink", filename_term, "open/3")
+                    raise PrologThrow(error_term)
+                raise exc
+        # Note: Do not catch generic OSError outside this block to avoid masking IO errors.
 
         # Generate unique stream handle
         stream_handle = engine._generate_stream_handle()
 
         # Create and register stream
-        stream = Stream(handle=stream_handle, file_obj=file_obj, mode=mode, filename=filename)
+        stream = Stream(handle=stream_handle, file_obj=file_obj, mode=mode, filename=actual_filename)
         # Register into the engine's stream registry (add_stream is the public API)
         engine.add_stream(stream)
 

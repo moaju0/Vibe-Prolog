@@ -158,14 +158,13 @@ class TestOperatorPrecedence:
         assert isinstance(body, Compound)
         assert body.functor == ';'
 
-    def test_op_directive_rejected(self):
-        """Test that :- op/3 directive is rejected"""
+    def test_op_directive_supported(self):
+        """Test that :- op/3 directive updates operator table"""
         from vibeprolog import PrologInterpreter
-        from vibeprolog.exceptions import PrologThrow
 
         prolog = PrologInterpreter()
-        with pytest.raises(PrologThrow):
-            prolog.consult_string(":- op(500, xfx, foo).")
+        prolog.consult_string(":- op(500, xfx, foo).")
+        assert prolog.has_solution("current_op(500, xfx, foo)")
 
 
 class TestCutAndNegation:
