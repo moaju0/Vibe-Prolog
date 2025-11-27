@@ -210,7 +210,7 @@
 - ✅ `module_property/2` – Query module exports and (where available) the source file.
 - ✅ Built-ins remain accessible from all modules.
 - ⚠️ `use_module/1,2` imports are not implemented in this change (deferred).
-- ⚠️ Non-qualified goal resolution inside clause bodies currently uses global resolution; module-aware resolution for clause bodies is planned (see issue).
+- ✅ Module-aware resolution for non-qualified goals inside clause bodies: unqualified goals in clause bodies resolve first to the defining module's predicates, then to user module predicates, preserving export restrictions for other modules.
 - ⚠️ Dynamic/multifile interactions across modules are supported minimally and may need further tests and refinement.
 
 ## Execution Model

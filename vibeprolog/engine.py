@@ -79,7 +79,7 @@ class PrologEngine:
         yield from self._solve_goals(goals, Substitution())
 
     def _solve_goals(
-        self, goals: list[Compound], subst: Substitution
+        self, goals: list[Compound], subst: Substitution, current_module: str = "user"
     ) -> Iterator[Substitution]:
         """Solve a list of goals with backtracking."""
         if not goals:
@@ -133,7 +133,7 @@ class PrologEngine:
                 return builtin_results
 
             # Delegate clause-search to the module's predicate index when available
-            for result in self._solve_module_predicate(module_name, key, inner_goal, subst, remaining_goals):
+            for result in self._solve_module_predicate(module_name, key, inner_goal, subst, remaining_goals, current_module):
                 yield result
             return
 
@@ -142,17 +142,27 @@ class PrologEngine:
             try:
                 for new_subst in builtin_results:
                     if new_subst is not None:
-                        yield from self._solve_goals(remaining_goals, new_subst)
+                        yield from self._solve_goals(remaining_goals, new_subst, current_module)
             except CutException:
                 raise
             except PrologThrow:
                 raise
             return
 
+        # Try to solve from current module predicates first
+        for result in self._solve_module_predicate(current_module, None, goal, subst, remaining_goals, current_module):
+            yield result
+
+        # If no solutions from current module, try global predicates (user module and others)
         cut_executed = False
         for clause in self.clauses:
             if cut_executed:
                 break
+
+            # Skip clauses that are in the current_module (already tried) or other modules
+            clause_module = getattr(clause, 'module', 'user')
+            if clause_module != 'user' or clause_module == current_module:
+                continue
 
             renamed_clause = self._rename_variables(clause)
             new_subst = unify(goal, renamed_clause.head, subst)
@@ -163,12 +173,13 @@ class PrologEngine:
                 else:
                     body_goals = self._flatten_body(renamed_clause.body)
                 clause_has_cut = any(isinstance(g, Cut) for g in body_goals)
+                clause_module = getattr(renamed_clause, 'module', 'user')
                 try:
                     if renamed_clause.is_fact():
-                        yield from self._solve_goals(remaining_goals, new_subst)
+                        yield from self._solve_goals(remaining_goals, new_subst, clause_module)
                     else:
                         new_goals = body_goals + remaining_goals
-                        yield from self._solve_goals(new_goals, new_subst)
+                        yield from self._solve_goals(new_goals, new_subst, clause_module)
                 except CutException:
                     if clause_has_cut:
                         cut_executed = True
@@ -177,11 +188,19 @@ class PrologEngine:
                 except PrologThrow:
                     raise
 
-    def _solve_module_predicate(self, module_name, key, inner_goal, subst, remaining_goals):
+    def _solve_module_predicate(self, module_name, key, inner_goal, subst, remaining_goals, current_module="user"):
         # Resolve a module-qualified goal by consulting the module's predicate index if available.
         module = getattr(self.interpreter, "modules", {}).get(module_name)
         if module is None:
             return iter(())
+        # If key is None, compute it from inner_goal
+        if key is None:
+            if isinstance(inner_goal, Compound):
+                key = (inner_goal.functor, len(inner_goal.args))
+            elif isinstance(inner_goal, Atom):
+                key = (inner_goal.name, 0)
+            else:
+                return iter(())
         # Prefer indexed predicates if available
         preds = getattr(module, "predicates", {}).get(key, [])
         cut_executed = False
@@ -196,10 +215,10 @@ class PrologEngine:
                 clause_has_cut = any(isinstance(g, Cut) for g in body_goals)
                 try:
                     if renamed_clause.is_fact():
-                        yield from self._solve_goals(remaining_goals, new_subst)
+                        yield from self._solve_goals(remaining_goals, new_subst, module_name)
                     else:
                         new_goals = body_goals + remaining_goals
-                        yield from self._solve_goals(new_goals, new_subst)
+                        yield from self._solve_goals(new_goals, new_subst, module_name)
                 except CutException:
                     if clause_has_cut:
                         cut_executed = True

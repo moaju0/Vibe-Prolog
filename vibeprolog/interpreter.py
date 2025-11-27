@@ -169,6 +169,8 @@ class PrologInterpreter:
             mod.file = file_source
             self.modules[module_name] = mod
             self.current_module = module_name
+            # Reset closed predicates when entering a new module
+            closed_predicates.clear()
             return
 
         if isinstance(goal, PredicatePropertyDirective):

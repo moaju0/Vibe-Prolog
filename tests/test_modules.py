@@ -47,10 +47,9 @@ def test_builtin_accessible_from_module():
 def test_module_qualified_call_in_clause_body():
     prolog = PrologInterpreter()
     prolog.consult_string("""
+        bar :- m1:foo(x).
         :- module(m1, [foo/1]).
         foo(x).
-        
-        bar :- m1:foo(x).
     """)
     assert prolog.has_solution("bar")
 
@@ -58,3 +57,60 @@ def test_module_property_nonexistent_module():
     prolog = PrologInterpreter()
     sols = list(prolog.query("module_property(nonexistent, _)"))
     assert len(sols) == 0
+
+
+def test_unqualified_call_in_clause_body():
+    """Test that unqualified goals in clause bodies resolve to the defining module."""
+    prolog = PrologInterpreter()
+    prolog.consult_string("""
+        :- module(m1, [test/1]).
+        helper(a).
+        test(X) :- helper(X).
+
+        :- module(m2, [helper/1]).
+        helper(b).
+    """)
+    # m1:test should find m1:helper(a), not m2:helper(b)
+    result = prolog.query_once("m1:test(X)")
+    assert result is not None and result["X"] == "a"
+
+
+def test_unqualified_call_prefers_defining_module():
+    """Unqualified calls in module clauses prefer local predicates over user."""
+    prolog = PrologInterpreter()
+    prolog.consult_string("""
+        helper(user).  % in user module
+
+        :- module(m1, [test/1]).
+        helper(local).  % in m1 module
+        test(X) :- helper(X).
+    """)
+    # Should find local, not user
+    result = prolog.query_once("m1:test(X)")
+    assert result is not None and result["X"] == "local"
+
+
+def test_unqualified_call_cannot_access_private_other_module():
+    """Unqualified calls cannot access private predicates of other modules."""
+    prolog = PrologInterpreter()
+    prolog.consult_string("""
+        :- module(m1, [test/1]).
+        test(X) :- other_helper(X).  % unqualified, should not find m2's private
+
+        :- module(m2, [public/1]).
+        other_helper(private).  % not exported
+        public(public).
+    """)
+    # Should not find the private predicate
+    assert not prolog.has_solution("m1:test(X)")
+
+
+def test_builtin_accessible_from_module_clause():
+    """Built-ins remain globally accessible from module clauses."""
+    prolog = PrologInterpreter()
+    prolog.consult_string("""
+        :- module(m1, [test/1]).
+        test(X) :- append([1], [2], X).
+    """)
+    result = prolog.query_once("m1:test(X)")
+    assert result is not None and result["X"] == [1, 2]
