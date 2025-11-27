@@ -59,7 +59,7 @@ class TestArithmeticTypeErrors:
         prolog = PrologInterpreter()
         with pytest.raises(Exception) as exc_info:
             prolog.query_once("atom =:= 5")
-        assert "type_error" in str(exc_info.value) or "instantiation_error" in str(exc_info.value)
+        assert "type_error" in str(exc_info.value) and "instantiation_error" not in str(exc_info.value)
 
 
 class TestEvaluationErrors:

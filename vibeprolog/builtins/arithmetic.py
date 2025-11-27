@@ -23,7 +23,7 @@ if TYPE_CHECKING:
     from vibeprolog.engine import PrologEngine
 
 
-def _check_instantiated(term: Any, subst: Substitution, engine: "PrologEngine", predicate: str) -> None:
+def _check_instantiated(term: Any, subst: Substitution, predicate: str) -> None:
     """Check if arithmetic expression is fully instantiated."""
     # Dereference term
     term = deref(term, subst)
@@ -35,10 +35,10 @@ def _check_instantiated(term: Any, subst: Substitution, engine: "PrologEngine", 
     # Recursively check compound terms
     if isinstance(term, Compound):
         for arg in term.args:  # Skip functor
-            _check_instantiated(arg, subst, engine, predicate)
+            _check_instantiated(arg, subst, predicate)
 
 
-def _check_evaluable(term: Any, subst: Substitution, engine: "PrologEngine", predicate: str) -> None:
+def _check_evaluable(term: Any, subst: Substitution, predicate: str) -> None:
     """Check if term is a valid arithmetic expression."""
     term = deref(term, subst)
 
@@ -71,7 +71,7 @@ def _check_evaluable(term: Any, subst: Substitution, engine: "PrologEngine", pre
 
         # Recursively check arguments
         for arg in term.args:
-            _check_evaluable(arg, subst, engine, predicate)
+            _check_evaluable(arg, subst, predicate)
 
     else:
         # Atoms and other types are not evaluable
