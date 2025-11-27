@@ -26,50 +26,58 @@ def _parser_inputs(argv: Sequence[str] | None) -> tuple[list[str] | None, str | 
     return values[1:], prog
 
 
-
-def fix_issue_with_kilocode(argv: Sequence[str] | None = None) -> None:
-    """CLI wrapper for the kilocode issue workflow."""
+def _run_issue_workflow(
+    argv: Sequence[str] | None,
+    tool_cmd: list[str],
+    branch_prefix: str,
+    tool_name: str,
+    default_timeout: int = 180,
+    input_instruction: str | None = None,
+    session_dir: Path | None = None,
+    use_json_output: bool = False,
+) -> None:
+    """Common issue workflow runner."""
     arg_list, prog = _parser_inputs(argv)
     parser = argparse.ArgumentParser(
         prog=prog,
-        description="Fix a GitHub issue by orchestrating kilocode with git and gh.",
+        description=f"Fix a GitHub issue using {tool_name} headless mode.",
     )
     parser.add_argument("issue", help="Issue number to fix")
     parser.add_argument(
         "--timeout",
         type=int,
-        default=1200,
-        help="Seconds before kilocode automation times out (default: %(default)s)",
+        default=default_timeout,
+        help=f"Seconds before {tool_name} automation times out (default: %(default)s)",
     )
     args = parser.parse_args(arg_list)
     config = IssueWorkflowConfig(
-        tool_cmd=["kilocode", "--auto"],
-        branch_prefix="fix-kilocode",
-        default_commit_message="Update from kilocode",
+        tool_cmd=tool_cmd,
+        branch_prefix=branch_prefix,
+        default_commit_message=f"Update from {tool_name.lower()}",
         timeout_seconds=args.timeout,
+        input_instruction=input_instruction,
+        session_dir=session_dir,
+        use_json_output=use_json_output,
     )
     run_issue_workflow(args.issue, config)
 
 
+def fix_issue_with_kilocode(argv: Sequence[str] | None = None) -> None:
+    """CLI wrapper for the kilocode issue workflow."""
+    _run_issue_workflow(
+        argv,
+        tool_cmd=["kilocode", "--auto"],
+        branch_prefix="fix-kilocode",
+        tool_name="kilocode",
+        default_timeout=1200,
+    )
+
+
 def fix_issue_with_claude(argv: Sequence[str] | None = None) -> None:
     """CLI wrapper for the claude issue workflow with headless mode."""
-    # Determine session directory (prefer ./paige relative to cwd)
     session_dir = Path.cwd() / "paige"
-
-    arg_list, prog = _parser_inputs(argv)
-    parser = argparse.ArgumentParser(
-        prog=prog,
-        description="Fix a GitHub issue using the Claude CLI headless workflow.",
-    )
-    parser.add_argument("issue", help="Issue number to fix")
-    parser.add_argument(
-        "--timeout",
-        type=int,
-        default=180,
-        help="Seconds before Claude automation times out (default: %(default)s)",
-    )
-    args = parser.parse_args(arg_list)
-    config = IssueWorkflowConfig(
+    _run_issue_workflow(
+        argv,
         tool_cmd=[
             "claude",
             "-p",
@@ -78,30 +86,16 @@ def fix_issue_with_claude(argv: Sequence[str] | None = None) -> None:
             "acceptEdits",
         ],
         branch_prefix="fix-claude",
-        default_commit_message="Update from claude",
-        timeout_seconds=args.timeout,
+        tool_name="Claude",
         session_dir=session_dir,
         use_json_output=True,
     )
-    run_issue_workflow(args.issue, config)
 
 
 def fix_issue_with_codex(argv: Sequence[str] | None = None) -> None:
     """CLI wrapper for the Codex issue workflow."""
-    arg_list, prog = _parser_inputs(argv)
-    parser = argparse.ArgumentParser(
-        prog=prog,
-        description="Fix a GitHub issue using Codex headless mode.",
-    )
-    parser.add_argument("issue", help="Issue number to fix")
-    parser.add_argument(
-        "--timeout",
-        type=int,
-        default=180,
-        help="Seconds before Codex automation times out (default: %(default)s)",
-    )
-    args = parser.parse_args(arg_list)
-    config = IssueWorkflowConfig(
+    _run_issue_workflow(
+        argv,
         tool_cmd=[
             "codex",
             "exec",
@@ -111,14 +105,26 @@ def fix_issue_with_codex(argv: Sequence[str] | None = None) -> None:
             "-",
         ],
         branch_prefix="fix-codex",
-        default_commit_message="Update from codex",
-        timeout_seconds=args.timeout,
+        tool_name="Codex",
         input_instruction=(
             "You are Codex running headless. Fix the GitHub issue described below using this "
             "repository. Apply edits, run relevant tests, and finish with a brief summary."
         ),
     )
-    run_issue_workflow(args.issue, config)
+
+
+def fix_issue_with_amp(argv: Sequence[str] | None = None) -> None:
+    """CLI wrapper for the Amp issue workflow."""
+    _run_issue_workflow(
+        argv,
+        tool_cmd=["amp", "-x"],
+        branch_prefix="fix-amp",
+        tool_name="Amp",
+        input_instruction=(
+            "You are Amp running headless. Fix the GitHub issue described below using this "
+            "repository. Apply edits, run relevant tests, and finish with a brief summary."
+        ),
+    )
 
 
 def address_pr_comments_with_kilocode(argv: Sequence[str] | None = None) -> None:
