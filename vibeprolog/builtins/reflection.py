@@ -28,6 +28,18 @@ class ReflectionBuiltins:
         )
         register_builtin(
             registry,
+            "current_module",
+            1,
+            ReflectionBuiltins._builtin_current_module,
+        )
+        register_builtin(
+            registry,
+            "module_property",
+            2,
+            ReflectionBuiltins._builtin_module_property,
+        )
+        register_builtin(
+            registry,
             "current_predicate",
             1,
             ReflectionBuiltins._builtin_current_predicate,
@@ -117,6 +129,61 @@ class ReflectionBuiltins:
             new_subst = unify(indicator, pred_indicator, subst)
             if new_subst is not None:
                 yield new_subst
+
+    @staticmethod
+    def _builtin_current_module(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext
+    ) -> Iterator[Substitution]:
+        module_arg = args[0]
+        interp = getattr(engine, "interpreter", None)
+        if interp is None:
+            return iter(())
+
+        for module_name in interp.modules.keys():
+            result = unify(module_arg, Atom(module_name), subst)
+            if result is not None:
+                yield result
+
+    @staticmethod
+    def _builtin_module_property(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext
+    ) -> Iterator[Substitution]:
+        module_term, property_term = args
+        module_term = deref(module_term, subst)
+        property_term = deref(property_term, subst)
+
+        interp = getattr(engine, "interpreter", None)
+        if interp is None:
+            return iter(())
+
+        # Helper to yield properties for a given module
+        def _yield_for_module(module_name, mod, subst_base):
+            exports_list = python_to_list([Compound("/", (Atom(n), Number(a))) for (n, a) in sorted(mod.exports)])
+            exp_unify = unify(property_term, Compound("exports", (exports_list,)), subst_base)
+            if exp_unify is not None:
+                yield exp_unify
+            if mod.file is not None:
+                file_unify = unify(property_term, Compound("file", (Atom(str(mod.file)),)), subst_base)
+                if file_unify is not None:
+                    yield file_unify
+
+        # If module_term is a concrete atom, answer for that module only
+        if isinstance(module_term, Atom):
+            module_name = module_term.name
+            mod = getattr(interp, "modules", {}).get(module_name)
+            if mod is None:
+                return iter(())
+            for res in _yield_for_module(module_name, mod, subst):
+                yield res
+        else:
+            # module_term is a variable: enumerate across all loaded modules
+            for module_name, mod in getattr(interp, "modules", {}).items():
+                new_subst = unify(module_term, Atom(module_name), subst)
+                if new_subst is None:
+                    continue
+                for res in _yield_for_module(module_name, mod, new_subst):
+                    yield res
+        return iter(())
 
     @staticmethod
     def _builtin_argv(

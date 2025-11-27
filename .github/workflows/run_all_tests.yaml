@@ -56,5 +56,4 @@ jobs:
         run: uv sync --frozen
 
       - name: Run optional test suite
-        run: uv run --frozen pytest tests/optional
-        run: pytest tests/optional
+        run: uv run --frozen pytest 

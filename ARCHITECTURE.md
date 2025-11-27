@@ -215,6 +215,15 @@ job(bob, engineer).
 ?- job(Person, doctor).  % Person = alice
 ```
 
+## Module System
+
+- Each module is represented by a `Module` object stored in `PrologInterpreter.modules`.
+- Module declaration uses `:- module(Name, Exports).` and sets the current module context for subsequent clauses during consultation.
+- Predicates defined in modules are associated with their defining module; clauses carry a `module` attribute.
+- Module-qualified calls use the syntax `Module:Goal` and resolve only against the specified module's predicates (and built-ins).
+- Export lists control which predicates are accessible from outside the module; attempting to call a non-exported predicate via `Module:Pred` raises a permission error.
+- The default module for non-module code is `user` and its predicates are globally accessible.
+
 ## Limitations
 
 This interpreter intentionally focuses on ISO core features. Significant gaps

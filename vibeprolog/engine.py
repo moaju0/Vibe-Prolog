@@ -38,6 +38,8 @@ class PrologEngine:
         predicate_docs: dict[tuple[str, int], str] | None = None,
     ):
         self.clauses = clauses
+        # Explicit dependency so engine can reference interpreter state if needed
+        self.interpreter = None
         self.argv = argv or []
         self.call_depth = 0
         self.max_depth = 1000  # Prevent infinite recursion
@@ -85,6 +87,52 @@ class PrologEngine:
         remaining_goals = goals[1:]
 
         goal = apply_substitution(goal, subst)
+        # Module-qualified call: Module:Goal
+        if isinstance(goal, Compound) and goal.functor == ":" and len(goal.args) == 2:
+            module_term = goal.args[0]
+            inner_goal = goal.args[1]
+
+            # Module must be an atom
+            if not isinstance(module_term, Atom):
+                error_term = PrologError.type_error("atom", module_term, "module:goal")
+                raise PrologThrow(error_term)
+
+            module_name = module_term.name
+            # Interpreter must be available to check modules
+            interpreter = getattr(self, "interpreter", None)
+            if interpreter is None or module_name not in getattr(interpreter, "modules", {}):
+                indicator = module_term
+                error_term = PrologError.existence_error("module", indicator, "module:goal")
+                raise PrologThrow(error_term)
+
+            module_obj = interpreter.modules[module_name]
+
+            # Check export list for the inner goal
+            key = None
+            if isinstance(inner_goal, Compound):
+                key = (inner_goal.functor, len(inner_goal.args))
+            elif isinstance(inner_goal, Atom):
+                key = (inner_goal.name, 0)
+
+            # Builtins are always accessible
+            is_builtin = key in self._builtin_registry if key is not None else False
+            if module_name != "user" and not is_builtin:
+                if key not in module_obj.exports:
+                    indicator = self._indicator_from_key(key[0], key[1]) if key is not None else inner_goal
+                    error_term = PrologError.permission_error(
+                        "access", "private_procedure", indicator, "module:goal"
+                    )
+                    raise PrologThrow(error_term)
+
+            # Try builtins first (builtins are module-global)
+            builtin_results = self._try_builtin(inner_goal, subst)
+            if builtin_results is not None:
+                return builtin_results
+
+            # Delegate clause-search to the module's predicate index when available
+            for result in self._solve_module_predicate(module_name, key, inner_goal, subst, remaining_goals):
+                yield result
+            return
 
         builtin_results = self._try_builtin(goal, subst)
         if builtin_results is not None:
@@ -111,6 +159,37 @@ class PrologEngine:
                     body_goals = []
                 else:
                     body_goals = self._flatten_body(renamed_clause.body)
+                clause_has_cut = any(isinstance(g, Cut) for g in body_goals)
+                try:
+                    if renamed_clause.is_fact():
+                        yield from self._solve_goals(remaining_goals, new_subst)
+                    else:
+                        new_goals = body_goals + remaining_goals
+                        yield from self._solve_goals(new_goals, new_subst)
+                except CutException:
+                    if clause_has_cut:
+                        cut_executed = True
+                    else:
+                        raise
+                except PrologThrow:
+                    raise
+
+    def _solve_module_predicate(self, module_name, key, inner_goal, subst, remaining_goals):
+        # Resolve a module-qualified goal by consulting the module's predicate index if available.
+        module = getattr(self.interpreter, "modules", {}).get(module_name)
+        if module is None:
+            return iter(())
+        # Prefer indexed predicates if available
+        preds = getattr(module, "predicates", {}).get(key, [])
+        cut_executed = False
+        for clause in preds:
+            if cut_executed:
+                break
+
+            renamed_clause = self._rename_variables(clause)
+            new_subst = unify(inner_goal, renamed_clause.head, subst)
+            if new_subst is not None:
+                body_goals = [] if renamed_clause.is_fact() else self._flatten_body(renamed_clause.body)
                 clause_has_cut = any(isinstance(g, Cut) for g in body_goals)
                 try:
                     if renamed_clause.is_fact():
