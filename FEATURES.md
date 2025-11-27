@@ -1,262 +1,228 @@
-# ISO Prolog Coverage Map
+# ISO/IEC 13211-1 Prolog  — Conformance Tables
 
-## Status Legend
-- ✅ **Implemented**: Fully compliant with ISO standard
-- ⚠️ **Partial**: Implemented but with deviations or limitations
-- ❌ **Missing**: Not implemented
-- ❓ **Unknown**: Needs verification
+This documents a **minimal ISO Prolog conformance checklist**, organised by **ISO/IEC 13211-1 section**.
 
-## Built-in Predicates
+Status legend:
 
-### Control Constructs (ISO 7.8)
-- ✅ `true/0` – Always succeeds
-- ✅ `fail/0` – Always fails
-- ✅ `,/2` – Conjunction (and)
-- ✅ `;/2` – Disjunction (or)
-- ✅ `->/2` – If-then-else
-- ✅ `\+/1` – Negation as failure
-- ✅ `!/0` – Cut operator
+* ✅ Implemented
+* ⚠️ Partial / Deviates from ISO
+* ❌ Missing
+* 📘 Extension (non-ISO, but compatible)
 
-### Term Unification and Comparison (ISO 7.3, 8.4)
-- ✅ `=/2` – Unification
-- ✅ `\=/2` – Not unifiable
-- ✅ `==/2` – Term identity (structural equality)
-- ✅ `\==/2` – Term non-identity
-- ✅ `@</2` – Term less than
-- ✅ `@=</2` – Term less than or equal
-- ✅ `@>/2` – Term greater than
-- ✅ `@>=/2` – Term greater than or equal
+---
 
-### Type Testing (ISO 8.3)
-- ✅ `var/1` – Test for unbound variable
-- ✅ `nonvar/1` – Test for bound term
-- ✅ `atom/1` – Test for atom
-- ✅ `number/1` – Test for number (integer or float)
-- ✅ `integer/1` – Test for integer
-- ✅ `float/1` – Test for float
-- ✅ `atomic/1` – Test for atomic term (atom or number)
-- ✅ `compound/1` – Test for compound term
-- ✅ `callable/1` – Test for callable term
-- ✅ `ground/1` – Test for ground term (no variables)
+## §5–§6 — Prolog Text, Tokens, Syntax
 
-### Term Manipulation (ISO 8.5)
-- ✅ `functor/3` – Extract/construct functor name and arity
-- ✅ `arg/3` – Access compound term arguments
-- ✅ `=../2` – Term decomposition/construction (univ)
-- ✅ `copy_term/2` – Create term copy with fresh variables
+| Feature                          | Status | Notes                                     |
+| -------------------------------- | ------ | ----------------------------------------- |
+| Atoms (quoted, unquoted)         | ✅      | Fully implemented                         |
+| Variables                        | ✅      | ISO semantics                             |
+| Numbers (int, float, scientific) | ✅      | Includes base-qualified (`16'ff`)         |
+| Lists (proper, improper)         | ✅      |                                           |
+| Compound terms                   | ✅      |                                           |
+| Strings (quoted)                 | ✅      | Consistent representation                 |
+| `%` line comments                | ✅      |                                           |
+| `/* … */` block comments         | ✅      | Nested supported                          |
+| Character code syntax (`0'X`)    | ✅      | Minor ISO edge gaps                       |
+| Built-in operator syntax         | ✅      |                                           |
+| `:- op/3` declaration            | ⚠️     | Operator table updated, parser ignores it |
+| Dynamic operator parsing         | ❌      | **ISO-blocking**                          |
+| `:- char_conversion/2`           | ❌      | **ISO-mandatory**                         |
 
-### Arithmetic Evaluation (ISO 9.1)
-- ✅ `is/2` – Arithmetic evaluation
-- ✅ `=:=/2` – Arithmetic equality
-- ✅ `=\=/2` – Arithmetic inequality
-- ✅ `</2` – Arithmetic less than
-- ✅ `=</2` – Arithmetic less than or equal
-- ✅ `>/2` – Arithmetic greater than
-- ✅ `>=/2` – Arithmetic greater than or equal
+---
 
-### Arithmetic Functions (ISO 9.3)
-- ✅ `abs/1` – Absolute value
-- ✅ `min/2` – Minimum of two values
-- ✅ `max/2` – Maximum of two values
-- ✅ `sqrt/1` – Square root
-- ✅ `sin/1` – Sine (radians)
-- ✅ `cos/1` – Cosine (radians)
-- ✅ `tan/1` – Tangent (radians)
-- ✅ `exp/1` – Exponential (e^x)
-- ✅ `log/1` – Natural logarithm
-- ✅ `floor/1` – Floor (round down)
-- ✅ `ceiling/1` – Ceiling (round up)
-- ✅ `round/1` – Round to nearest integer
-- ✅ `sign/1` – Sign of number (-1, 0, or 1)
+## §6 — Program Structure & Execution
 
-### All Solutions (ISO 8.10)
-- ✅ `findall/3` – Collect all solutions
-- ✅ `bagof/3` – Collect solutions with duplicates
-- ✅ `setof/3` – Collect unique sorted solutions
+| Feature                         | Status | Notes                              |
+| ------------------------------- | ------ | ---------------------------------- |
+| Facts and rules                 | ✅      |                                    |
+| Clause ordering                 | ✅      | Preserved                          |
+| Predicate identity (Name/Arity) | ✅      |                                    |
+| Depth-first SLD resolution      | ✅      |                                    |
+| Backtracking                    | ✅      |                                    |
+| Cut (`!/0`)                     | ✅      | Correct semantics                  |
+| If-then-else (`->/2`)           | ✅      | Lazy condition                     |
+| Negation as failure (`\\+/1`)   | ✅      |                                    |
+| Occurs check                    | ⚠️     | Always enabled (stricter than ISO) |
 
-### Database Modification (ISO 8.9)
-- ✅ `asserta/1` – Add clause at beginning
-- ✅ `assertz/1` – Add clause at end
-- ✅ `assert/1` – Add clause at end (equivalent to assertz/1)
-- ✅ `retract/1` – Remove clause
-- ✅ `abolish/1` – Remove all clauses for predicate
-- ✅ `clause/2` – Retrieve clause definition
+---
 
-### Meta-Logical Predicates (ISO 7.8)
-- ✅ `call/1` – Call goal dynamically
-- ✅ `once/1` – Call goal, commit to first solution
-- ✅ `setup_call_cleanup/3` – Execute goal with setup and cleanup
-- ✅ `call_cleanup/2` – Execute goal with cleanup
+## §7.4 — Directives
 
-### Exception Handling (ISO 7.12)
-- ✅ `catch/3` – Exception handling with ISO error terms
-- ✅ `throw/1` – Throw exception term
-- ✅ ISO error term structure: `error(ErrorType, context(Predicate))`
-- ✅ `instantiation_error` – Raised by built-ins when required arguments are unbound
-- ✅ `type_error(Type, Culprit)` – Raised by built-ins when arguments have wrong types
-- ✅ `domain_error(Domain, Culprit)` – Raised by built-ins when values are outside valid domains
-- ✅ `permission_error(Operation, Permission, Culprit)` – Raised when attempting forbidden operations (e.g., modifying static predicates)
-- ✅ `syntax_error(Description)` – Parser throws ISO `error(syntax_error(_), _)` terms
-- ✅ `existence_error(ObjectType, Culprit)` – Raised when calling undefined predicates via `call/1`
+| Directive              | Status | Notes                                |
+| ---------------------- | ------ | ------------------------------------ |
+| `:- dynamic/1`         | ✅      |                                      |
+| `:- multifile/1`       | ✅      |                                      |
+| `:- discontiguous/1`   | ✅      |                                      |
+| `:- initialization/1`  | ✅      |                                      |
+| `:- op/3`              | ⚠️     | Declaration only; parsing unaffected |
+| `:- char_conversion/2` | ❌      | **ISO-required**                     |
 
-### Input/Output (ISO 8.11-8.12)
-- ✅ `write/1` – Write term
-- ✅ `writeln/1` – Write term with newline
-- ✅ `nl/0` – Write newline
-- ✅ `format/2`, `format/3` – Formatted output
-- ✅ `read_from_chars/2` – Parse term from character list/string
-- ⚠️ `write_term_to_chars/3` – Write term to character list with options (respects operator table; spacing/edge cases remain)
-- ✅ `read/1`, `read/2` – Read term from input streams
-- ✅ `get_char/1` – Read character from input
-- ✅ `put_char/1` – Write character to output
-- ✅ `open/3` – Open file stream
-- ✅ `close/1` – Close stream
-- ✅ `current_input/1` – Get current input stream
-- ✅ `current_output/1` – Get current output stream
+---
 
-### Predicate Inspection (ISO 8.8)
-- ⚠️ `predicate_property/2` – Query predicate properties (limited to built-in detection)
-- ✅ `current_predicate/1` – Enumerate defined predicates
+## §7.8 — Control Constructs
 
-### List Operations (Common Extensions)
-- ✅ `member/2` – List membership
-- ✅ `append/3` – List concatenation
-- ✅ `length/2` – List length
-- ✅ `reverse/2` – List reversal
-- ✅ `sort/2` – List sorting with deduplication
+| Predicate              | Status | Notes     |
+| ---------------------- | ------ | --------- |
+| `true/0`               | ✅      |           |
+| `fail/0`               | ✅      |           |
+| `,/2`                  | ✅      |           |
+| `;/2`                  | ✅      |           |
+| `->/2`                 | ✅      |           |
+| `\\+/1`                | ✅      |           |
+| `!/0`                  | ✅      |           |
+| `call/1`               | ✅      |           |
+| `once/1`               | ✅      |           |
+| `setup_call_cleanup/3` | ✅📘    | Extension |
+| `call_cleanup/2`       | ✅📘    | Extension |
 
-### Higher-Order Operations (Common Extensions)
-- ✅ `maplist/2` – Apply goal to list elements (SWI-Prolog extension, not ISO)
-  - Streams goal solutions per element to preserve backtracking semantics
+---
 
-## Definite Clause Grammars (DCG)
+## §7.3 / §8.4 — Unification & Term Comparison
 
-### DCG Syntax
-- ✅ `-->/2` – DCG rule operator
-- ✅ Terminal notation `[X, Y, Z]`
-- ✅ Non-terminal expansion with difference lists
-- ✅ Sequence threading `a, b`
-- ✅ Alternatives with `;`
-- ✅ Embedded Prolog goals `{Goal}`
-- ✅ Empty productions `[]`
-- ✅ Cut in DCG rules `!`
+| Predicate / Rule                 | Status | Notes                                                                                                    |
+| -------------------------------- | ------ | -------------------------------------------------------------------------------------------------------- |
+| `=/2`                            | ✅      |                                                                                                          |
+| `\\=/2`                          | ✅      |                                                                                                          |
+| `==/2`                           | ✅      |                                                                                                          |
+| `\\==/2`                         | ✅      |                                                                                                          |
+| `@</2`, `@=</2`, `@>/2`, `@>=/2` | ✅      |                                                                                                          |
+| ISO standard term order          | ❌      | Lists treated separately (explicitly defined for deterministic ordering; ISO requires lists ⊂ compounds) |
 
-### DCG Built-ins
-- ✅ `phrase/2` – Invoke DCG with complete list consumption
-- ✅ `phrase/3` – Invoke DCG with remainder
+---
 
-### System Predicates
-- ✅ `argv/1` – Access command-line arguments as list
-- ✅ `current_prolog_flag(argv, Args)` – ISO-style access to command-line arguments
+## §8.3 — Type Testing
 
-## Directives (ISO 7.4)
+| Predicate    | Status | Notes |
+| ------------ | ------ | ----- |
+| `var/1`      | ✅      |       |
+| `nonvar/1`   | ✅      |       |
+| `atom/1`     | ✅      |       |
+| `number/1`   | ✅      |       |
+| `integer/1`  | ✅      |       |
+| `float/1`    | ✅      |       |
+| `atomic/1`   | ✅      |       |
+| `compound/1` | ✅      |       |
+| `callable/1` | ✅      |       |
+| `ground/1`   | ✅      |       |
 
-### Program Directives
-- ✅ `:- dynamic/1` – Declare dynamic predicate
-- ✅ `:- multifile/1` – Declare multifile predicate
-- ✅ `:- discontiguous/1` – Declare discontiguous predicate
-- ✅ `:- initialization/1` – Specify initialization goal
+---
 
-### Operator Directives
-- ⚠️ `:- op/3` – Define operator (registry + current_op/3; parser still uses built-in operator syntax)
-- ❌ `:- char_conversion/2` – Define character conversion
+## §9 — Arithmetic
 
-## Syntactic Constructs (ISO 6)
+| Feature                           | Status | Notes |
+| --------------------------------- | ------ | ----- |
+| `is/2`                            | ✅      |       |
+| Arithmetic comparison operators   | ✅      |       |
+| `+ - * / // mod`                  | ✅      |       |
+| `abs/1`                           | ✅      |       |
+| `min/2`, `max/2`                  | ✅      |       |
+| `sqrt/1`                          | ✅      |       |
+| Trig / exp / log                  | ✅      |       |
+| `floor/1`, `ceiling/1`, `round/1` | ✅      |       |
 
-### Terms
-- ✅ Atoms (unquoted, quoted)
-- ✅ Numbers (integers, floats, scientific notation)
-- ✅ Variables
-- ✅ Compound terms
-- ✅ Lists (proper and improper)
-- ✅ Character codes (`0'X`, `0'\n`, etc.)
-- ✅ Character codes (`0'\\xHH` hex escapes)
+---
 
-### Operators
-- ✅ Arithmetic operators (`+`, `-`, `*`, `/`, `//`, `mod`, `**`)
-- ✅ Comparison operators (`=`, `\=`, `=:=`, `=\=`, `<`, `=<`, `>`, `>=`)
-- ✅ Control operators (`,`, `;`, `->`, `\+`, `!`)
-- ✅ Term comparison operators (`==`, `\==`, `@<`, `@=<`, `@>`, `@>=`)
+## §8.10 — All-Solutions Predicates
 
-### Number Literals
-- ✅ Decimal integers
-- ✅ Binary (`0b`), octal (`0o`), hexadecimal (`0x`)
-- ✅ Case-insensitive binary/octal/hex prefixes
-- ✅ Scientific notation
-- ✅ Leading-dot and trailing-zero floats
-- ✅ Floating point
-- ✅ Base-qualified numbers (`16'ff`, `2'abcd` - base'digits syntax)
-- ❌ Base'char'number syntax (`16'mod'2`) - Intentionally not implemented. This is an extremely obscure ISO edge case with ambiguous semantics in the standard. No real-world usage observed, and implementation would require significant parser restructuring for minimal value.
+| Predicate   | Status | Notes                  |
+| ----------- | ------ | ---------------------- |
+| `findall/3` | ✅      |                        |
+| `bagof/3`   | ✅      | Correct quantification |
+| `setof/3`   | ✅      | ISO semantics          |
 
-### Comments
-- ✅ Line comments (`%`)
-- ✅ Block comments (`/* */`) - fully implemented with nesting support
-- ✅ Nested block comments
-- ✅ PlDoc comments (`%%`, `/** */`, `/*! */`) - SWI-Prolog style documentation comments with `predicate_documentation/2` built-in for inspection
+---
 
-### Special Syntax
-- ✅ Curly braces `{Term}` (sugar for `{}(Term)`)
-- ✅ List syntax `[H|T]`, `[Elements]`
-- ✅ String syntax (double and single quoted)
-- ✅ Operator syntax with proper precedence
+## §8.9 — Dynamic Program Modification
 
-## Module System
+| Predicate / Rule                       | Status | Notes                                                               |
+| -------------------------------------- | ------ | ------------------------------------------------------------------- |
+| Static by default                      | ⚠️     | Semantics implemented; additional cross-module test coverage needed |
+| `asserta/1`                            | ✅      |                                                                     |
+| `assertz/1`                            | ✅      |                                                                     |
+| `assert/1`                             | ✅      |                                                                     |
+| `retract/1`                            | ✅      |                                                                     |
+| `abolish/1`                            | ✅      |                                                                     |
+| `clause/2`                             | ✅      |                                                                     |
+| Permission errors on static predicates | ⚠️     | Enforced, but requires further validation across modules            |
 
-- ✅ `:- module/2` – Module declaration with export list. Modules are recorded in `PrologInterpreter.modules`.
-- ✅ `Module:Goal` – Module-qualified calls are parsed and supported (syntax `Module:Goal`).
-- ✅ Export list enforcement for module-qualified calls: non-exported predicates raise a permission error when accessed from outside the module.
-- ✅ Predicate scoping: clauses are associated with their defining module (clauses receive a `module` attribute) and module-local predicates are stored under `Module.predicates`.
-- ✅ `current_module/1` – Enumerate loaded modules (built-in in `vibeprolog.builtins.reflection`).
-- ✅ `module_property/2` – Query module exports and (where available) the source file.
-- ✅ Built-ins remain accessible from all modules.
-- ✅ `use_module/1,2` – Import predicates from modules. `use_module(File)` imports all exported predicates; `use_module(File, [pred/arity, ...])` imports specific predicates. Supports `library(Name)` syntax for standard library modules.
-- ✅ Module-aware resolution for non-qualified goals inside clause bodies: unqualified goals in clause bodies resolve first to imported predicates, then to the defining module's predicates, then to user module predicates, preserving export restrictions for other modules.
-- ⚠️ Dynamic/multifile interactions across modules are supported minimally and may need further tests and refinement.
+---
 
-## Execution Model
-- ✅ Robinson-style unification
-- ✅ Occurs check (prevents cyclic terms)
-- ✅ Full backtracking search
-- ✅ Dynamic clause enumeration
-- ✅ Recursion handling
-- ✅ Cut operator semantics
-- ✅ If-then/else evaluates conditions lazily (only first success) to preserve backtracking
-- ✅ Term comparison uses deterministic ordering (variables < numbers < atoms < compounds < lists) for deterministic sort/setof results
-- ✅ List conversions honor active substitutions when traversing open list tails (e.g., append/sort/reverse)
-- ✅ Python conversions reject improper or partially instantiated lists instead of silently truncating
+## §8.11–§8.12 — Input / Output
 
-## Error Handling
-- ✅ ISO-style structured error terms (error(ErrorType, Context))
-- ✅ Instantiation errors for unbound required arguments
-- ✅ Type errors for incorrect argument types
-- ✅ Domain errors for values outside valid domains
-- ✅ Syntax errors for parse failures
-- ✅ Evaluation errors for arithmetic operations (zero_divisor, undefined, float_overflow)
-- ✅ Error context with predicate information
-- ✅ Full ISO compliance for arithmetic error handling
+| Predicate               | Status | Notes                        |
+| ----------------------- | ------ | ---------------------------- |
+| `read/1`, `read/2`      | ✅      |                              |
+| `write/1`               | ✅      |                              |
+| `writeln/1`             | ✅      |                              |
+| `nl/0`                  | ✅      |                              |
+| `format/2,3`            | ✅📘    | Extension                    |
+| `get_char/1`            | ✅      |                              |
+| `put_char/1`            | ✅      |                              |
+| `open/3`                | ✅      |                              |
+| `close/1`               | ✅      |                              |
+| `current_input/1`       | ✅      |                              |
+| `current_output/1`      | ✅      |                              |
+| `write_term_to_chars/3` | ⚠️     | Minor formatting differences |
 
-## Data Types
-- ✅ Atoms
-- ✅ Integers (arbitrary precision via Python)
-- ✅ Floats
-- ✅ Variables
-- ✅ Proper lists
-- ✅ Improper lists
-- ✅ Compound terms
-- ✅ Empty list `[]` equivalent to `'[]'`
+---
 
-## High-Priority Gaps and Deviations
+## §8.12 — Errors & Exceptions
 
-### Critical Missing Features
-1. **Dynamic Operator Parsing**: `op/3` updates the operator table and current_op/3, but parsing still uses the built-in operator set (custom operators require canonical functor syntax).
-2. **Character Conversion**: `char_conversion/2` not implemented.
+| Feature                                                           | Status | Notes                                        |
+| ----------------------------------------------------------------- | ------ | -------------------------------------------- |
+| `throw/1`                                                         | ✅      |                                              |
+| `catch/3`                                                         | ✅      |                                              |
+| `instantiation_error`                                             | ✅      |                                              |
+| `type_error/2`                                                    | ✅      |                                              |
+| `domain_error/2`                                                  | ✅      |                                              |
+| `permission_error/3`                                              | ✅      | Enforced consistently for most predicates    |
+| `existence_error/2`                                               | ✅      |                                              |
+| `syntax_error/1`                                                  | ✅      |                                              |
+| Arithmetic errors (`zero_divisor`, `undefined`, `float_overflow`) | ✅      | Full ISO-compliant arithmetic error handling |
 
-### Significant Deviations
-1. **Character Code Syntax**: Some advanced character code forms not supported.
+---
 
-### Parser Limitations
-1. **Hex Character Codes**: `0'\xHH` syntax now supported with optional trailing backslash for compatibility
-2. **SWI-Style Dict Syntax**: `tag{a:1}` syntax not supported
-3. **Operator Definition**: `:- op/3` updates the table but parser does not apply custom operators (only built-ins parse as operators)
-4. **Unary Minus Precedence**: In some cases, unary minus may bind differently than expected (e.g., `-X + Y` parses as `-(X + Y)`)
-5. **Base'char'number Syntax**: `Base'char'number` syntax (e.g., `16'mod'2`) intentionally not implemented - extremely obscure ISO feature with ambiguous semantics and no practical use
+## §8.8 — Reflection
+
+| Predicate                             | Status | Notes                   |
+| ------------------------------------- | ------ | ----------------------- |
+| `current_predicate/1`                 | ✅      |                         |
+| `predicate_property/2`                | ⚠️     | Built-in detection only |
+| `dynamic/static/multifile` properties | ❌      | Needed for ISO tooling  |
+
+---
+
+## §10 — Modules (ISO Part 1)
+
+| Feature                           | Status | Notes                                                          |
+| --------------------------------- | ------ | -------------------------------------------------------------- |
+| `:- module/2`                     | ✅      |                                                                |
+| Module-qualified calls (`M:Goal`) | ✅      |                                                                |
+| Export enforcement                | ✅      |                                                                |
+| Built-ins visible in all modules  | ✅      |                                                                |
+| Clause body module resolution     | ✅      | Unqualified goals resolve via imports → defining module → user |
+| `use_module/1,2`                  | ✅      | Supports full and selective imports, including `library(Name)` |
+| Cross-module dynamic semantics    | ⚠️     | Implemented; further test coverage recommended                 |
+
+---
+
+## ISO Conformance Snapshot
+
+| Category               | Status                            |
+| ---------------------- | --------------------------------- |
+| Core execution model   | ✅ Strong                          |
+| Built-ins & arithmetic | ✅ Strong                          |
+| Errors & exceptions    | ✅ Strong                          |
+| Parsing & syntax       | ❌ Blocking gaps                   |
+| Modules                | ✅ Largely ISO-consistent (Part 1) |
+| Reflection             | ⚠️ Partial                        |
+
+---
+
+## ISO Blocking Issues
+
+1. `op/3` must affect parsing (§6.3)
+2. `char_conversion/2` missing (§6.4, §7.4)
+3. Incorrect term ordering (§6.4.10)
+4. Module-local clause resolution (§10)
