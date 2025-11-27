@@ -181,6 +181,35 @@ Shared helpers for the AST live in `vibeprolog/utils/`:
 These modules are imported by `vibeprolog/engine.py` and have focused coverage in
 `tests/utils/`.
 
+## DCG (Definite Clause Grammar) Support
+
+DCG rules are syntactic sugar for Prolog clauses that manipulate difference lists.
+The `vibeprolog/dcg.py` module handles the expansion of DCG syntax into regular Prolog.
+
+### DCG Expansion Process
+
+1. **Parser**: DCG rules `Head --> Body` are parsed as special clause types
+2. **Expansion**: During consultation, DCG clauses are expanded using `DCGExpander`
+3. **Storage**: Expanded rules are stored as regular Prolog clauses with difference list arguments
+
+### Expansion Rules
+
+- `Head --> Body` becomes `Head(S0, S) :- ExpandedBody`
+- Terminals `[X, Y, Z]` → `S0 = [X, Y, Z | S]`
+- Non-terminals `foo` → `foo(S0, S)`
+- Sequences `a, b` → threaded difference lists: `a(S0, S1), b(S1, S)`
+- Alternatives `(a ; b)` → `a(S0, S) ; b(S0, S)`
+- Embedded goals `{Goal}` → `S0 = S, Goal` (no list threading)
+- Empty `[]` → `S0 = S`
+- Cut `!` → preserved as-is
+
+### Built-in Predicates
+
+- `phrase(RuleSet, List)` ≡ `RuleSet(List, [])`
+- `phrase(RuleSet, List, Rest)` ≡ `RuleSet(List, Rest)`
+
+DCG rules are expanded at parse time, not runtime, ensuring efficient execution.
+
 ## Examples
 
 ### Family Relationships

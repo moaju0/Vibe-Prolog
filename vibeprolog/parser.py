@@ -44,6 +44,7 @@ class Clause:
     body: list[Compound] | None = None  # None for facts
     doc: str | None = None  # PlDoc documentation
     meta: Any = None  # Lark meta information
+    dcg: bool = False  # True for DCG rules
 
     def is_fact(self):
         return self.body is None
@@ -81,9 +82,10 @@ class PredicatePropertyDirective:
 PROLOG_GRAMMAR = r"""
     start: (clause | directive)+
 
-    clause: fact | rule
+    clause: fact | rule | dcg_rule
     fact: term "."
     rule: term ":-" goals "."
+    dcg_rule: term "-->" goals "."
     directive: ":-" (property_directive | term) "."
 
     property_directive: "dynamic" "(" predicate_indicators ")"    -> dynamic_directive
@@ -137,7 +139,7 @@ PROLOG_GRAMMAR = r"""
     curly_braces: "{" term "}"
 
     COMP_OP: "=.." | "is" | "=" | "\\=" | "=:=" | "=\=" | "<" | ">" | "=<" | ">=" | "==" | "\\==" | "@<" | "@=<" | "@>" | "@>="
-    OPERATOR_ATOM: ":-"
+    OPERATOR_ATOM: ":-" | "-->"
     PREFIX_OP.3: "\\+" | "+" | "-"
     ADD_OP: "+" | "-"
     POW_OP.2: "**"
@@ -221,6 +223,11 @@ class PrologTransformer(Transformer):
     def rule(self, meta, items):
         head, body = items
         return Clause(head=head, body=body, meta=meta)
+
+    @v_args(meta=True)
+    def dcg_rule(self, meta, items):
+        head, body = items
+        return Clause(head=head, body=body, dcg=True, meta=meta)
 
     def goals(self, items):
         return items

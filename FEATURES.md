@@ -129,6 +129,22 @@
 - ✅ `maplist/2` – Apply goal to list elements (SWI-Prolog extension, not ISO)
   - Streams goal solutions per element to preserve backtracking semantics
 
+## Definite Clause Grammars (DCG)
+
+### DCG Syntax
+- ✅ `-->/2` – DCG rule operator
+- ✅ Terminal notation `[X, Y, Z]`
+- ✅ Non-terminal expansion with difference lists
+- ✅ Sequence threading `a, b`
+- ✅ Alternatives with `;`
+- ✅ Embedded Prolog goals `{Goal}`
+- ✅ Empty productions `[]`
+- ✅ Cut in DCG rules `!`
+
+### DCG Built-ins
+- ✅ `phrase/2` – Invoke DCG with complete list consumption
+- ✅ `phrase/3` – Invoke DCG with remainder
+
 ### System Predicates
 - ✅ `argv/1` – Access command-line arguments as list
 - ✅ `current_prolog_flag(argv, Args)` – ISO-style access to command-line arguments
