@@ -29,6 +29,8 @@ class Module:
         self.exports = exports if exports is not None else set()
         self.predicates: dict[tuple[str, int], list] = {}
         self.file: str | None = None
+        # Import table: (functor, arity) -> source_module_name
+        self.imports: dict[tuple[str, int], str] = {}
 
 
 class PrologInterpreter:
@@ -146,7 +148,6 @@ class PrologInterpreter:
 
             # Parse export list (should be a List AST)
             exports = set()
-            file_source = source_name
 
             if isinstance(exports_term, ParserList):
                 for elt in exports_term.elements:
@@ -164,13 +165,69 @@ class PrologInterpreter:
                 error_term = PrologError.type_error("list", exports_term, "module/2")
                 raise PrologThrow(error_term)
 
+            # Extract filepath from source_name (remove the #counter suffix)
+            if source_name.startswith("file:") and "#" in source_name:
+                filepath = source_name.split("#")[0][5:]  # Remove "file:" prefix and "#counter" suffix
+            else:
+                filepath = source_name
+
             # Create Module object and set current module context
             mod = Module(module_name, exports)
-            mod.file = file_source
+            mod.file = filepath
             self.modules[module_name] = mod
             self.current_module = module_name
             # Reset closed predicates when entering a new module
             closed_predicates.clear()
+            return
+
+        # use_module directives: :- use_module(File). or :- use_module(File, Imports).
+        if isinstance(goal, Compound) and goal.functor == "use_module":
+            if len(goal.args) == 1:
+                # use_module(File)
+                file_term = goal.args[0]
+                imports = None
+            elif len(goal.args) == 2:
+                # use_module(File, Imports)
+                file_term, imports_term = goal.args
+                imports = self._parse_import_list(imports_term, "use_module/2")
+            else:
+                error_term = PrologError.type_error("callable", goal, "use_module/1,2")
+                raise PrologThrow(error_term)
+
+            # Resolve the module file
+            module_file = self._resolve_module_file(file_term, "use_module/1,2")
+
+            # Load the module if not already loaded
+            module_name = self._load_module_from_file(module_file)
+
+            # Add imports to current module
+            current_mod = self.modules.get(self.current_module)
+            if current_mod is None:
+                # Create user module if it doesn't exist
+                current_mod = Module(self.current_module, None)
+                self.modules[self.current_module] = current_mod
+
+            # Get the source module
+            source_mod = self.modules.get(module_name)
+            if source_mod is None:
+                error_term = PrologError.existence_error("module", Atom(module_name), "use_module/1,2")
+                raise PrologThrow(error_term)
+
+            # Add imports
+            if imports is None:
+                # Import all exported predicates
+                for pred_key in source_mod.exports:
+                    current_mod.imports[pred_key] = module_name
+            else:
+                # Import specific predicates
+                for pred_key in imports:
+                    if pred_key not in source_mod.exports:
+                        indicator = self._indicator_from_key(pred_key)
+                        error_term = PrologError.permission_error(
+                            "access", "private_procedure", indicator, "use_module/2"
+                        )
+                        raise PrologThrow(error_term)
+                    current_mod.imports[pred_key] = module_name
             return
 
         if isinstance(goal, PredicatePropertyDirective):
@@ -196,6 +253,77 @@ class PrologInterpreter:
                 raise PrologThrow(error_term)
             self.initialization_goals.append(init_goal)
         # Other directives can be added here
+
+    def _parse_import_list(self, imports_term, context: str) -> set[tuple[str, int]]:
+        """Parse import list for use_module/2."""
+        imports = set()
+        if isinstance(imports_term, ParserList):
+            for elt in imports_term.elements:
+                # Each elt should be Name/Arity (Compound "/")
+                if isinstance(elt, Compound) and elt.functor == "/" and len(elt.args) == 2:
+                    name_arg, arity_arg = elt.args
+                    if not isinstance(name_arg, Atom) or not isinstance(arity_arg, Number):
+                        error_term = PrologError.type_error("predicate_indicator", elt, context)
+                        raise PrologThrow(error_term)
+                    imports.add((name_arg.name, int(arity_arg.value)))
+                else:
+                    error_term = PrologError.type_error("predicate_indicator", elt, context)
+                    raise PrologThrow(error_term)
+        else:
+            error_term = PrologError.type_error("list", imports_term, context)
+            raise PrologThrow(error_term)
+        return imports
+
+    def _resolve_module_file(self, file_term, context: str) -> str:
+        """Resolve module file path."""
+        if isinstance(file_term, Atom):
+            module_name = file_term.name
+            # Direct file path
+            if not Path(module_name).exists():
+                error_term = PrologError.existence_error("file", file_term, context)
+                raise PrologThrow(error_term)
+            return module_name
+        elif isinstance(file_term, Compound) and file_term.functor == "library" and len(file_term.args) == 1:
+            # library(Name) syntax
+            lib_term = file_term.args[0]
+            if not isinstance(lib_term, Atom):
+                error_term = PrologError.type_error("atom", lib_term, context)
+                raise PrologThrow(error_term)
+            lib_name = lib_term.name
+            # Look in examples/modules/ first, then library/
+            candidates = [
+                f"examples/modules/{lib_name}.pl",
+                f"library/{lib_name}.pl"
+            ]
+            for candidate in candidates:
+                if Path(candidate).exists():
+                    return candidate
+            error_term = PrologError.existence_error("file", file_term, context)
+            raise PrologThrow(error_term)
+        else:
+            error_term = PrologError.type_error("atom", file_term, context)
+            raise PrologThrow(error_term)
+
+    def _load_module_from_file(self, filepath: str) -> str:
+        """Load a module from file and return its name."""
+        # Check if already loaded by checking modules
+        for mod_name, mod in self.modules.items():
+            if mod.file == filepath:
+                return mod_name
+
+        # Save current module context
+        saved_current_module = self.current_module
+
+        # Load the file
+        self.consult(filepath)
+
+        # Get the module name that was loaded
+        loaded_module_name = self.current_module
+
+        # Restore current module context
+        self.current_module = saved_current_module
+
+        return loaded_module_name
 
     def _handle_predicate_property_directive(
         self, directive: PredicatePropertyDirective, closed_predicates: set[tuple[str, int]]

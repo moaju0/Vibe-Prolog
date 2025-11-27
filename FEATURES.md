@@ -209,8 +209,8 @@
 - ✅ `current_module/1` – Enumerate loaded modules (built-in in `vibeprolog.builtins.reflection`).
 - ✅ `module_property/2` – Query module exports and (where available) the source file.
 - ✅ Built-ins remain accessible from all modules.
-- ⚠️ `use_module/1,2` imports are not implemented in this change (deferred).
-- ✅ Module-aware resolution for non-qualified goals inside clause bodies: unqualified goals in clause bodies resolve first to the defining module's predicates, then to user module predicates, preserving export restrictions for other modules.
+- ✅ `use_module/1,2` – Import predicates from modules. `use_module(File)` imports all exported predicates; `use_module(File, [pred/arity, ...])` imports specific predicates. Supports `library(Name)` syntax for standard library modules.
+- ✅ Module-aware resolution for non-qualified goals inside clause bodies: unqualified goals in clause bodies resolve first to imported predicates, then to the defining module's predicates, then to user module predicates, preserving export restrictions for other modules.
 - ⚠️ Dynamic/multifile interactions across modules are supported minimally and may need further tests and refinement.
 
 ## Execution Model

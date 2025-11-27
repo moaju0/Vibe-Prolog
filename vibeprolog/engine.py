@@ -149,6 +149,14 @@ class PrologEngine:
                 raise
             return
 
+        # Check if goal is an imported predicate in current module
+        imported_module = self._check_imported_predicate(current_module, goal)
+        if imported_module is not None:
+            # Resolve from imported module
+            for result in self._solve_module_predicate(imported_module, None, goal, subst, remaining_goals, current_module):
+                yield result
+            return
+
         # Try to solve from current module predicates first
         for result in self._solve_module_predicate(current_module, None, goal, subst, remaining_goals, current_module):
             yield result
@@ -187,6 +195,29 @@ class PrologEngine:
                         raise
                 except PrologThrow:
                     raise
+
+    def _check_imported_predicate(self, current_module_name: str, goal) -> str | None:
+        """Check if goal is an imported predicate in current module, return source module name."""
+        interpreter = getattr(self, "interpreter", None)
+        if interpreter is None:
+            return None
+
+        current_mod = interpreter.modules.get(current_module_name)
+        if current_mod is None:
+            return None
+
+        # Get predicate key
+        key = None
+        if isinstance(goal, Compound):
+            key = (goal.functor, len(goal.args))
+        elif isinstance(goal, Atom):
+            key = (goal.name, 0)
+
+        if key is None:
+            return None
+
+        # Check imports
+        return current_mod.imports.get(key)
 
     def _solve_module_predicate(self, module_name, key, inner_goal, subst, remaining_goals, current_module="user"):
         # Resolve a module-qualified goal by consulting the module's predicate index if available.

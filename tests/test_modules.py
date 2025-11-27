@@ -114,3 +114,105 @@ def test_builtin_accessible_from_module_clause():
     """)
     result = prolog.query_once("m1:test(X)")
     assert result is not None and result["X"] == [1, 2]
+
+
+class TestUseModule:
+    """Tests for use_module/1,2 directives."""
+
+    def test_use_module_file_all_exports(self):
+        """Test use_module(File) imports all exported predicates."""
+        prolog = PrologInterpreter()
+        prolog.consult_string("""
+            :- use_module('examples/modules/math_utils.pl').
+            test_double(X) :- double(5, X).
+            test_square(X) :- square(3, X).
+        """)
+        result1 = prolog.query_once("test_double(X)")
+        assert result1 is not None and result1["X"] == 10
+        result2 = prolog.query_once("test_square(X)")
+        assert result2 is not None and result2["X"] == 9
+
+    def test_use_module_file_specific_imports(self):
+        """Test use_module(File, [pred/arity]) imports only specified predicates."""
+        prolog = PrologInterpreter()
+        prolog.consult_string("""
+            :- use_module('examples/modules/math_utils.pl', [double/2]).
+            test_double(X) :- double(4, X).
+        """)
+        # Should work for imported predicate
+        result = prolog.query_once("test_double(X)")
+        assert result is not None and result["X"] == 8
+
+        # Should fail for non-imported predicate
+        assert not prolog.has_solution("square(2, X)")
+
+    def test_use_module_nonexistent_file(self):
+        """Test use_module with nonexistent file raises error."""
+        prolog = PrologInterpreter()
+        try:
+            prolog.consult_string(":- use_module('nonexistent.pl').")
+            assert False, "Should have raised an error"
+        except Exception as e:
+            assert "existence_error" in str(e)
+
+    def test_use_module_nonexistent_module(self):
+        """Test use_module with nonexistent module raises error."""
+        prolog = PrologInterpreter()
+        try:
+            prolog.consult_string(":- use_module('examples/modules/nonexistent.pl').")
+            assert False, "Should have raised an error"
+        except Exception as e:
+            assert "existence_error" in str(e)
+
+    def test_use_module_private_predicate(self):
+        """Test use_module cannot import non-exported predicates."""
+        prolog = PrologInterpreter()
+        try:
+            prolog.consult_string("""
+                :- use_module('examples/modules/math_utils.pl', [private_helper/2]).
+            """)
+            assert False, "Should have raised a permission error"
+        except Exception as e:
+            assert "permission_error" in str(e)
+
+    def test_use_module_idempotent(self):
+        """Test use_module is idempotent - multiple imports don't duplicate."""
+        prolog = PrologInterpreter()
+        prolog.consult_string("""
+            :- use_module('examples/modules/lists.pl').
+            :- use_module('examples/modules/lists.pl').
+            test(X) :- my_append([1,2], [3,4], X).
+        """)
+        result = prolog.query_once("test(X)")
+        assert result is not None and result["X"] == [1, 2, 3, 4]
+
+    def test_use_module_in_module_clause(self):
+        """Test use_module works when used inside a module."""
+        prolog = PrologInterpreter()
+        prolog.consult_string("""
+            :- module(my_module, [test/1]).
+            :- use_module('examples/modules/math_utils.pl').
+            test(X) :- double(3, X).
+        """)
+        result = prolog.query_once("my_module:test(X)")
+        assert result is not None and result["X"] == 6
+
+    def test_imported_predicates_in_clause_body(self):
+        """Test imported predicates work in clause bodies."""
+        prolog = PrologInterpreter()
+        prolog.consult_string("""
+            :- use_module('examples/modules/lists.pl').
+            test_combined(X) :- my_append([1], [2], Temp), my_reverse(Temp, X).
+        """)
+        result = prolog.query_once("test_combined(X)")
+        assert result is not None and result["X"] == [2, 1]
+
+    def test_use_module_library_syntax(self):
+        """Test library(Name) syntax for use_module."""
+        prolog = PrologInterpreter()
+        prolog.consult_string("""
+            :- use_module(library(math_utils)).
+            test(X) :- double(7, X).
+        """)
+        result = prolog.query_once("test(X)")
+        assert result is not None and result["X"] == 14
