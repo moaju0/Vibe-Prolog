@@ -119,6 +119,42 @@ uv run pytest tests/test_builtins.py::TestUnification::test_unify_atoms
 **Complex Examples (2 tests)**
 - Real-world examples (cans.pl)
 - Meta-interpreter patterns
+### Fixtures (`test_fixtures.py`)
+
+Comprehensive fixtures for exercising the interpreter across various features.
+
+**Recursion (`recursion.pl`)**
+- `factorial/2` - Recursive factorial calculation
+- `fib/2` - Recursive Fibonacci sequence
+- Tests deep recursion and arithmetic recursion
+
+**List Operations (`lists.pl`)**
+- `append/3` - List concatenation
+- `reverse/2` - List reversal
+- `member/2` - List membership
+- `map/3` - Simple list mapping with succ/2
+- Tests list manipulation and recursion on lists
+
+**Meta-Predicates (`meta_predicates.pl`)**
+- `p/1` - Simple facts
+- `q/1` - Uses `findall/3` to collect all p/1 facts
+- `test_call/0` - Uses `call/1` to call p(a)
+- Tests higher-order predicates and meta-programming
+
+**Arithmetic (`arithmetic.pl`)**
+- `sum_list/2` - Accumulates sum of list elements
+- `greater_than/2` - Simple comparison
+- `product_list/2` - Accumulates product of list elements
+- Tests arithmetic operations and comparisons
+
+**DCGs (`dcg_sample.pl`)**
+- `s//0` - DCG for balanced parentheses
+- Tests definite clause grammars
+
+**Large Facts (`large_facts.pl`)**
+- 500 `person/1` facts (person(1) to person(500))
+- Tests scalability with large fact bases
+
 
 ## Test Statistics
 
