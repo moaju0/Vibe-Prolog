@@ -507,3 +507,23 @@ def address_pr_comments_with_codex(
         ),
     )
     run_pr_comment_workflow(pr_number, config)
+
+
+def address_pr_comments_with_amp(
+    pr_number: str | None = None, timeout_seconds: int | None = 180
+) -> None:
+    """Address PR comments using the Amp CLI headless mode."""
+    config = PRCommentWorkflowConfig(
+        tool_name="amp",
+        tool_cmd=[
+            "amp",
+            "-x",
+        ],
+        timeout_seconds=timeout_seconds,
+        input_instruction=(
+            "You are Amp running headless. Address the PR review comments described "
+            "below by editing this repository, running tests as appropriate, and summarizing "
+            "your updates before finishing."
+        ),
+    )
+    run_pr_comment_workflow(pr_number, config)

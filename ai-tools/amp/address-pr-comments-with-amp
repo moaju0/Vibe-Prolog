@@ -1,0 +1,10 @@
+#!/usr/bin/env -S uv run --script
+#
+# /// script
+# requires-python = ">=3.12"
+# ///
+from autocoder_utils.cli import address_pr_comments_with_amp
+
+
+if __name__ == "__main__":
+    address_pr_comments_with_amp()

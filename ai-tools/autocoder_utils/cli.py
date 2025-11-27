@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Sequence
 
 from .address_pr_comments import (
+    address_pr_comments_with_amp as _address_pr_comments_with_amp,
     address_pr_comments_with_codex as _address_pr_comments_with_codex,
     address_pr_comments_with_claude as _address_pr_comments_with_claude,
     address_pr_comments_with_kilocode as _address_pr_comments_with_kilocode,
@@ -191,6 +192,28 @@ def address_pr_comments_with_codex(argv: Sequence[str] | None = None) -> None:
     )
     args = parser.parse_args(arg_list)
     _address_pr_comments_with_codex(pr_number=args.pr_number, timeout_seconds=args.timeout)
+
+
+def address_pr_comments_with_amp(argv: Sequence[str] | None = None) -> None:
+    """CLI wrapper for addressing PR comments using Amp."""
+    arg_list, prog = _parser_inputs(argv)
+    parser = argparse.ArgumentParser(
+        prog=prog,
+        description="Address PR review comments automatically with Amp headless mode.",
+    )
+    parser.add_argument(
+        "pr_number",
+        nargs="?",
+        help="PR number to update (auto-detect from current branch when omitted)",
+    )
+    parser.add_argument(
+        "--timeout",
+        type=int,
+        default=180,
+        help="Seconds before Amp processing times out (default: %(default)s)",
+    )
+    args = parser.parse_args(arg_list)
+    _address_pr_comments_with_amp(pr_number=args.pr_number, timeout_seconds=args.timeout)
 
 
 def generate_changelog(argv: Sequence[str] | None = None) -> None:
