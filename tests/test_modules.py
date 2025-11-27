@@ -149,14 +149,14 @@ class TestUseModule:
     def test_use_module_nonexistent_file(self):
         """Test use_module with nonexistent file raises error."""
         prolog = PrologInterpreter()
-        try:
-            prolog.consult_string(":- use_module('nonexistent.pl').")
-            assert False, "Should have raised an error"
-        except Exception as e:
-            assert "existence_error" in str(e)
+        from vibeprolog.exceptions import PrologThrow
 
-    def test_use_module_nonexistent_module(self):
-        """Test use_module with nonexistent module raises error."""
+        with pytest.raises(PrologThrow) as excinfo:
+            prolog.consult_string(":- use_module('nonexistent.pl').")
+        assert "existence_error" in str(excinfo.value.term)
+
+    def test_use_module_nonexistent_file_in_path(self):
+        """Test use_module with a nonexistent file in an existing path raises an error."""
         prolog = PrologInterpreter()
         try:
             prolog.consult_string(":- use_module('examples/modules/nonexistent.pl').")
