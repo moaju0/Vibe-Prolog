@@ -87,24 +87,41 @@ Status legend:
 | `==/2`                           | ✅      |                                                                                                          |
 | `\\==/2`                         | ✅      |                                                                                                          |
 | `@</2`, `@=</2`, `@>/2`, `@>=/2` | ✅      |                                                                                                          |
+| `compare/3`                      | ❌      | **ISO-required** - Three-way term comparison                                                             |
+| `unify_with_occurs_check/2`      | ❌      | **ISO-required** - Logically sound unification                                                           |
 | ISO standard term order          | ❌      | Lists treated separately (explicitly defined for deterministic ordering; ISO requires lists ⊂ compounds) |
 
 ---
 
 ## §8.3 — Type Testing
 
-| Predicate    | Status | Notes |
-| ------------ | ------ | ----- |
-| `var/1`      | ✅      |       |
-| `nonvar/1`   | ✅      |       |
-| `atom/1`     | ✅      |       |
-| `number/1`   | ✅      |       |
-| `integer/1`  | ✅      |       |
-| `float/1`    | ✅      |       |
-| `atomic/1`   | ✅      |       |
-| `compound/1` | ✅      |       |
-| `callable/1` | ✅      |       |
-| `ground/1`   | ✅      |       |
+| Predicate    | Status | Notes                                |
+| ------------ | ------ | ------------------------------------ |
+| `var/1`      | ✅      |                                      |
+| `nonvar/1`   | ✅      |                                      |
+| `atom/1`     | ✅      |                                      |
+| `number/1`   | ✅      |                                      |
+| `integer/1`  | ✅      |                                      |
+| `float/1`    | ✅      |                                      |
+| `atomic/1`   | ✅      |                                      |
+| `compound/1` | ✅      |                                      |
+| `callable/1` | ✅      |                                      |
+| `ground/1`   | ✅      |                                      |
+| `is_list/1`  | ❌      | Common extension (de facto standard) |
+
+---
+
+## §8.5 — Term Creation and Decomposition
+
+| Predicate           | Status | Notes                   |
+| ------------------- | ------ | ----------------------- |
+| `functor/3`         | ✅      |                         |
+| `arg/3`             | ✅      |                         |
+| `=../2` (univ)      | ✅      |                         |
+| `copy_term/2`       | ✅      |                         |
+| `term_variables/2`  | ❌      | **ISO-required**        |
+| `numbervars/3`      | ❌      | Common extension        |
+| `subsumes_term/2`   | ❌      | ISO extension (Part 2)  |
 
 ---
 
@@ -125,16 +142,46 @@ Status legend:
 
 ## §9 — Arithmetic
 
-| Feature                           | Status | Notes |
-| --------------------------------- | ------ | ----- |
-| `is/2`                            | ✅      |       |
-| Arithmetic comparison operators   | ✅      |       |
-| `+ - * / // mod`                  | ✅      |       |
-| `abs/1`                           | ✅      |       |
-| `min/2`, `max/2`                  | ✅      |       |
-| `sqrt/1`                          | ✅      |       |
-| Trig / exp / log                  | ✅      |       |
-| `floor/1`, `ceiling/1`, `round/1` | ✅      |       |
+| Feature                           | Status | Notes                                 |
+| --------------------------------- | ------ | ------------------------------------- |
+| `is/2`                            | ✅      |                                       |
+| Arithmetic comparison operators   | ✅      |                                       |
+| `+ - * / // mod`                  | ✅      |                                       |
+| `abs/1`                           | ✅      |                                       |
+| `min/2`, `max/2`                  | ✅      |                                       |
+| `sqrt/1`                          | ✅      |                                       |
+| Trig / exp / log                  | ✅      |                                       |
+| `floor/1`, `ceiling/1`, `round/1` | ✅      |                                       |
+| `between/3`                       | ❌      | **ISO-required** - Integer generation |
+| `succ/2`                          | ❌      | **ISO-required** - Successor relation |
+| `plus/3`                          | ❌      | **ISO-required** - Addition relation  |
+| `divmod/4`                        | ❌      | Common extension                      |
+
+---
+
+## List Operations (ISO §8.5.3 + Common Extensions)
+
+| Predicate               | Status | Notes                                         |
+| ----------------------- | ------ | --------------------------------------------- |
+| `append/3`              | ✅      |                                               |
+| `member/2`              | ✅      |                                               |
+| `length/2`              | ✅      |                                               |
+| `reverse/2`             | ✅      |                                               |
+| `sort/2`                | ✅      |                                               |
+| `msort/2`               | ❌      | **ISO-required** - Sort keeping duplicates    |
+| `keysort/2`             | ❌      | **ISO-required** - Sort Key-Value pairs       |
+| `nth0/3`, `nth1/3`      | ❌      | Common extension - Access by index            |
+| `last/2`                | ❌      | Common extension                              |
+| `select/3`              | ❌      | Common extension - Select element             |
+| `memberchk/2`           | ❌      | Common extension - Deterministic member       |
+| `sumlist/2`             | ❌      | Common extension                              |
+| `max_list/2`            | ❌      | Common extension                              |
+| `min_list/2`            | ❌      | Common extension                              |
+| `maplist/3-5`           | ❌      | Higher-order (only `/2` implemented)          |
+| `include/3`             | ❌      | Higher-order - Filter list                    |
+| `exclude/3`             | ❌      | Higher-order - Filter list (negated)          |
+| `partition/4`           | ❌      | Higher-order - Split list by condition        |
+| `foldl/4-6`             | ❌      | Higher-order - Fold left                      |
 
 ---
 
@@ -145,6 +192,16 @@ Status legend:
 | `findall/3` | ✅      |                        |
 | `bagof/3`   | ✅      | Correct quantification |
 | `setof/3`   | ✅      | ISO semantics          |
+
+---
+
+## Meta-Predicates & Control Flow Extensions
+
+| Predicate   | Status | Notes                               |
+| ----------- | ------ | ----------------------------------- |
+| `forall/2`  | ❌      | Common extension - Universal quantification |
+| `ignore/1`  | ❌      | Common extension - Always succeed   |
+| `apply/2`   | ❌      | Common extension - Call with args   |
 
 ---
 
@@ -163,26 +220,58 @@ Status legend:
 
 ---
 
-## §8.11–§8.12 — Input / Output
+## §8.11 — Character Input/Output
 
-| Predicate               | Status | Notes                        |
-| ----------------------- | ------ | ---------------------------- |
-| `read/1`, `read/2`      | ✅      |                              |
-| `write/1`               | ✅      |                              |
-| `writeln/1`             | ✅      |                              |
-| `nl/0`                  | ✅      |                              |
-| `format/2,3`            | ✅📘    | Extension                    |
-| `get_char/1`            | ✅      |                              |
-| `put_char/1`            | ✅      |                              |
-| `open/3`                | ✅      |                              |
-| `close/1`               | ✅      |                              |
-| `current_input/1`       | ✅      |                              |
-| `current_output/1`      | ✅      |                              |
-| `write_term_to_chars/3` | ⚠️     | Minor formatting differences |
+| Predicate       | Status | Notes                            |
+| --------------- | ------ | -------------------------------- |
+| `get_char/1-2`  | ⚠️     | Only `/1` implemented            |
+| `put_char/1-2`  | ⚠️     | Only `/1` implemented            |
+| `get_code/1-2`  | ❌      | **ISO-required**                 |
+| `put_code/1-2`  | ❌      | **ISO-required**                 |
+| `peek_char/1-2` | ❌      | **ISO-required** - Look ahead    |
+| `peek_code/1-2` | ❌      | **ISO-required** - Look ahead    |
+| `peek_byte/1-2` | ❌      | **ISO-required**                 |
+| `get_byte/1-2`  | ❌      | **ISO-required**                 |
+| `put_byte/1-2`  | ❌      | **ISO-required**                 |
+| `nl/0-1`        | ⚠️     | Only `/0` implemented            |
 
 ---
 
-## §8.12 — Errors & Exceptions
+## §8.12 — Term Input/Output
+
+| Predicate               | Status | Notes                            |
+| ----------------------- | ------ | -------------------------------- |
+| `read/1-2`              | ✅      |                                  |
+| `read_term/2-3`         | ❌      | **ISO-required** - With options  |
+| `write/1-2`             | ⚠️     | Only `/1` implemented            |
+| `writeq/1-2`            | ❌      | **ISO-required** - With quotes   |
+| `write_canonical/1-2`   | ❌      | **ISO-required** - Canonical form|
+| `write_term/2-3`        | ❌      | **ISO-required** - With options  |
+| `print/1-2`             | ❌      | Common extension                 |
+| `writeln/1-2`           | ⚠️     | Only `/1` implemented (extension)|
+| `format/2-3`            | ✅📘    | Extension                        |
+| `write_term_to_chars/3` | ⚠️     | Minor formatting differences     |
+
+---
+
+## §8.13 — Stream Selection and Control
+
+| Predicate                | Status | Notes                        |
+| ------------------------ | ------ | ---------------------------- |
+| `open/3-4`               | ⚠️     | Only `/3` implemented        |
+| `close/1-2`              | ⚠️     | Only `/1` implemented        |
+| `current_input/1`        | ✅      |                              |
+| `current_output/1`       | ✅      |                              |
+| `set_input/1`            | ❌      | **ISO-required**             |
+| `set_output/1`           | ❌      | **ISO-required**             |
+| `flush_output/0-1`       | ❌      | **ISO-required**             |
+| `at_end_of_stream/0-1`   | ❌      | **ISO-required** - EOF test  |
+| `stream_property/2`      | ❌      | **ISO-required**             |
+| `set_stream_position/2`  | ❌      | **ISO-required** - Seek      |
+
+---
+
+## §7.12 — Errors & Exceptions
 
 | Feature                                                           | Status | Notes                                        |
 | ----------------------------------------------------------------- | ------ | -------------------------------------------- |
@@ -224,14 +313,26 @@ Status legend:
 
 ## ISO Conformance Snapshot
 
-| Category               | Status                            |
-| ---------------------- | --------------------------------- |
-| Core execution model   | ✅ Strong                          |
-| Built-ins & arithmetic | ⚠️ Strong (missing §8.16 atom processing) |
-| Errors & exceptions    | ✅ Strong                          |
-| Parsing & syntax       | ❌ Blocking gaps                   |
-| Modules                | ✅ Largely ISO-consistent (Part 1) |
-| Reflection             | ⚠️ Partial                        |
+| Category                  | Status                                                     |
+| ------------------------- | ---------------------------------------------------------- |
+| Core execution model      | ✅ Strong                                                   |
+| Control constructs        | ✅ Strong                                                   |
+| Unification & comparison  | ⚠️ Missing `compare/3`, `unify_with_occurs_check/2`        |
+| Type testing              | ✅ Strong (missing `is_list/1` extension)                   |
+| Term manipulation         | ⚠️ Missing `term_variables/2`, `numbervars/3`              |
+| Atom processing (§8.16)   | ❌ All 8 predicates missing (tracked in #164, #165)        |
+| Arithmetic                | ⚠️ Missing `between/3`, `succ/2`, `plus/3`                 |
+| List operations           | ⚠️ Basic ops ✅, missing `msort/2`, `keysort/2`, nth, etc. |
+| All-solutions             | ✅ Strong                                                   |
+| Meta-predicates           | ⚠️ Missing `forall/2`, higher-order list ops               |
+| Database operations       | ✅ Strong                                                   |
+| Character I/O (§8.11)     | ⚠️ Basic ✅, missing code/peek predicates                  |
+| Term I/O (§8.12)          | ⚠️ Basic read/write ✅, missing options & variants         |
+| Stream control (§8.13)    | ⚠️ Basic ✅, missing flush, seek, properties               |
+| Errors & exceptions       | ✅ Strong                                                   |
+| Parsing & syntax          | ❌ Blocking gaps (op/3, char_conversion)                   |
+| Modules                   | ✅ Largely ISO-consistent (Part 1)                          |
+| Reflection                | ⚠️ Partial                                                 |
 
 ---
 
@@ -242,3 +343,9 @@ Status legend:
 3. Incorrect term ordering (§6.4.10)
 4. Module-local clause resolution (§10)
 5. **Atom processing predicates missing (§8.16)** - All 8 predicates unimplemented, breaks DCG examples
+6. **Arithmetic predicates missing (§9)** - `between/3`, `succ/2`, `plus/3` unimplemented
+7. **Comparison predicates missing (§8.4)** - `compare/3`, `unify_with_occurs_check/2` unimplemented
+8. **List sorting missing** - `msort/2`, `keysort/2` unimplemented (ISO-required)
+9. **Character I/O incomplete (§8.11)** - Missing `get_code`, `put_code`, `peek_*` predicates
+10. **Term I/O incomplete (§8.12)** - Missing `read_term`, `write_term`, `writeq`, `write_canonical`
+11. **Stream operations incomplete (§8.13)** - Missing `flush_output`, `at_end_of_stream`, `stream_property`
