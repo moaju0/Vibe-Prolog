@@ -27,6 +27,16 @@ def _parser_inputs(argv: Sequence[str] | None) -> tuple[list[str] | None, str | 
     return values[1:], prog
 
 
+def parse_timeout(value: str) -> int | None:
+    """Parse timeout argument, allowing 'off' for no timeout."""
+    if value.lower() == "off":
+        return None
+    try:
+        return int(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"Invalid timeout value: {value!r}. Must be an integer or 'off'.")
+
+
 def _run_issue_workflow(
     argv: Sequence[str] | None,
     tool_cmd: list[str],
@@ -46,9 +56,9 @@ def _run_issue_workflow(
     parser.add_argument("issue", help="Issue number to fix")
     parser.add_argument(
         "--timeout",
-        type=int,
+        type=parse_timeout,
         default=default_timeout,
-        help=f"Seconds before {tool_name} automation times out (default: %(default)s)",
+        help=f"Seconds before {tool_name} automation times out (default: %(default)s). Use 'off' to disable.",
     )
     parser.add_argument(
         "--newbranch",
@@ -154,9 +164,9 @@ def address_pr_comments_with_kilocode(argv: Sequence[str] | None = None) -> None
     )
     parser.add_argument(
         "--timeout",
-        type=int,
+        type=parse_timeout,
         default=1200,
-        help="Seconds before Kilocode processing times out (default: %(default)s)",
+        help="Seconds before Kilocode processing times out (default: %(default)s). Use 'off' to disable.",
     )
     args = parser.parse_args(arg_list)
     _address_pr_comments_with_kilocode(pr_number=args.pr_number, timeout_seconds=args.timeout)
@@ -176,9 +186,9 @@ def address_pr_comments_with_claude(argv: Sequence[str] | None = None) -> None:
     )
     parser.add_argument(
         "--timeout",
-        type=int,
+        type=parse_timeout,
         default=180,
-        help="Seconds before Claude processing times out (default: %(default)s)",
+        help="Seconds before Claude processing times out (default: %(default)s). Use 'off' to disable.",
     )
     args = parser.parse_args(arg_list)
     _address_pr_comments_with_claude(pr_number=args.pr_number, timeout_seconds=args.timeout)
@@ -198,9 +208,9 @@ def address_pr_comments_with_codex(argv: Sequence[str] | None = None) -> None:
     )
     parser.add_argument(
         "--timeout",
-        type=int,
+        type=parse_timeout,
         default=180,
-        help="Seconds before Codex processing times out (default: %(default)s)",
+        help="Seconds before Codex processing times out (default: %(default)s). Use 'off' to disable.",
     )
     args = parser.parse_args(arg_list)
     _address_pr_comments_with_codex(pr_number=args.pr_number, timeout_seconds=args.timeout)
@@ -220,9 +230,9 @@ def address_pr_comments_with_amp(argv: Sequence[str] | None = None) -> None:
     )
     parser.add_argument(
         "--timeout",
-        type=int,
+        type=parse_timeout,
         default=180,
-        help="Seconds before Amp processing times out (default: %(default)s)",
+        help="Seconds before Amp processing times out (default: %(default)s). Use 'off' to disable.",
     )
     args = parser.parse_args(arg_list)
     _address_pr_comments_with_amp(pr_number=args.pr_number, timeout_seconds=args.timeout)
