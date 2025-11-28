@@ -90,7 +90,7 @@ class PrologEngine:
     ) -> Iterator[Substitution]:
         """Solve a list of goals with backtracking."""
         # Check recursion depth limit
-        if depth >= self.max_depth:
+        if depth > self.max_depth:
             # Extract context from current goal for error message
             context = None
             if goals:
