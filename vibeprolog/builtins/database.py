@@ -99,12 +99,26 @@ class DatabaseBuiltins:
 
         if position == "front":
             engine.clauses.insert(0, new_clause)
+            clause_index = 0
+            # Shift existing indices in the first-arg index
+            for index_list in engine._first_arg_index.values():
+                for i in range(len(index_list)):
+                    if index_list[i] >= 0:
+                        index_list[i] += 1
+            for index_list in engine._variable_first_arg_clauses.values():
+                for i in range(len(index_list)):
+                    if index_list[i] >= 0:
+                        index_list[i] += 1
         else:
             engine.clauses.append(new_clause)
+            clause_index = len(engine.clauses) - 1
 
         # Update the predicate index
         engine._add_predicate_to_index(new_clause)
         engine._record_predicate_source(key, "runtime")
+
+        # Update the first-argument index
+        engine._add_clause_to_index(new_clause, clause_index)
 
         # Add to user module predicates
         if hasattr(engine, 'interpreter') and engine.interpreter:
@@ -158,7 +172,20 @@ class DatabaseBuiltins:
 
         for i, new_subst in reversed(matches):
             clause = engine.clauses[i]
+            # Remove from first-argument index before removing from clauses
+            engine._remove_clause_from_index(clause, i)
             engine.clauses.pop(i)
+
+            # Update indices for clauses that come after this one
+            for index_list in engine._first_arg_index.values():
+                for j in range(len(index_list)):
+                    if index_list[j] > i:
+                        index_list[j] -= 1
+            for index_list in engine._variable_first_arg_clauses.values():
+                for j in range(len(index_list)):
+                    if index_list[j] > i:
+                        index_list[j] -= 1
+
             # Also remove from module predicates
             if hasattr(engine, 'interpreter') and engine.interpreter:
                 module_name = getattr(clause, 'module', 'user')
@@ -237,6 +264,8 @@ class DatabaseBuiltins:
         if had_clauses:
             engine._predicate_index.discard((name, arity))
             engine.predicate_sources.pop((name, arity), None)
+            # Clear first-argument index entries
+            engine._clear_predicate_from_index(name, arity)
 
         return subst
 

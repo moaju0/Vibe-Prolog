@@ -60,6 +60,12 @@ class PrologEngine:
         self._initialize_builtin_properties()
         # Index of user-defined predicates for O(1) existence checks
         self._predicate_index: set[tuple[str, int]] = self._build_predicate_index()
+        # First-argument index: maps (functor, arity, first_arg_key) -> list of clause indices
+        self._first_arg_index = {}
+        # Fallback: clauses with variable first arguments (can't be indexed)
+        self._variable_first_arg_clauses = {}
+        # Build the first-argument index from existing clauses
+        self._build_first_arg_index()
         # Stream management
         self._streams: dict[str, Stream] = {}
         self._stream_counter = 0
@@ -162,8 +168,16 @@ class PrologEngine:
             yield result
 
         # If no solutions from current module, try global predicates (user module and others)
+        # Use first-argument indexing for efficient clause retrieval
+        if isinstance(goal, Compound):
+            relevant_clauses = self._get_indexed_clauses(goal.functor, len(goal.args), goal)
+        elif isinstance(goal, Atom):
+            relevant_clauses = self._get_indexed_clauses(goal.name, 0, goal)
+        else:
+            relevant_clauses = []
+
         cut_executed = False
-        for clause in self.clauses:
+        for clause in relevant_clauses:
             if cut_executed:
                 break
 
@@ -353,6 +367,133 @@ class PrologEngine:
             elif isinstance(head, Atom):
                 index.add((head.name, 0))
         return index
+
+    def _make_index_key(self, functor: str, arity: int, first_arg: Any) -> tuple[str, int, str, Any] | None:
+        """Generate index key for a clause based on its first argument.
+
+        Args:
+            functor: Predicate functor name
+            arity: Predicate arity
+            first_arg: The first argument term
+
+        Returns:
+            Tuple of (functor, arity, key_type, key_value) or None if not indexable
+        """
+        # Handle variables - not indexable
+        if self._is_var(first_arg):
+            return None
+
+        # Handle atoms
+        if isinstance(first_arg, str):
+            return (functor, arity, 'atom', first_arg)
+
+        # Handle numbers
+        if isinstance(first_arg, (int, float)):
+            return (functor, arity, 'number', first_arg)
+
+        # Handle empty list
+        if first_arg == [] or first_arg == '[]':
+            return (functor, arity, 'nil')
+
+        # Handle compound terms - index by functor
+        if isinstance(first_arg, tuple) and len(first_arg) >= 1:
+            sub_functor = first_arg[0]
+            sub_arity = len(first_arg) - 1
+            return (functor, arity, 'compound', sub_functor, sub_arity)
+
+        # Handle lists (non-empty) - index by list marker
+        # Lists are represented as ['|', Head, Tail]
+        if isinstance(first_arg, list) and len(first_arg) > 0:
+            return (functor, arity, 'list')
+
+        # Other cases: not indexable
+        return None
+
+    def _is_var(self, term: Any) -> bool:
+        """Check if a term is a variable."""
+        return isinstance(term, Variable)
+
+    def _build_first_arg_index(self) -> None:
+        """Build the first-argument index from existing clauses."""
+        for i, clause in enumerate(self.clauses):
+            self._index_clause(clause, i)
+
+    def _index_clause(self, clause: Clause, clause_index: int) -> None:
+        """Add a clause to the first-argument index.
+
+        Args:
+            clause: The clause to index
+            clause_index: Index of the clause in self.clauses
+        """
+        head = clause.head
+        if isinstance(head, Compound) and len(head.args) > 0:
+            functor = head.functor
+            arity = len(head.args)
+            first_arg = head.args[0]
+            index_key = self._make_index_key(functor, arity, first_arg)
+
+            if index_key is not None:
+                # Indexable - add to first-arg index
+                if index_key not in self._first_arg_index:
+                    self._first_arg_index[index_key] = []
+                self._first_arg_index[index_key].append(clause_index)
+            else:
+                # Not indexable (variable first arg) - add to fallback
+                fallback_key = (functor, arity)
+                if fallback_key not in self._variable_first_arg_clauses:
+                    self._variable_first_arg_clauses[fallback_key] = []
+                self._variable_first_arg_clauses[fallback_key].append(clause_index)
+        elif isinstance(head, Atom):
+            # Zero-arity predicates don't need indexing
+            pass
+
+    def _get_indexed_clauses(self, functor: str, arity: int, goal: Compound) -> list[Clause]:
+        """Get clauses relevant to goal using first-argument index.
+
+        Args:
+            functor: Predicate functor
+            arity: Predicate arity
+            goal: The goal term being solved
+
+        Returns:
+            List of clauses to try (already filtered by first argument)
+        """
+        # Check if predicate has any clauses
+        if (functor, arity) not in self._predicate_index:
+            return []
+
+        # If arity is 0, return all clauses for this functor
+        if arity == 0:
+            return [clause for clause in self.clauses
+                    if (isinstance(clause.head, Atom) and clause.head.name == functor)]
+
+        # Get first argument of goal
+        first_arg = goal.args[0] if len(goal.args) > 0 else None
+
+        # Generate index key
+        index_key = self._make_index_key(functor, arity, first_arg)
+
+        clauses_to_try = []
+
+        if index_key is not None:
+            # Goal has ground first argument - use index
+            if index_key in self._first_arg_index:
+                clause_indices = self._first_arg_index[index_key]
+                clauses_to_try.extend(self.clauses[i] for i in clause_indices)
+        else:
+            # Goal has variable first argument - must try all clauses
+            # Include both indexed and non-indexed clauses
+            for key, clause_indices in self._first_arg_index.items():
+                if key[0] == functor and key[1] == arity:
+                    clauses_to_try.extend(self.clauses[i] for i in clause_indices)
+
+        # Always include clauses with variable first arguments (fallback)
+        fallback_key = (functor, arity)
+        if fallback_key in self._variable_first_arg_clauses:
+            clause_indices = self._variable_first_arg_clauses[fallback_key]
+            clauses_to_try.extend(self.clauses[i] for i in clause_indices)
+
+        return clauses_to_try
 
     def _register_builtin(
         self, functor: str, arity: int, registry: BuiltinRegistry, handler: Callable
@@ -586,6 +727,67 @@ class PrologEngine:
             self._predicate_index.add((head.functor, len(head.args)))
         elif isinstance(head, Atom):
             self._predicate_index.add((head.name, 0))
+
+    def _add_clause_to_index(self, clause: Clause, clause_index: int) -> None:
+        """Add a clause to the first-argument index.
+
+        Args:
+            clause: The clause being added
+            clause_index: Index of the clause in self.clauses
+        """
+        self._index_clause(clause, clause_index)
+
+    def _remove_clause_from_index(self, clause: Clause, clause_index: int) -> None:
+        """Remove a clause from the first-argument index.
+
+        Args:
+            clause: The clause being removed
+            clause_index: Index of the clause in self.clauses
+        """
+        head = clause.head
+        if isinstance(head, Compound) and len(head.args) > 0:
+            functor = head.functor
+            arity = len(head.args)
+            first_arg = head.args[0]
+            index_key = self._make_index_key(functor, arity, first_arg)
+
+            if index_key is not None:
+                # Remove from first-arg index
+                if index_key in self._first_arg_index and clause_index in self._first_arg_index[index_key]:
+                    self._first_arg_index[index_key].remove(clause_index)
+                    # Clean up empty entries
+                    if not self._first_arg_index[index_key]:
+                        del self._first_arg_index[index_key]
+            else:
+                # Remove from fallback
+                fallback_key = (functor, arity)
+                if fallback_key in self._variable_first_arg_clauses and clause_index in self._variable_first_arg_clauses[fallback_key]:
+                    self._variable_first_arg_clauses[fallback_key].remove(clause_index)
+                    if not self._variable_first_arg_clauses[fallback_key]:
+                        del self._variable_first_arg_clauses[fallback_key]
+        elif isinstance(head, Atom):
+            # Zero-arity predicates don't need indexing
+            pass
+
+    def _clear_predicate_from_index(self, functor: str, arity: int) -> None:
+        """Remove all index entries for a predicate.
+
+        Args:
+            functor: The predicate functor name
+            arity: The predicate arity
+        """
+        # Remove from first-argument index
+        keys_to_remove = [
+            key for key in self._first_arg_index.keys()
+            if key[0] == functor and key[1] == arity
+        ]
+        for key in keys_to_remove:
+            del self._first_arg_index[key]
+
+        # Remove from fallback
+        fallback_key = (functor, arity)
+        if fallback_key in self._variable_first_arg_clauses:
+            del self._variable_first_arg_clauses[fallback_key]
 
     def _record_predicate_source(self, key: tuple[str, int], source: str) -> None:
         """Track which source provided clauses for a predicate."""
