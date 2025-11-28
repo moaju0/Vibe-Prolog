@@ -77,6 +77,28 @@ class AtomProcessingBuiltins:
                 yield new_subst
 
     @staticmethod
+    def _flatten_prolog_list(term) -> list | None:
+        """Flatten a Prolog list into a Python list of elements.
+
+        Returns None if the term is not a proper list.
+        """
+        if not isinstance(term, List):
+            return None
+
+        elements = []
+        current = term
+        while isinstance(current, List):
+            elements.extend(current.elements)
+            if current.tail is None:
+                break
+            current = current.tail
+        else:
+            # Not a proper list
+            return None
+
+        return elements
+
+    @staticmethod
     def _is_char_list(term) -> bool:
         """Check if term is a proper list of single-character atoms."""
         if not isinstance(term, List):
