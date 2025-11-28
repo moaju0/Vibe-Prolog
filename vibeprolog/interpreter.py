@@ -426,7 +426,7 @@ class PrologInterpreter:
             raise PrologThrow(error_term)
 
         sources = self._predicate_sources.setdefault(key, set())
-        if sources and source_name not in sources and "multifile" not in properties:
+        if "static" in properties and sources and source_name not in sources and "multifile" not in properties:
             indicator = self._indicator_from_key(key)
             error_term = PrologError.permission_error(
                 "modify", "static_procedure", indicator, "consult/1"
@@ -638,8 +638,8 @@ class PrologInterpreter:
             self._raise_syntax_error(exc, "query/1")
 
         if clauses and clauses[0].body:
-            # Flatten conjunction into list of goals
-            return self._flatten_conjunction(clauses[0].body[0])
+            # The parser already returns body as a flattened list of goals
+            return clauses[0].body
 
         # Single goal case
         prolog_code = query_str
