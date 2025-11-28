@@ -90,7 +90,7 @@ Status legend:
 | `@</2`, `@=</2`, `@>/2`, `@>=/2` | ✅      |                                                                                                          |
 | `compare/3`                      | ❌      | **ISO-required** - Three-way term comparison                                                             |
 | `unify_with_occurs_check/2`      | ❌      | **ISO-required** - Logically sound unification                                                           |
-| ISO standard term order          | ❌      | Lists treated separately (explicitly defined for deterministic ordering; ISO requires lists ⊂ compounds) |
+| ISO standard term order          | ✅      | |
 
 ---
 
