@@ -386,9 +386,12 @@ class TestNumberChars:
         assert "syntax_error" in str(exc_info.value)
 
     def test_number_chars_invalid_chars(self):
-        """Test failure when list contains non-character atoms."""
+        """Test type error when list contains non-character atoms."""
         prolog = PrologInterpreter()
-        assert not prolog.has_solution("number_chars(X, ['1','2',hello]).")
+        with pytest.raises(PrologThrow) as exc_info:
+            prolog.query_once("number_chars(X, ['1','2',hello]).")
+        assert "type_error" in str(exc_info.value)
+        assert "character" in str(exc_info.value)
 
 
 class TestNumberCodes:
@@ -462,6 +465,17 @@ class TestNumberCodes:
         assert "syntax_error" in str(exc_info.value)
 
     def test_number_codes_invalid_codes(self):
-        """Test failure when list contains non-integers."""
+        """Test type error when list contains non-integers."""
         prolog = PrologInterpreter()
-        assert not prolog.has_solution("number_codes(X, [49,50,hello]).")
+        with pytest.raises(PrologThrow) as exc_info:
+            prolog.query_once("number_codes(X, [49,50,hello]).")
+        assert "type_error" in str(exc_info.value)
+        assert "integer" in str(exc_info.value)
+
+    def test_number_codes_invalid_character_code(self):
+        """Test type error when list contains invalid character code."""
+        prolog = PrologInterpreter()
+        with pytest.raises(PrologThrow) as exc_info:
+            prolog.query_once("number_codes(X, [1114112]).")
+        assert "type_error" in str(exc_info.value)
+        assert "character_code" in str(exc_info.value)

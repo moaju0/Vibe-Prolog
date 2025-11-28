@@ -421,8 +421,10 @@ class AtomProcessingBuiltins:
 
             char_str = ""
             for elem in elements:
+                elem = deref(elem, subst)
                 if not isinstance(elem, Atom) or len(elem.name) != 1:
-                    return  # Invalid character
+                    error_term = PrologError.type_error("character", elem, "number_chars/2")
+                    raise PrologThrow(error_term)
                 char_str += elem.name
 
             # Parse the number
@@ -475,9 +477,15 @@ class AtomProcessingBuiltins:
 
             char_str = ""
             for elem in elements:
+                elem = deref(elem, subst)
                 if not isinstance(elem, Number) or not isinstance(elem.value, int):
-                    return  # Invalid integer
-                char_str += chr(int(elem.value))
+                    error_term = PrologError.type_error("integer", elem, "number_codes/2")
+                    raise PrologThrow(error_term)
+                try:
+                    char_str += chr(elem.value)
+                except ValueError:
+                    error_term = PrologError.type_error("character_code", elem, "number_codes/2")
+                    raise PrologThrow(error_term)
 
             # Parse the number
             try:
