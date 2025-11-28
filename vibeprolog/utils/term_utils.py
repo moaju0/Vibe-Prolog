@@ -122,7 +122,28 @@ def term_sort_key(term: Any, subst: Substitution | None = None) -> tuple:
             normalized_elements.extend(current_tail.elements)
             current_tail = deref(current_tail.tail, subst) if current_tail.tail is not None else None
 
-        final_tail = Atom('[]') if current_tail is None else current_tail
-        return (4, tuple(term_sort_key(e, subst) for e in normalized_elements), term_sort_key(final_tail, subst))
+<<<<<<< HEAD
+        # Build sort key for compound representation iteratively to avoid recursion depth issues.
+        final_tail_term = Atom('[]') if current_tail is None else current_tail
+        key = term_sort_key(final_tail_term, subst)
+
+        for elem in reversed(normalized_elements):
+            elem_key = term_sort_key(elem, subst)
+            # This creates the sort key for Compound('.', [elem, ...])
+            key = (3, 2, '.', (elem_key, key))
+
+        return key
+=======
+        # Build sort key for compound representation iteratively to avoid recursion depth issues.
+        final_tail_term = Atom('[]') if current_tail is None else current_tail
+        key = term_sort_key(final_tail_term, subst)
+
+        for elem in reversed(normalized_elements):
+            elem_key = term_sort_key(elem, subst)
+            # This creates the sort key for Compound('.', [elem, ...])
+            key = (3, 2, '.', (elem_key, key))
+
+        return key
+>>>>>>> c05b2700558631bb59134b76f13db91dba20dfe8
 
     return (5, str(term))
