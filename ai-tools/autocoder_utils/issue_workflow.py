@@ -138,6 +138,8 @@ def get_or_create_branch(issue_number: str, config: IssueWorkflowConfig) -> str:
             if parts:
                 branches.append(parts[0])
 
+        print(f"Found branches for issue #{issue_number}: {branches}")
+
         # Check if we're already on one of the branches for this issue
         if current_branch and current_branch in branches:
             print(f"Already on branch for issue #{issue_number}: {current_branch}")            
