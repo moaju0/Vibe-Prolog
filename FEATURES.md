@@ -43,6 +43,7 @@ Status legend:
 | Cut (`!/0`)                     | ✅      | Correct semantics                  |
 | If-then-else (`->/2`)           | ✅      | Lazy condition                     |
 | Negation as failure (`\\+/1`)   | ✅      |                                    |
+| First-argument indexing         | ✅      | O(1) clause lookup for large DBs   |
 | Occurs check                    | ⚠️     | Always enabled (stricter than ISO) |
 
 ---
