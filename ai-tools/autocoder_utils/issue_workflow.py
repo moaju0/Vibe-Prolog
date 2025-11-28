@@ -109,10 +109,15 @@ def get_or_create_branch(issue_number: str, config: IssueWorkflowConfig) -> str:
 
     Returns the branch name that was checked out.
     """
+    # Refresh
+    run(["git", "pull"], capture_output=False)
+
+    # Get current branch
+    current_branch = run(["git", "branch", "--show-current"]).strip()
+
     if config.use_new_branch:
         # Always create a new branch
-        output = run(["gh", "issue", "develop", issue_number, "--checkout"], capture_output=False)
-        # Extract branch name from current branch
+        run(["gh", "issue", "develop", issue_number, "--checkout"], capture_output=False)
         branch_name = run(["git", "branch", "--show-current"]).strip()
         return branch_name
 
@@ -132,6 +137,11 @@ def get_or_create_branch(issue_number: str, config: IssueWorkflowConfig) -> str:
             parts = line.split()
             if parts:
                 branches.append(parts[0])
+
+        # Check if we're already on one of the branches for this issue
+        if current_branch and current_branch in branches:
+            print(f"Already on branch for issue #{issue_number}: {current_branch}")            
+            return current_branch
 
         if not branches:
             # No existing branches, create a new one
