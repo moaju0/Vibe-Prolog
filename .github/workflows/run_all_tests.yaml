@@ -1,4 +1,4 @@
-name: Run All Tests
+name: Run All Non-Performance Tests
 
 on:
   pull_request:
@@ -55,5 +55,5 @@ jobs:
       - name: Sync dependencies (locked)
         run: uv sync --frozen
 
-      - name: Run optional test suite
-        run: uv run --frozen pytest 
+      - name: Run non-performance test suite
+        run: uv run --frozen pytest  --ignore=tests/performance
