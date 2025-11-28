@@ -82,10 +82,13 @@ class PredicatePropertyDirective:
 PROLOG_GRAMMAR = r"""
     start: (clause | directive)+
 
-    clause: fact | rule | dcg_rule
-    fact: term "."
+    clause: rule | dcg_rule | fact
+    fact: atom_or_compound "."
     rule: term ":-" goals "."
     dcg_rule: term "-->" goals "."
+    atom_or_compound: atom
+        | atom "(" args ")"
+    
     directive: ":-" (prefix_directive | property_directive | term) "."
 
     prefix_directive: "dynamic" predicate_indicators -> dynamic_directive
@@ -114,6 +117,7 @@ PROLOG_GRAMMAR = r"""
     comparison_term: module_term (COMP_OP module_term)?
 
     prefix_term: PREFIX_OP prefix_term  -> prefix_op
+        | "-" prefix_term  -> prefix_op
         | expr
 
     // Module qualification operator (right-associative, xfy)
@@ -134,6 +138,7 @@ PROLOG_GRAMMAR = r"""
         | cut
         | char_code
         | number
+        | "-" number -> negative_number
         | atom
         | variable
         | list
@@ -147,6 +152,7 @@ PROLOG_GRAMMAR = r"""
 
     COMP_OP: "=.." | "is" | "=" | "\\=" | "=:=" | "=\=" | "<" | ">" | "=<" | ">=" | "==" | "\\==" | "@<" | "@=<" | "@>" | "@>="
     OPERATOR_ATOM: ":-" | "-->"
+    PREFIX_OP.3: "\\+" | "+" | "-"
     ADD_OP: "+" | "-"
     POW_OP.2: "**"
     MUL_OP: "*" | "/" | "//" | "mod"
@@ -182,7 +188,6 @@ PROLOG_GRAMMAR = r"""
     STRING: /"([^"\\]|\\.)*"/ | /'(\\.|''|[^'\\])*'/
     SPECIAL_ATOM: /'([^'\\]|\\.)+'/
     SPECIAL_ATOM_OPS.5: /-\$/
-    PREFIX_OP.3: "\\+" | "+" | "-"
     ATOM: /[a-z][a-zA-Z0-9_]*/ | /\{\}/ | /\$[a-zA-Z0-9_-]*/ | /[+\-*\/]/
 
     VARIABLE: /[A-Z_][a-zA-Z0-9_]*/
@@ -206,49 +211,30 @@ class PrologTransformer(Transformer):
     def clause(self, items):
         return items[0]
 
+    def atom_or_compound(self, items):
+        if len(items) == 1:
+            return items[0]  # Just an atom
+        else:
+            # atom "(" args ")"
+            atom = items[0]
+            args = items[1]
+            return Compound(atom.name, tuple(args))
+
     @v_args(meta=True)
     def directive(self, meta, items):
-        goal = items[0]
-        # Check if it's a parenthesized form like dynamic(foo/1)
-        if isinstance(goal, Compound) and goal.functor in ("dynamic", "multifile", "discontiguous"):
-            if len(goal.args) == 1:
-                indicators = goal.args[0]
-                if isinstance(indicators, list):
-                    goal = PredicatePropertyDirective(goal.functor, tuple(indicators))
-                else:
-                    goal = PredicatePropertyDirective(goal.functor, (indicators,))
-        # Check for a comma-separated directive form like `:- dynamic, foo/1.`
-        elif (isinstance(goal, Compound) and goal.functor == "," and len(goal.args) == 2 and
-              isinstance(goal.args[0], Atom) and
-              goal.args[0].name in ("dynamic", "multifile", "discontiguous")):
-            property_name = goal.args[0].name
-            rest = goal.args[1]
-            indicators = self._extract_indicators_from_conjunction(rest)
-            goal = PredicatePropertyDirective(property_name, tuple(indicators))
-        return Directive(goal=goal, meta=meta)
+        return Directive(goal=items[0], meta=meta)
 
     def predicate_indicators(self, items):
         return items
 
     def dynamic_directive(self, items):
-        indicators = items[0]
-        return PredicatePropertyDirective("dynamic", tuple(indicators))
+        return PredicatePropertyDirective("dynamic", tuple(items[0]))
 
     def multifile_directive(self, items):
-        indicators = items[0]
-        return PredicatePropertyDirective("multifile", tuple(indicators))
+        return PredicatePropertyDirective("multifile", tuple(items[0]))
 
     def discontiguous_directive(self, items):
-        indicators = items[0]
-        return PredicatePropertyDirective("discontiguous", tuple(indicators))
-
-    def _extract_indicators_from_conjunction(self, term):
-        if isinstance(term, Compound) and term.functor == ",":
-            left = self._extract_indicators_from_conjunction(term.args[0])
-            right = self._extract_indicators_from_conjunction(term.args[1])
-            return left + right
-        else:
-            return [term]
+        return PredicatePropertyDirective("discontiguous", tuple(items[0]))
 
     @v_args(meta=True)
     def fact(self, meta, items):
@@ -304,9 +290,15 @@ class PrologTransformer(Transformer):
         return items[0]
 
     def prefix_op(self, items):
-        # items[0] is the operator, items[1] is the term
-        op, term = items
-        return Compound(str(op), (term,))
+        # items can be [op, term] or just [term] depending on the rule
+        if len(items) == 2:
+            op, term = items
+            return Compound(str(op), (term,))
+        else:
+            # For "-" prefix_term rule, items is just [term]
+            # The "-" is implicit in the rule
+            term = items[0]
+            return Compound("-", (term,))
 
     def module_term(self, items):
         # Module qualification: left:right (right-associative)
@@ -456,6 +448,17 @@ class PrologTransformer(Transformer):
         else:
             # Regular integer
             return Number(int(value))
+
+    def negative_number(self, items):
+        # items[0] is the dash, items[1] is the number
+        num = items[1]
+        # Negate the number
+        if isinstance(num, Number):
+            if isinstance(num.value, int):
+                return Number(-num.value)
+            else:
+                return Number(-num.value)
+        return num
 
     def _parse_base_number(self, value):
         """Parse base'digits syntax like 16'ff or -2'abcd."""
