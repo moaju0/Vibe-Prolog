@@ -230,7 +230,6 @@ def run_tool_with_changes(changes_to_make: str, config: PRCommentWorkflowConfig)
                 if config.session_dir:
                     save_session_id(session_id, config.session_dir)
                 print(f"\n⏱️  Timeout after {config.timeout_seconds}s. Session ID: {session_id}", file=sys.stderr)
-                print(f"Resume with: claude --session-id {session_id}", file=sys.stderr)
             else:
                 print(f"\n⏱️  Timeout after {config.timeout_seconds}s. No session ID found.", file=sys.stderr)
 

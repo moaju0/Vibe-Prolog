@@ -186,7 +186,6 @@ def run_tool(issue_content: str, config: IssueWorkflowConfig) -> None:
                 if config.session_dir:
                     save_session_id(session_id, config.session_dir)
                 print(f"\n⏱️  Timeout after {config.timeout_seconds}s. Session ID: {session_id}", file=sys.stderr)
-                print(f"Resume with: claude --session-id {session_id}", file=sys.stderr)
             else:
                 print(f"\n⏱️  Timeout after {config.timeout_seconds}s. No session ID found.", file=sys.stderr)
 

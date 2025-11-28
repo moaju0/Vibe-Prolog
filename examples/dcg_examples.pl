@@ -103,7 +103,7 @@ animal --> [cat], ! ; [dog] ; [bird].
 json_value(V) --> json_string(V) ; json_number(V) ; json_object(V) ; json_array(V) ; json_bool(V) ; json_null.
 
 %% JSON string (simplified - no escapes)
-json_string(S) --> ['"'], string_chars(Chars), ['"'], {atom_codes(S, Chars)}.
+json_string(S) --> ['"'], string_chars(Chars), ['"'], {atom_chars(S, Chars)}.
 
 string_chars([]) --> [].
 string_chars([H|T]) --> [H], {H \= '"'}, string_chars(T).
