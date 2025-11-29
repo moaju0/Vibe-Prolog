@@ -36,6 +36,18 @@ class ListOperationsBuiltins:
             registry, "reverse", 2, ListOperationsBuiltins._builtin_reverse
         )
         register_builtin(registry, "sort", 2, ListOperationsBuiltins._builtin_sort)
+        register_builtin(registry, "msort", 2, ListOperationsBuiltins._builtin_msort)
+        register_builtin(registry, "keysort", 2, ListOperationsBuiltins._builtin_keysort)
+        register_builtin(registry, "nth0", 3, ListOperationsBuiltins._builtin_nth0)
+        register_builtin(registry, "nth1", 3, ListOperationsBuiltins._builtin_nth1)
+        register_builtin(registry, "last", 2, ListOperationsBuiltins._builtin_last)
+        register_builtin(registry, "select", 3, ListOperationsBuiltins._builtin_select)
+        register_builtin(registry, "memberchk", 2, ListOperationsBuiltins._builtin_memberchk)
+        register_builtin(registry, "is_list", 1, ListOperationsBuiltins._builtin_is_list)
+        register_builtin(registry, "sumlist", 2, ListOperationsBuiltins._builtin_sumlist)
+        register_builtin(registry, "sum_list", 2, ListOperationsBuiltins._builtin_sumlist)  # Alias
+        register_builtin(registry, "max_list", 2, ListOperationsBuiltins._builtin_max_list)
+        register_builtin(registry, "min_list", 2, ListOperationsBuiltins._builtin_min_list)
 
     @staticmethod
     def _builtin_member(
@@ -220,6 +232,331 @@ class ListOperationsBuiltins:
 
         result = python_to_list(sorted_py)
         return unify(sorted_lst, result, subst)
+
+    @staticmethod
+    def _builtin_msort(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext
+    ) -> Substitution | None:
+        lst, sorted_lst = args
+        lst = deref(lst, subst)
+
+        if not isinstance(lst, List):
+            raise PrologThrow(PrologError.type_error("list", lst))
+
+        try:
+            py_list = list_to_python(lst, subst)
+        except TypeError:
+            raise PrologThrow(PrologError.type_error("list", lst))
+
+        try:
+            sorted_py = sorted(py_list, key=term_sort_key)
+        except TypeError:
+            sorted_py = py_list
+
+        result = python_to_list(sorted_py)
+        return unify(sorted_lst, result, subst)
+
+    @staticmethod
+    def _builtin_keysort(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext
+    ) -> Substitution | None:
+        pairs, sorted_pairs = args
+        pairs = deref(pairs, subst)
+
+        if not isinstance(pairs, List):
+            raise PrologThrow(PrologError.type_error("list", pairs))
+
+        try:
+            py_list = list_to_python(pairs, subst)
+        except TypeError:
+            raise PrologThrow(PrologError.type_error("list", pairs))
+
+        # Check each element is a Key-Value pair
+        for item in py_list:
+            if not (hasattr(item, 'functor') and item.functor == '-' and len(item.args) == 2):
+                raise PrologThrow(PrologError.type_error("pair", item))
+
+        # Sort by key (first argument of the pair)
+        try:
+            sorted_py = sorted(py_list, key=lambda pair: term_sort_key(pair.args[0]))
+        except TypeError:
+            sorted_py = py_list
+
+        result = python_to_list(sorted_py)
+        return unify(sorted_pairs, result, subst)
+
+    @staticmethod
+    def _builtin_nth0(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext
+    ) -> Iterator[Substitution]:
+        index, lst, elem = args
+        index = deref(index, subst)
+        lst = deref(lst, subst)
+        elem = deref(elem, subst)
+
+        if not isinstance(lst, List):
+            raise PrologThrow(PrologError.type_error("list", lst))
+
+        try:
+            py_list = list_to_python(lst, subst)
+        except TypeError:
+            raise PrologThrow(PrologError.type_error("list", lst))
+
+        # Mode 1: Index is bound, get element
+        if isinstance(index, Number) and isinstance(index.value, int):
+            idx = index.value
+            if idx < 0:
+                raise PrologThrow(PrologError.domain_error("not_less_than_zero", index))
+            if idx < len(py_list):
+                new_subst = unify(elem, py_list[idx], subst)
+                if new_subst is not None:
+                    yield new_subst
+            # Out of range: fail silently
+        elif isinstance(index, Number) and not isinstance(index.value, int):
+            # Index is a number but not an integer
+            raise PrologThrow(PrologError.type_error("integer", index))
+        elif not isinstance(index, Variable):
+            # Index is bound but not a number
+            raise PrologThrow(PrologError.type_error("integer", index))
+
+        # Mode 2: Element is bound, find index (backtracking)
+        elif not isinstance(elem, Variable):
+            for i, item in enumerate(py_list):
+                if terms_equal(elem, item):
+                    new_subst = unify(index, Number(i), subst)
+                    if new_subst is not None:
+                        yield new_subst
+
+        # Mode 3: Generate list with element at index
+        elif isinstance(index, Number) and isinstance(index.value, int):
+            idx = index.value
+            if idx < 0:
+                raise PrologThrow(PrologError.domain_error("not_less_than_zero", index))
+            if isinstance(elem, Variable):
+                # Generate list with elem at position idx
+                if idx == 0:
+                    # [Elem | Tail] where Tail is fresh
+                    tail_var = engine._fresh_variable("Tail_")
+                    result_list = List((elem,), tail_var)
+                    new_subst = unify(lst, result_list, subst)
+                    if new_subst is not None:
+                        yield new_subst
+                else:
+                    # Build list with elem at idx
+                    prefix = [engine._fresh_variable(f"Elem{i}_") for i in range(idx)]
+                    tail_var = engine._fresh_variable("Tail_")
+                    elements = tuple(prefix) + (elem,) + (tail_var,)
+                    result_list = List(elements, None)
+                    new_subst = unify(lst, result_list, subst)
+                    if new_subst is not None:
+                        yield new_subst
+
+    @staticmethod
+    def _builtin_nth1(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext
+    ) -> Iterator[Substitution]:
+        index, lst, elem = args
+        index = deref(index, subst)
+
+        if isinstance(index, Number) and isinstance(index.value, int):
+            if index.value < 1:
+                raise PrologThrow(PrologError.domain_error("not_less_than_one", index))
+            # Convert to 0-based
+            zero_index = Number(index.value - 1)
+            yield from ListOperationsBuiltins._builtin_nth0(
+                (zero_index, lst, elem), subst, engine
+            )
+        else:
+            # For backtracking mode, we need to handle the conversion
+            for subst_result in ListOperationsBuiltins._builtin_nth0(
+                (Variable(), lst, elem), subst, engine
+            ):
+                # Get the 0-based index from the result
+                zero_idx_term = deref(Variable(), subst_result)
+                if isinstance(zero_idx_term, Number) and isinstance(zero_idx_term.value, int):
+                    one_idx = Number(zero_idx_term.value + 1)
+                    final_subst = unify(index, one_idx, subst_result)
+                    if final_subst is not None:
+                        yield final_subst
+
+    @staticmethod
+    def _builtin_last(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext
+    ) -> Iterator[Substitution]:
+        lst, elem = args
+        lst = deref(lst, subst)
+        elem = deref(elem, subst)
+
+        if not isinstance(lst, List):
+            raise PrologThrow(PrologError.type_error("list", lst))
+
+        try:
+            py_list = list_to_python(lst, subst)
+        except TypeError:
+            raise PrologThrow(PrologError.type_error("list", lst))
+
+        if not py_list:
+            return  # Empty list, fail
+
+        last_elem = py_list[-1]
+        new_subst = unify(elem, last_elem, subst)
+        if new_subst is not None:
+            yield new_subst
+
+    @staticmethod
+    def _builtin_select(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext
+    ) -> Iterator[Substitution]:
+        elem, lst, remainder = args
+        lst = deref(lst, subst)
+
+        if not isinstance(lst, List):
+            raise PrologThrow(PrologError.type_error("list", lst))
+
+        try:
+            py_list = list_to_python(lst, subst)
+        except TypeError:
+            raise PrologThrow(PrologError.type_error("list", lst))
+
+        # Find all positions where elem matches
+        for i, item in enumerate(py_list):
+            new_subst = unify(elem, item, subst)
+            if new_subst is not None:
+                # Create remainder by removing element at i
+                remainder_py = py_list[:i] + py_list[i+1:]
+                remainder_list = python_to_list(remainder_py)
+                final_subst = unify(remainder, remainder_list, new_subst)
+                if final_subst is not None:
+                    yield final_subst
+
+    @staticmethod
+    def _builtin_memberchk(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext
+    ) -> Iterator[Substitution]:
+        elem, lst = args
+        lst = deref(lst, subst)
+
+        if not isinstance(lst, List):
+            raise PrologThrow(PrologError.type_error("list", lst))
+
+        try:
+            py_list = list_to_python(lst, subst)
+        except TypeError:
+            raise PrologThrow(PrologError.type_error("list", lst))
+
+        # Check for first match only (deterministic)
+        for item in py_list:
+            new_subst = unify(elem, item, subst)
+            if new_subst is not None:
+                yield new_subst
+                return
+
+    @staticmethod
+    def _builtin_is_list(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext
+    ) -> Iterator[Substitution]:
+        term, = args
+        term = deref(term, subst)
+
+        # Unbound variables are not lists
+        if isinstance(term, Variable):
+            return
+
+        current = term
+        while isinstance(current, List):
+            if current.tail is None:
+                # Ends with []
+                yield subst
+                return
+            current = deref(current.tail, subst)
+
+        # Not a proper list
+        return
+
+    @staticmethod
+    def _builtin_sumlist(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext
+    ) -> Iterator[Substitution]:
+        lst, sum_result = args
+        lst = deref(lst, subst)
+
+        if not isinstance(lst, List):
+            raise PrologThrow(PrologError.type_error("list", lst))
+
+        try:
+            py_list = list_to_python(lst, subst)
+        except TypeError:
+            raise PrologThrow(PrologError.type_error("list", lst))
+
+        total = 0
+        for item in py_list:
+            if not isinstance(item, Number):
+                raise PrologThrow(PrologError.type_error("number", item))
+            total += item.value
+
+        new_subst = unify(sum_result, Number(total), subst)
+        if new_subst is not None:
+            yield new_subst
+
+    @staticmethod
+    def _builtin_max_list(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext
+    ) -> Iterator[Substitution]:
+        lst, max_result = args
+        lst = deref(lst, subst)
+
+        if not isinstance(lst, List):
+            raise PrologThrow(PrologError.type_error("list", lst))
+
+        try:
+            py_list = list_to_python(lst, subst)
+        except TypeError:
+            raise PrologThrow(PrologError.type_error("list", lst))
+
+        if not py_list:
+            raise PrologThrow(PrologError.domain_error("not_empty_list", lst))
+
+        # Check all are numbers and collect values
+        values = []
+        for item in py_list:
+            if not isinstance(item, Number):
+                raise PrologThrow(PrologError.type_error("number", item))
+            values.append(item.value)
+
+        max_val = max(values)
+        new_subst = unify(max_result, Number(max_val), subst)
+        if new_subst is not None:
+            yield new_subst
+
+    @staticmethod
+    def _builtin_min_list(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext
+    ) -> Iterator[Substitution]:
+        lst, min_result = args
+        lst = deref(lst, subst)
+
+        if not isinstance(lst, List):
+            raise PrologThrow(PrologError.type_error("list", lst))
+
+        try:
+            py_list = list_to_python(lst, subst)
+        except TypeError:
+            raise PrologThrow(PrologError.type_error("list", lst))
+
+        if not py_list:
+            raise PrologThrow(PrologError.domain_error("not_empty_list", lst))
+
+        # Check all are numbers and collect values
+        values = []
+        for item in py_list:
+            if not isinstance(item, Number):
+                raise PrologThrow(PrologError.type_error("number", item))
+            values.append(item.value)
+
+        min_val = min(values)
+        new_subst = unify(min_result, Number(min_val), subst)
+        if new_subst is not None:
+            yield new_subst
 
 
 __all__ = ["ListOperationsBuiltins"]

@@ -170,15 +170,15 @@ Status legend:
 | `length/2`              | ✅      |                                               |
 | `reverse/2`             | ✅      |                                               |
 | `sort/2`                | ✅      |                                               |
-| `msort/2`               | ❌      | **ISO-required** - Sort keeping duplicates    |
-| `keysort/2`             | ❌      | **ISO-required** - Sort Key-Value pairs       |
-| `nth0/3`, `nth1/3`      | ❌      | Common extension - Access by index            |
-| `last/2`                | ❌      | Common extension                              |
-| `select/3`              | ❌      | Common extension - Select element             |
-| `memberchk/2`           | ❌      | Common extension - Deterministic member       |
-| `sumlist/2`             | ❌      | Common extension                              |
-| `max_list/2`            | ❌      | Common extension                              |
-| `min_list/2`            | ❌      | Common extension                              |
+| `msort/2`               | ✅      | **ISO-required** - Sort keeping duplicates    |
+| `keysort/2`             | ✅      | **ISO-required** - Sort Key-Value pairs       |
+| `nth0/3`, `nth1/3`      | ✅      | Common extension - Access by index            |
+| `last/2`                | ✅      | Common extension                              |
+| `select/3`              | ✅      | Common extension - Select element             |
+| `memberchk/2`           | ✅      | Common extension - Deterministic member       |
+| `sumlist/2`             | ✅      | Common extension                              |
+| `max_list/2`            | ✅      | Common extension                              |
+| `min_list/2`            | ✅      | Common extension                              |
 | `maplist/3-5`           | ❌      | Higher-order (only `/2` implemented)          |
 | `include/3`             | ❌      | Higher-order - Filter list                    |
 | `exclude/3`             | ❌      | Higher-order - Filter list (negated)          |
