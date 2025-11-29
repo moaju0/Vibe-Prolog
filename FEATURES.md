@@ -321,7 +321,7 @@ Status legend:
 | Unification & comparison  | ✅ Strong                                                   |
 | Type testing              | ✅ Strong (missing `is_list/1` extension)                   |
 | Term manipulation         | ⚠️ Missing `term_variables/2`, `numbervars/3`              |
-| Atom processing (§8.16)   | ❌ All 8 predicates missing (tracked in #164, #165)        |
+| Atom processing (§8.16)   | ✅ Strong                                                   |
 | Arithmetic                | ✅ Strong                                                   |
 | List operations           | ⚠️ Basic ops ✅, missing `msort/2`, `keysort/2`, nth, etc. |
 | All-solutions             | ✅ Strong                                                   |
@@ -343,8 +343,7 @@ Status legend:
 2. `char_conversion/2` missing (§6.4, §7.4)
 3. Incorrect term ordering (§6.4.10)
 4. Module-local clause resolution (§10)
-5. **Atom processing predicates missing (§8.16)** - All 8 predicates unimplemented, breaks DCG examples
-6. **List sorting missing** - `msort/2`, `keysort/2` unimplemented (ISO-required)
-9. **Character I/O incomplete (§8.11)** - Missing `get_code`, `put_code`, `peek_*` predicates
-10. **Term I/O incomplete (§8.12)** - Missing `read_term`, `write_term`, `writeq`, `write_canonical`
-11. **Stream operations incomplete (§8.13)** - Missing `flush_output`, `at_end_of_stream`, `stream_property`
+5. **List sorting missing** - `msort/2`, `keysort/2` unimplemented (ISO-required)
+6. **Character I/O incomplete (§8.11)** - Missing `get_code`, `put_code`, `peek_*` predicates
+7. **Term I/O incomplete (§8.12)** - Missing `read_term`, `write_term`, `writeq`, `write_canonical`
+8. **Stream operations incomplete (§8.13)** - Missing `flush_output`, `at_end_of_stream`, `stream_property`
