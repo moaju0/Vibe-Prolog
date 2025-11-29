@@ -16,17 +16,78 @@ from . import (
     run,
     stage_changes,
 )
-def _checkout_and_get_current_branch(issue_number: str, config: IssueWorkflowConfig) -> str:
-    """Helper: refresh, then checkout/create branch as needed and return current branch name."""
-    # Refresh
-    run(["git", "pull"], capture_output=False)
-    # Get current branch
-    current_branch = run(["git", "branch", "--show-current"]).strip()
+def get_issue_linked_branches(issue_number: str) -> list[str]:
+    """Get list of branches linked to this issue in GitHub.
+
+    Uses `gh issue develop --list` to find branches associated with the issue.
+
+    Args:
+        issue_number: The issue number
+
+    Returns:
+        List of branch names linked to this issue (empty if none)
+    """
+    try:
+        output = run(["gh", "issue", "develop", "--list", issue_number]).strip()
+        if not output:
+            return []
+
+        # Parse output - typically one branch per line
+        branches = [line.strip() for line in output.splitlines() if line.strip()]
+        return branches
+    except Exception:
+        # If gh command fails or issue has no linked branches, return empty list
+        return []
+
+
+def determine_target_branch(
+    issue_number: str,
+    current_branch: str,
+    config: IssueWorkflowConfig,
+    linked_branches: list[str] | None = None,
+) -> tuple[str, bool]:
+    """Determine which branch should be used for the issue.
+
+    Args:
+        issue_number: The issue number
+        current_branch: The currently checked out branch
+        config: Configuration for branch naming
+        linked_branches: Optional list of branches linked to this issue in GitHub.
+                        If provided, will use one of these branches if available.
+
+    Returns:
+        tuple[str, bool]: (branch_name, should_create)
+            - branch_name: The name of the branch to use
+            - should_create: True if a new branch needs to be created
+
+    Logic:
+        1. If existing_branch is set, use it (checkout, don't create)
+        2. If use_new_branch is True, generate new branch via gh issue develop
+        3. Otherwise:
+            - If current branch is linked to this issue, stay on it
+            - If linked_branches provided and non-empty, use the first one
+            - Otherwise, create a new branch
+    """
+    # Case 1: Explicit branch specified
+    if config.existing_branch:
+        return config.existing_branch, False
+
+    # Case 2: Explicitly requested new branch
     if config.use_new_branch:
-        # Always create a new branch for the issue
-        run(["gh", "issue", "develop", issue_number, "--checkout"], capture_output=False)
-        return run(["git", "branch", "--show-current"]).strip()
-    return current_branch
+        # gh issue develop will create the branch name, so return sentinel
+        return "", True
+
+    # Case 3: Auto-determine based on current branch and linked branches
+    # If current branch is one of the linked branches, stay on it
+    if linked_branches and current_branch in linked_branches:
+        return current_branch, False
+
+    # If there are linked branches, use the first one
+    if linked_branches:
+        return linked_branches[0], False
+
+    # Otherwise, need to create a new branch
+    return "", True
 
 
 
@@ -119,10 +180,40 @@ def create_branch_name(issue_number: str, issue_content: str, config: IssueWorkf
 def get_or_create_branch(issue_number: str, config: IssueWorkflowConfig) -> str:
     """Get existing branch or create a new one for the given issue, returning the
     name of the branch that is checked out.
-    
-    Logic refactored to use a helper to remove duplication across code paths.
+
+    This function:
+    1. Refreshes from remote
+    2. Gets branches linked to this issue from GitHub
+    3. Determines the appropriate branch to use
+    4. Creates or checks out the branch as needed
+    5. Returns the final branch name
     """
-    return _checkout_and_get_current_branch(issue_number, config)
+    # Refresh from remote
+    run(["git", "fetch", "origin"], capture_output=False)
+    run(["git", "pull"], capture_output=False)
+
+    # Get current branch
+    current_branch = run(["git", "branch", "--show-current"]).strip()
+
+    # Get branches linked to this issue from GitHub
+    linked_branches = get_issue_linked_branches(issue_number)
+
+    # Determine what to do
+    target_branch, should_create = determine_target_branch(
+        issue_number, current_branch, config, linked_branches
+    )
+
+    if should_create:
+        # Use gh issue develop to create and checkout the branch
+        run(["gh", "issue", "develop", issue_number, "--checkout"], capture_output=False)
+        return run(["git", "branch", "--show-current"]).strip()
+    elif target_branch != current_branch:
+        # Need to checkout existing branch
+        run(["git", "checkout", target_branch], capture_output=False)
+        return target_branch
+    else:
+        # Already on the right branch
+        return current_branch
 
 
 def run_tool(issue_content: str, config: IssueWorkflowConfig) -> None:
