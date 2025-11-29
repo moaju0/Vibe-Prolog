@@ -5,7 +5,7 @@ Implements ISO-style predicates for deconstructing and constructing terms.
 
 from __future__ import annotations
 
-from typing import Iterator
+from typing import Any, Iterator
 
 from vibeprolog.builtins import BuiltinRegistry, register_builtin
 from vibeprolog.builtins.common import BuiltinArgs, EngineContext
@@ -45,6 +45,18 @@ class TermManipulationBuiltins:
         )
         register_builtin(registry, "compare", 3, TermManipulationBuiltins._builtin_compare)
         register_builtin(registry, "unify_with_occurs_check", 2, TermManipulationBuiltins._builtin_unify_with_occurs_check)
+        register_builtin(
+            registry, "term_variables", 2, TermManipulationBuiltins._builtin_term_variables
+        )
+        register_builtin(
+            registry, "numbervars", 3, TermManipulationBuiltins._builtin_numbervars
+        )
+        register_builtin(
+            registry,
+            "subsumes_term",
+            2,
+            TermManipulationBuiltins._builtin_subsumes_term,
+        )
 
     @staticmethod
     def _builtin_term_compare(
@@ -236,6 +248,123 @@ class TermManipulationBuiltins:
         term1, term2 = args
         # Vibe-Prolog already performs occurs check in unify/3
         return unify(term1, term2, subst)
+
+    @staticmethod
+    def _collect_variables(term: Any, subst: Substitution) -> list[Variable]:
+        """Collect variables in first-encounter order."""
+        seen: set[Variable] = set()
+        variables: list[Variable] = []
+
+        def walk(current: Any) -> None:
+            current = deref(current, subst)
+            if isinstance(current, Variable):
+                if current not in seen:
+                    seen.add(current)
+                    variables.append(current)
+                return
+            if isinstance(current, Compound):
+                for arg in current.args:
+                    walk(arg)
+            elif isinstance(current, List):
+                for elem in current.elements:
+                    walk(elem)
+                if current.tail is not None:
+                    walk(current.tail)
+            elif isinstance(current, list):
+                for item in current:
+                    walk(item)
+
+        walk(term)
+        return variables
+
+    @staticmethod
+    def _builtin_term_variables(
+        args: BuiltinArgs, subst: Substitution, _engine: EngineContext | None
+    ) -> Substitution | None:
+        term, variables = args
+        ordered_vars = TermManipulationBuiltins._collect_variables(term, subst)
+        result_list = List(tuple(ordered_vars), None)
+        return unify(variables, result_list, subst)
+
+    @staticmethod
+    def _builtin_numbervars(
+        args: BuiltinArgs, subst: Substitution, _engine: EngineContext | None
+    ) -> Substitution | None:
+        term, start, end = args
+        start_value = deref(start, subst)
+
+        if not isinstance(start_value, Number) or not isinstance(start_value.value, int):
+            error_term = PrologError.type_error("integer", start_value, "numbervars/3")
+            raise PrologThrow(error_term)
+
+        current_value = int(start_value.value)
+        ordered_vars = TermManipulationBuiltins._collect_variables(term, subst)
+        current_subst = subst
+
+        for var in ordered_vars:
+            numbered_term = Compound("$VAR", (Number(current_value),))
+            current_subst = unify(var, numbered_term, current_subst)
+            if current_subst is None:
+                return None
+            current_value += 1
+
+        return unify(end, Number(current_value), current_subst)
+
+    @staticmethod
+    def _builtin_subsumes_term(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext
+    ) -> Substitution | None:
+        """subsumes_term/2 - True if General subsumes Specific without binding."""
+        general, specific = args
+        general_copy = copy_term_recursive(
+            deref(general, subst), {}, engine._fresh_variable
+        )
+        specific_copy = copy_term_recursive(
+            deref(specific, subst), {}, engine._fresh_variable
+        )
+        frozen_specific = TermManipulationBuiltins._freeze_specific_vars(specific_copy)
+        result = unify(general_copy, frozen_specific, Substitution())
+        if result is None:
+            return None
+        return subst
+
+    @staticmethod
+    def _freeze_specific_vars(term: Any, mapping: dict[Variable, Atom] | None = None) -> Any:
+        """Replace variables with unique atoms to avoid binding Specific."""
+        if mapping is None:
+            mapping = {}
+
+        if isinstance(term, Variable):
+            if term not in mapping:
+                mapping[term] = Atom(f"__SPEC_VAR_{len(mapping)}")
+            return mapping[term]
+
+        if isinstance(term, Compound):
+            new_args = tuple(
+                TermManipulationBuiltins._freeze_specific_vars(arg, mapping)
+                for arg in term.args
+            )
+            return Compound(term.functor, new_args)
+
+        if isinstance(term, List):
+            new_elements = tuple(
+                TermManipulationBuiltins._freeze_specific_vars(elem, mapping)
+                for elem in term.elements
+            )
+            new_tail = (
+                TermManipulationBuiltins._freeze_specific_vars(term.tail, mapping)
+                if term.tail is not None
+                else None
+            )
+            return List(new_elements, new_tail)
+
+        if isinstance(term, list):
+            return [
+                TermManipulationBuiltins._freeze_specific_vars(elem, mapping)
+                for elem in term
+            ]
+
+        return term
 
 
 __all__ = ["TermManipulationBuiltins"]
