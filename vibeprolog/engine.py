@@ -16,6 +16,10 @@ from vibeprolog.terms import Atom, Compound, Number, Variable
 from vibeprolog.unification import Substitution, apply_substitution, deref, unify
 from vibeprolog.utils.list_utils import list_to_python, python_to_list
 
+# Import stream constants
+USER_INPUT_STREAM = Atom("user_input")
+USER_OUTPUT_STREAM = Atom("user_output")
+
 BuiltinResult: TypeAlias = Iterator[Substitution] | Substitution | None
 BuiltinHandler: TypeAlias = Callable[
     [tuple, Substitution, "PrologEngine | None"], BuiltinResult
@@ -71,6 +75,9 @@ class PrologEngine:
         self._streams: dict[str, Stream] = {}
         self._stream_counter = 0
         self._initialize_standard_streams()
+        # Current input/output streams (can be changed by set_input/set_output)
+        self._current_input_stream = USER_INPUT_STREAM
+        self._current_output_stream = USER_OUTPUT_STREAM
 
     # Compatibility wrappers retained for tests and external callers.
     def _list_to_python(
