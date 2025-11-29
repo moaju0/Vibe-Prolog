@@ -256,6 +256,33 @@ The `vibeprolog/dcg.py` module handles the expansion of DCG syntax into regular 
 
 DCG rules are expanded at parse time, not runtime, ensuring efficient execution.
 
+## Recursion Depth Limits
+
+The engine enforces a maximum recursion depth to prevent Python stack overflow and provide clear error messages for infinite recursion.
+
+### Configuration
+
+```python
+# Default limit: 500
+prolog = PrologInterpreter()
+
+# Custom limit
+prolog = PrologInterpreter(max_recursion_depth=1000)
+```
+
+### Behavior
+
+- Depth is tracked across all goal resolution
+- When depth exceeds `max_depth`, raises `resource_error(recursion_depth_exceeded)`
+- Depth counter resets for each top-level query
+- Error includes context showing which predicate exceeded limit
+
+### Limitations
+
+- This is a hard limit, not tail-call optimization
+- Tail-recursive predicates still consume depth
+- For unbounded tail recursion, see issue #141 (TCO implementation)
+
 ## Examples
 
 ### Family Relationships
@@ -317,8 +344,7 @@ you should be aware of:
   This is an extremely obscure ISO edge case with ambiguous semantics in the
   standard, no real-world usage, and would require significant parser
   restructuring for minimal value.
-- No DCG, module system, CLP libraries, or tail-call optimization. Very deep
-  recursion can still overflow Python's stack in pathological cases.
+- No DCG, module system, CLP libraries, or tail-call optimization. Recursion depth is limited to prevent Python stack overflow (default: 500 levels).
 
 ## Test Coverage Snapshot
 

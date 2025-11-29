@@ -131,6 +131,20 @@ class PrologError:
         return PrologError._create_error_with_context(error_term, context)
 
     @staticmethod
+    def resource_error(resource: str, context: str | None = None) -> "Compound":
+        """Create a resource_error term.
+
+        Args:
+            resource: Type of resource (e.g., 'recursion_depth_exceeded', 'stack')
+            context: Optional context (predicate/arity)
+
+        Returns:
+            error(resource_error(Resource), context(Predicate))
+        """
+        error_term = Compound('resource_error', (Atom(resource),))
+        return PrologError._create_error_with_context(error_term, context)
+
+    @staticmethod
     def permission_error(operation: str, permission_type: str, culprit: Any, context: str | None = None) -> "Compound":
         """Create a permission_error term.
 

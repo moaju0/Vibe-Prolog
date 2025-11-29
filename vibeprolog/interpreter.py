@@ -36,7 +36,7 @@ class Module:
 class PrologInterpreter:
     """Main interface for the Prolog interpreter."""
 
-    def __init__(self, argv: list[str] | None = None) -> None:
+    def __init__(self, argv: list[str] | None = None, max_recursion_depth: int = 400) -> None:
         self.operator_table = OperatorTable()
         self.parser = PrologParser(self.operator_table)
         self.clauses = []
@@ -45,6 +45,7 @@ class PrologInterpreter:
         self.current_module: str = "user"
 
         self._argv: list[str] = argv or []
+        self.max_recursion_depth = max_recursion_depth
         self.engine = None
         self.initialization_goals = []
         self.predicate_properties: dict[tuple[str, int], set[str]] = {}
@@ -81,6 +82,7 @@ class PrologInterpreter:
                 self.predicate_properties,
                 self._predicate_sources,
                 self.predicate_docs,
+                max_depth=self.max_recursion_depth,
             )
             # Expose interpreter to engine for module introspection
             eng.interpreter = self
@@ -496,6 +498,7 @@ class PrologInterpreter:
             self._predicate_sources,
             self.predicate_docs,
             operator_table=self.operator_table,
+            max_depth=self.max_recursion_depth,
         )
         # Expose interpreter to engine for module-aware resolution
         self.engine.interpreter = self
@@ -540,6 +543,7 @@ class PrologInterpreter:
                 self._predicate_sources,
                 self.predicate_docs,
                 operator_table=self.operator_table,
+                max_depth=self.max_recursion_depth,
             )
             self.engine.interpreter = self
 
@@ -557,6 +561,9 @@ class PrologInterpreter:
 
         # Execute query
         solutions = []
+        # Reset depth tracking for new query
+        if self.engine is not None:
+            self.engine.call_depth = 0
         # Preserve current module context for the engine
         if hasattr(self, "engine") and self.engine is not None:
             self.engine.current_module = self.current_module

@@ -38,13 +38,14 @@ class PrologEngine:
         predicate_sources: dict[tuple[str, int], set[str]] | None = None,
         predicate_docs: dict[tuple[str, int], str] | None = None,
         operator_table: OperatorTable | None = None,
+        max_depth: int = 500,
     ):
         self.clauses = clauses
         # Explicit dependency so engine can reference interpreter state if needed
         self.interpreter = None
         self.argv = argv or []
         self.call_depth = 0
-        self.max_depth = 1000  # Prevent infinite recursion
+        self.max_depth = max_depth  # Prevent infinite recursion
         self._fresh_var_counter = 0
         self.predicate_properties: dict[tuple[str, int], set[str]] = (
             predicate_properties if predicate_properties is not None else {}
@@ -82,12 +83,32 @@ class PrologEngine:
 
     def query(self, goals: list[Compound]) -> Iterator[Substitution]:
         """Query the knowledge base and yield all substitutions that satisfy the goals."""
-        yield from self._solve_goals(goals, Substitution())
+        yield from self._solve_goals(goals, Substitution(), depth=0)
 
     def _solve_goals(
-        self, goals: list[Compound], subst: Substitution, current_module: str = "user"
+        self, goals: list[Compound], subst: Substitution, current_module: str = "user", depth: int = 0
     ) -> Iterator[Substitution]:
         """Solve a list of goals with backtracking."""
+        # Check recursion depth limit
+        if depth > self.max_depth:
+            # Extract context from current goal for error message
+            context = None
+            if goals:
+                goal = goals[0]
+                if isinstance(goal, Compound):
+                    functor = goal.functor
+                    arity = len(goal.args)
+                    context = f"{functor}/{arity}"
+                elif isinstance(goal, Atom):
+                    context = f"{goal.name}/0"
+            raise PrologThrow(PrologError.resource_error(
+                "recursion_depth_exceeded",
+                context
+            ))
+
+        # Update max depth tracking
+        self.call_depth = max(self.call_depth, depth)
+
         if not goals:
             yield subst
             return
@@ -139,7 +160,7 @@ class PrologEngine:
                 return builtin_results
 
             # Delegate clause-search to the module's predicate index when available
-            for result in self._solve_module_predicate(module_name, key, inner_goal, subst, remaining_goals, current_module):
+            for result in self._solve_module_predicate(module_name, key, inner_goal, subst, remaining_goals, current_module, depth):
                 yield result
             return
 
@@ -148,7 +169,7 @@ class PrologEngine:
             try:
                 for new_subst in builtin_results:
                     if new_subst is not None:
-                        yield from self._solve_goals(remaining_goals, new_subst, current_module)
+                        yield from self._solve_goals(remaining_goals, new_subst, current_module, depth)
             except CutException:
                 raise
             except PrologThrow:
@@ -159,12 +180,12 @@ class PrologEngine:
         imported_module = self._check_imported_predicate(current_module, goal)
         if imported_module is not None:
             # Resolve from imported module
-            for result in self._solve_module_predicate(imported_module, None, goal, subst, remaining_goals, current_module):
+            for result in self._solve_module_predicate(imported_module, None, goal, subst, remaining_goals, current_module, depth):
                 yield result
             return
 
         # Try to solve from current module predicates first
-        for result in self._solve_module_predicate(current_module, None, goal, subst, remaining_goals, current_module):
+        for result in self._solve_module_predicate(current_module, None, goal, subst, remaining_goals, current_module, depth):
             yield result
 
         # If no solutions from current module, try global predicates (user module and others)
@@ -198,10 +219,10 @@ class PrologEngine:
                 clause_module = getattr(renamed_clause, 'module', 'user')
                 try:
                     if renamed_clause.is_fact():
-                        yield from self._solve_goals(remaining_goals, new_subst, clause_module)
+                        yield from self._solve_goals(remaining_goals, new_subst, clause_module, depth)
                     else:
                         new_goals = body_goals + remaining_goals
-                        yield from self._solve_goals(new_goals, new_subst, clause_module)
+                        yield from self._solve_goals(new_goals, new_subst, clause_module, depth + 1)
                 except CutException:
                     if clause_has_cut:
                         cut_executed = True
@@ -233,7 +254,7 @@ class PrologEngine:
         # Check imports
         return current_mod.imports.get(key)
 
-    def _solve_module_predicate(self, module_name, key, inner_goal, subst, remaining_goals, current_module="user"):
+    def _solve_module_predicate(self, module_name, key, inner_goal, subst, remaining_goals, current_module="user", depth=0):
         # Resolve a module-qualified goal by consulting the module's predicate index if available.
         module = getattr(self.interpreter, "modules", {}).get(module_name)
         if module is None:
@@ -260,10 +281,10 @@ class PrologEngine:
                 clause_has_cut = any(isinstance(g, Cut) for g in body_goals)
                 try:
                     if renamed_clause.is_fact():
-                        yield from self._solve_goals(remaining_goals, new_subst, module_name)
+                        yield from self._solve_goals(remaining_goals, new_subst, module_name, depth)
                     else:
                         new_goals = body_goals + remaining_goals
-                        yield from self._solve_goals(new_goals, new_subst, module_name)
+                        yield from self._solve_goals(new_goals, new_subst, module_name, depth + 1)
                 except CutException:
                     if clause_has_cut:
                         cut_executed = True

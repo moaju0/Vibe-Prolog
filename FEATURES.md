@@ -45,6 +45,7 @@ Status legend:
 | Negation as failure (`\\+/1`)   | ✅      |                                    |
 | First-argument indexing         | ✅      | O(1) clause lookup for large DBs   |
 | Occurs check                    | ⚠️     | Always enabled (stricter than ISO) |
+| Recursion handling with depth limits | ✅      | Configurable recursion depth limit (default: 500) |
 
 ---
 
@@ -284,6 +285,7 @@ Status legend:
 | `permission_error/3`                                              | ✅      | Enforced consistently for most predicates    |
 | `existence_error/2`                                               | ✅      |                                              |
 | `syntax_error/1`                                                  | ✅      |                                              |
+| `resource_error/2`                                                | ✅      | Recursion depth exceeded                      |
 | Arithmetic errors (`zero_divisor`, `undefined`, `float_overflow`) | ✅      | Full ISO-compliant arithmetic error handling |
 
 ---
