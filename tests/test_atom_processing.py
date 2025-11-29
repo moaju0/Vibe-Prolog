@@ -307,3 +307,175 @@ class TestSubAtom:
         with pytest.raises(PrologThrow) as exc_info:
             prolog.query_once("sub_atom(hello, atom, 5, _, Y).")
         assert "type_error" in str(exc_info.value)
+
+
+class TestNumberChars:
+    """Tests for number_chars/2 predicate."""
+
+    def test_number_chars_decompose_integer(self):
+        """Test decomposing integer to character list."""
+        prolog = PrologInterpreter()
+        result = prolog.query_once("number_chars(123, X).")
+        assert result['X'] == ['1', '2', '3']
+
+    def test_number_chars_decompose_negative(self):
+        """Test decomposing negative integer to character list."""
+        prolog = PrologInterpreter()
+        result = prolog.query_once("number_chars(-456, X).")
+        assert result['X'] == ['-', '4', '5', '6']
+
+    def test_number_chars_decompose_float(self):
+        """Test decomposing float to character list."""
+        prolog = PrologInterpreter()
+        result = prolog.query_once("number_chars(3.14, X).")
+        assert result['X'] == ['3', '.', '1', '4']
+
+    def test_number_chars_decompose_zero(self):
+        """Test decomposing zero to character list."""
+        prolog = PrologInterpreter()
+        result = prolog.query_once("number_chars(0, X).")
+        assert result['X'] == ['0']
+
+    def test_number_chars_construct_integer(self):
+        """Test constructing integer from character list."""
+        prolog = PrologInterpreter()
+        result = prolog.query_once("number_chars(X, ['4','2']).")
+        assert result['X'] == 42
+
+    def test_number_chars_construct_negative(self):
+        """Test constructing negative integer from character list."""
+        prolog = PrologInterpreter()
+        result = prolog.query_once("number_chars(X, ['-','1','2','3']).")
+        assert result['X'] == -123
+
+    def test_number_chars_construct_float(self):
+        """Test constructing float from character list."""
+        prolog = PrologInterpreter()
+        result = prolog.query_once("number_chars(X, ['3','.','1','4']).")
+        assert result['X'] == 3.14
+
+    def test_number_chars_unify_true(self):
+        """Test number_chars with both arguments instantiated (true case)."""
+        prolog = PrologInterpreter()
+        assert prolog.has_solution("number_chars(123, ['1','2','3']).")
+
+    def test_number_chars_unify_false(self):
+        """Test number_chars with both arguments instantiated (false case)."""
+        prolog = PrologInterpreter()
+        assert not prolog.has_solution("number_chars(123, ['1','2','4']).")
+
+    def test_number_chars_type_error_number(self):
+        """Test type error when first arg is not a number."""
+        prolog = PrologInterpreter()
+        with pytest.raises(PrologThrow) as exc_info:
+            prolog.query_once("number_chars(hello, X).")
+        assert "type_error" in str(exc_info.value)
+
+    def test_number_chars_type_error_list(self):
+        """Test type error when second arg is not a list."""
+        prolog = PrologInterpreter()
+        with pytest.raises(PrologThrow) as exc_info:
+            prolog.query_once("number_chars(123, atom).")
+        assert "type_error" in str(exc_info.value)
+
+    def test_number_chars_syntax_error_invalid(self):
+        """Test syntax error for invalid number format."""
+        prolog = PrologInterpreter()
+        with pytest.raises(PrologThrow) as exc_info:
+            prolog.query_once("number_chars(X, ['1','2','a']).")
+        assert "syntax_error" in str(exc_info.value)
+
+    def test_number_chars_invalid_chars(self):
+        """Test type error when list contains non-character atoms."""
+        prolog = PrologInterpreter()
+        with pytest.raises(PrologThrow) as exc_info:
+            prolog.query_once("number_chars(X, ['1','2',hello]).")
+        assert "type_error" in str(exc_info.value)
+        assert "character" in str(exc_info.value)
+
+
+class TestNumberCodes:
+    """Tests for number_codes/2 predicate."""
+
+    def test_number_codes_decompose_integer(self):
+        """Test decomposing integer to code list."""
+        prolog = PrologInterpreter()
+        result = prolog.query_once("number_codes(123, X).")
+        assert result['X'] == [49, 50, 51]  # ASCII codes for '1','2','3'
+
+    def test_number_codes_decompose_negative(self):
+        """Test decomposing negative integer to code list."""
+        prolog = PrologInterpreter()
+        result = prolog.query_once("number_codes(-456, X).")
+        assert result['X'] == [45, 52, 53, 54]  # ASCII for '-','4','5','6'
+
+    def test_number_codes_decompose_float(self):
+        """Test decomposing float to code list."""
+        prolog = PrologInterpreter()
+        result = prolog.query_once("number_codes(3.14, X).")
+        assert result['X'] == [51, 46, 49, 52]  # ASCII for '3','.','1','4'
+
+    def test_number_codes_construct_integer(self):
+        """Test constructing integer from code list."""
+        prolog = PrologInterpreter()
+        result = prolog.query_once("number_codes(X, [52,50]).")
+        assert result['X'] == 42
+
+    def test_number_codes_construct_negative(self):
+        """Test constructing negative integer from code list."""
+        prolog = PrologInterpreter()
+        result = prolog.query_once("number_codes(X, [45,49,50,51]).")
+        assert result['X'] == -123
+
+    def test_number_codes_construct_float(self):
+        """Test constructing float from code list."""
+        prolog = PrologInterpreter()
+        result = prolog.query_once("number_codes(X, [51,46,49,52]).")
+        assert result['X'] == 3.14
+
+    def test_number_codes_unify_true(self):
+        """Test number_codes with both arguments instantiated (true case)."""
+        prolog = PrologInterpreter()
+        assert prolog.has_solution("number_codes(123, [49,50,51]).")
+
+    def test_number_codes_unify_false(self):
+        """Test number_codes with both arguments instantiated (false case)."""
+        prolog = PrologInterpreter()
+        assert not prolog.has_solution("number_codes(123, [49,50,52]).")
+
+    def test_number_codes_type_error_number(self):
+        """Test type error when first arg is not a number."""
+        prolog = PrologInterpreter()
+        with pytest.raises(PrologThrow) as exc_info:
+            prolog.query_once("number_codes(hello, X).")
+        assert "type_error" in str(exc_info.value)
+
+    def test_number_codes_type_error_list(self):
+        """Test type error when second arg is not a list."""
+        prolog = PrologInterpreter()
+        with pytest.raises(PrologThrow) as exc_info:
+            prolog.query_once("number_codes(123, atom).")
+        assert "type_error" in str(exc_info.value)
+
+    def test_number_codes_syntax_error_invalid(self):
+        """Test syntax error for invalid number format."""
+        prolog = PrologInterpreter()
+        with pytest.raises(PrologThrow) as exc_info:
+            prolog.query_once("number_codes(X, [49,50,97]).")  # '1','2','a'
+        assert "syntax_error" in str(exc_info.value)
+
+    def test_number_codes_invalid_codes(self):
+        """Test type error when list contains non-integers."""
+        prolog = PrologInterpreter()
+        with pytest.raises(PrologThrow) as exc_info:
+            prolog.query_once("number_codes(X, [49,50,hello]).")
+        assert "type_error" in str(exc_info.value)
+        assert "integer" in str(exc_info.value)
+
+    def test_number_codes_invalid_character_code(self):
+        """Test type error when list contains invalid character code."""
+        prolog = PrologInterpreter()
+        with pytest.raises(PrologThrow) as exc_info:
+            prolog.query_once("number_codes(X, [1114112]).")
+        assert "type_error" in str(exc_info.value)
+        assert "character_code" in str(exc_info.value)

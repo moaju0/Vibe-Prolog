@@ -116,9 +116,12 @@ class TestRules:
         clauses = parser.parse("grandparent(X, Z) :- parent(X, Y), parent(Y, Z).")
         clause = clauses[0]
         assert clause.is_rule()
-        # The body should be a conjunction (,)
+        # The body is a list of goals (flattened, not a conjunction tree)
+        assert len(clause.body) == 2
         assert isinstance(clause.body[0], Compound)
-        assert clause.body[0].functor == ","
+        assert clause.body[0].functor == "parent"
+        assert isinstance(clause.body[1], Compound)
+        assert clause.body[1].functor == "parent"
 
     def test_parse_rule_with_arithmetic(self):
         """Test parsing a rule with arithmetic."""
@@ -266,20 +269,24 @@ class TestControlStructures:
         parser = PrologParser()
         clauses = parser.parse("test :- foo, bar.")
         clause = clauses[0]
-        assert len(clause.body) == 1
-        conj = clause.body[0]
-        assert isinstance(conj, Compound)
-        assert conj.functor == ","
+        # Body is a list of flattened goals
+        assert len(clause.body) == 2
+        assert isinstance(clause.body[0], Atom)
+        assert clause.body[0].name == "foo"
+        assert isinstance(clause.body[1], Atom)
+        assert clause.body[1].name == "bar"
 
     def test_parse_parenthesized_conjunction(self):
         """Test parsing parenthesized conjunction."""
         parser = PrologParser()
         clauses = parser.parse("test(A, B) :- (A, B).")
         clause = clauses[0]
-        assert len(clause.body) == 1
-        body = clause.body[0]
-        assert isinstance(body, Compound)
-        assert body.functor == ","
+        # Parenthesized conjunction is flattened (syntactically equivalent)
+        assert len(clause.body) == 2
+        assert isinstance(clause.body[0], Variable)
+        assert clause.body[0].name == 'A'
+        assert isinstance(clause.body[1], Variable)
+        assert clause.body[1].name == 'B'
 
     def test_parse_if_then(self):
         """Test parsing if-then (->)."""

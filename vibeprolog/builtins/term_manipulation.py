@@ -43,6 +43,8 @@ class TermManipulationBuiltins:
         register_builtin(
             registry, "copy_term", 2, TermManipulationBuiltins._builtin_copy_term
         )
+        register_builtin(registry, "compare", 3, TermManipulationBuiltins._builtin_compare)
+        register_builtin(registry, "unify_with_occurs_check", 2, TermManipulationBuiltins._builtin_unify_with_occurs_check)
 
     @staticmethod
     def _builtin_term_compare(
@@ -196,6 +198,44 @@ class TermManipulationBuiltins:
         var_map: dict[Variable, Variable] = {}
         copied_term = copy_term_recursive(source, var_map, engine._fresh_variable)
         return unify(copy, copied_term, subst)
+
+    @staticmethod
+    def _builtin_compare(
+        args: BuiltinArgs, subst: Substitution, _engine: EngineContext | None
+    ) -> Substitution | None:
+        """compare/3 - Three-way comparison using standard term order."""
+        order, term1, term2 = args
+
+        order_deref = deref(order, subst)
+
+        # If Order is bound, check it's a valid order atom
+        if not isinstance(order_deref, Variable):
+            if not isinstance(order_deref, Atom) or order_deref.name not in {'<', '=', '>'}:
+                raise PrologThrow(PrologError.domain_error("order", order_deref, "compare/3"))
+
+        term1_deref = deref(term1, subst)
+        term2_deref = deref(term2, subst)
+
+        key1 = term_sort_key(term1_deref)
+        key2 = term_sort_key(term2_deref)
+
+        if key1 < key2:
+            order_atom = Atom('<')
+        elif key1 > key2:
+            order_atom = Atom('>')
+        else:
+            order_atom = Atom('=')
+
+        return unify(order, order_atom, subst)
+
+    @staticmethod
+    def _builtin_unify_with_occurs_check(
+        args: BuiltinArgs, subst: Substitution, _engine: EngineContext | None
+    ) -> Substitution | None:
+        """unify_with_occurs_check/2 - Unification with occurs check."""
+        term1, term2 = args
+        # Vibe-Prolog already performs occurs check in unify/3
+        return unify(term1, term2, subst)
 
 
 __all__ = ["TermManipulationBuiltins"]

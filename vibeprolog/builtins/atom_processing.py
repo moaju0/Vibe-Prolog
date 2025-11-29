@@ -7,6 +7,8 @@ Implements ISO-standard predicates for atom manipulation:
 - atom_length/2: Get or check atom length
 - atom_concat/3: Concatenate atoms or decompose atoms into parts
 - sub_atom/5: Extract or check subatoms with position information
+- number_chars/2: Convert between numbers and character lists
+- number_codes/2: Convert between numbers and character code lists
 """
 
 from __future__ import annotations
@@ -33,6 +35,8 @@ class AtomProcessingBuiltins:
         register_builtin(registry, "atom_length", 2, AtomProcessingBuiltins._builtin_atom_length)
         register_builtin(registry, "atom_concat", 3, AtomProcessingBuiltins._builtin_atom_concat)
         register_builtin(registry, "sub_atom", 5, AtomProcessingBuiltins._builtin_sub_atom)
+        register_builtin(registry, "number_chars", 2, AtomProcessingBuiltins._builtin_number_chars)
+        register_builtin(registry, "number_codes", 2, AtomProcessingBuiltins._builtin_number_codes)
 
     @staticmethod
     def _builtin_atom_chars(
@@ -61,11 +65,13 @@ class AtomProcessingBuiltins:
 
         # Mode 2: atom_chars(?Atom, +Chars) - construct atom from chars
         elif isinstance(chars_term, List):
-            # Check if it's a proper list of characters
-            if chars_term.tail is not None:
+            # Collect all elements from the list (handle nested representation)
+            elements = AtomProcessingBuiltins._flatten_prolog_list(chars_term)
+            if elements is None:
                 return  # Not a proper list
+
             char_str = ""
-            for elem in chars_term.elements:
+            for elem in elements:
                 if not isinstance(elem, Atom) or len(elem.name) != 1:
                     return  # Invalid character
                 char_str += elem.name
@@ -73,6 +79,28 @@ class AtomProcessingBuiltins:
             new_subst = unify(atom_term, result_atom, subst)
             if new_subst is not None:
                 yield new_subst
+
+    @staticmethod
+    def _flatten_prolog_list(term) -> list | None:
+        """Flatten a Prolog list into a Python list of elements.
+
+        Returns None if the term is not a proper list.
+        """
+        if not isinstance(term, List):
+            return None
+
+        elements = []
+        current = term
+        while isinstance(current, List):
+            elements.extend(current.elements)
+            if current.tail is None:
+                break
+            current = current.tail
+        else:
+            # Not a proper list
+            return None
+
+        return elements
 
     @staticmethod
     def _is_char_list(term) -> bool:
@@ -118,11 +146,13 @@ class AtomProcessingBuiltins:
 
         # Mode 2: atom_codes(?Atom, +Codes) - construct atom from codes
         elif isinstance(codes_term, List):
-            # Check if it's a proper list of integers
-            if codes_term.tail is not None:
+            # Collect all elements from the list (handle nested representation)
+            elements = AtomProcessingBuiltins._flatten_prolog_list(codes_term)
+            if elements is None:
                 return  # Not a proper list
+
             char_str = ""
-            for elem in codes_term.elements:
+            for elem in elements:
                 if not isinstance(elem, Number) or not isinstance(elem.value, int):
                     return  # Invalid integer
                 char_str += chr(int(elem.value))
@@ -355,6 +385,122 @@ class AtomProcessingBuiltins:
                         continue
 
                 yield new_subst
+
+    @staticmethod
+    def _builtin_number_chars(
+        args: BuiltinArgs, subst: Substitution, _engine: EngineContext | None
+    ) -> Iterator[Substitution]:
+        """number_chars(+Number, ?Chars) - Convert between number and character list."""
+        number_term, chars_term = args
+        number_term = deref(number_term, subst)
+        chars_term = deref(chars_term, subst)
+
+        # Check type errors
+        if not isinstance(number_term, Variable) and not isinstance(number_term, Number):
+            error_term = PrologError.type_error("number", number_term, "number_chars/2")
+            raise PrologThrow(error_term)
+        if not isinstance(chars_term, Variable) and not isinstance(chars_term, List):
+            error_term = PrologError.type_error("list", chars_term, "number_chars/2")
+            raise PrologThrow(error_term)
+
+        # Mode 1: number_chars(+Number, ?Chars) - decompose number to chars
+        if isinstance(number_term, Number):
+            num_str = str(number_term.value)
+            chars = [Atom(c) for c in num_str]
+            char_list = List(tuple(chars), None)
+            new_subst = unify(chars_term, char_list, subst)
+            if new_subst is not None:
+                yield new_subst
+
+        # Mode 2: number_chars(?Number, +Chars) - construct number from chars
+        elif isinstance(chars_term, List):
+            # Collect all elements from the list (handle nested representation)
+            elements = AtomProcessingBuiltins._flatten_prolog_list(chars_term)
+            if elements is None:
+                return  # Not a proper list
+
+            char_str = ""
+            for elem in elements:
+                elem = deref(elem, subst)
+                if not isinstance(elem, Atom) or len(elem.name) != 1:
+                    error_term = PrologError.type_error("character", elem, "number_chars/2")
+                    raise PrologThrow(error_term)
+                char_str += elem.name
+
+            # Parse the number
+            try:
+                if '.' in char_str or 'e' in char_str.lower():
+                    result = float(char_str)
+                else:
+                    result = int(char_str)
+                result_number = Number(result)
+                new_subst = unify(number_term, result_number, subst)
+                if new_subst is not None:
+                    yield new_subst
+            except ValueError:
+                # Syntax error for invalid number format
+                error_term = PrologError.syntax_error(f"Invalid number format: {char_str}", "number_chars/2")
+                raise PrologThrow(error_term)
+
+    @staticmethod
+    def _builtin_number_codes(
+        args: BuiltinArgs, subst: Substitution, _engine: EngineContext | None
+    ) -> Iterator[Substitution]:
+        """number_codes(+Number, ?Codes) - Convert between number and character code list."""
+        number_term, codes_term = args
+        number_term = deref(number_term, subst)
+        codes_term = deref(codes_term, subst)
+
+        # Check type errors
+        if not isinstance(number_term, Variable) and not isinstance(number_term, Number):
+            error_term = PrologError.type_error("number", number_term, "number_codes/2")
+            raise PrologThrow(error_term)
+        if not isinstance(codes_term, Variable) and not isinstance(codes_term, List):
+            error_term = PrologError.type_error("list", codes_term, "number_codes/2")
+            raise PrologThrow(error_term)
+
+        # Mode 1: number_codes(+Number, ?Codes) - decompose number to codes
+        if isinstance(number_term, Number):
+            num_str = str(number_term.value)
+            codes = [Number(ord(c)) for c in num_str]
+            code_list = List(tuple(codes), None)
+            new_subst = unify(codes_term, code_list, subst)
+            if new_subst is not None:
+                yield new_subst
+
+        # Mode 2: number_codes(?Number, +Codes) - construct number from codes
+        elif isinstance(codes_term, List):
+            # Collect all elements from the list (handle nested representation)
+            elements = AtomProcessingBuiltins._flatten_prolog_list(codes_term)
+            if elements is None:
+                return  # Not a proper list
+
+            char_str = ""
+            for elem in elements:
+                elem = deref(elem, subst)
+                if not isinstance(elem, Number) or not isinstance(elem.value, int):
+                    error_term = PrologError.type_error("integer", elem, "number_codes/2")
+                    raise PrologThrow(error_term)
+                try:
+                    char_str += chr(elem.value)
+                except ValueError:
+                    error_term = PrologError.type_error("character_code", elem, "number_codes/2")
+                    raise PrologThrow(error_term)
+
+            # Parse the number
+            try:
+                if '.' in char_str or 'e' in char_str.lower():
+                    result = float(char_str)
+                else:
+                    result = int(char_str)
+                result_number = Number(result)
+                new_subst = unify(number_term, result_number, subst)
+                if new_subst is not None:
+                    yield new_subst
+            except ValueError:
+                # Syntax error for invalid number format
+                error_term = PrologError.syntax_error(f"Invalid number format: {char_str}", "number_codes/2")
+                raise PrologThrow(error_term)
 
 
 __all__ = ["AtomProcessingBuiltins"]

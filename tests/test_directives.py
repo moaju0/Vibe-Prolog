@@ -9,7 +9,7 @@ class TestPredicateDirectives:
         prolog = PrologInterpreter()
         prolog.consult_string(":- dynamic(foo/1).\nfoo(1).")
 
-        assert prolog.has_solution("catch(asserta(foo(2)), _, true)")
+        assert prolog.has_solution("asserta(foo(2))")
         assert prolog.has_solution("foo(2)")
 
         result = prolog.query_once(
@@ -95,4 +95,52 @@ class TestPredicateDirectives:
 
         with pytest.raises(PrologThrow):
             prolog.consult_string(":- dynamic(member/2).")
+
+    def test_dynamic_no_parens_single(self):
+        prolog = PrologInterpreter()
+        prolog.consult_string(":- dynamic foo/1.\nfoo(1).")
+
+        assert prolog.has_solution("asserta(foo(2))")
+        assert prolog.has_solution("foo(2)")
+
+    def test_dynamic_no_parens_multiple(self):
+        prolog = PrologInterpreter()
+        prolog.consult_string(":- dynamic foo/1, bar/2.\nfoo(1).\nbar(a, b).")
+
+        assert prolog.has_solution("asserta(foo(2))")
+        assert prolog.has_solution("foo(2)")
+        assert prolog.has_solution("asserta(bar(c, d))")
+        assert prolog.has_solution("bar(c, d)")
+
+    def test_dynamic_no_parens_multiline(self):
+        prolog = PrologInterpreter()
+        prolog.consult_string("""\
+:- dynamic
+    known/3,
+    voice/1.
+known(yes, test, val).
+voice(loud).
+""")
+
+        assert prolog.has_solution("asserta(known(no, test, val2))")
+        assert prolog.has_solution("known(no, test, val2)")
+        assert prolog.has_solution("asserta(voice(soft))")
+        assert prolog.has_solution("voice(soft)")
+
+    def test_multifile_no_parens(self):
+        prolog = PrologInterpreter()
+        prolog.consult_string(":- multifile shared/1.\nshared(1).")
+        prolog.consult_string("shared(2).")
+
+        results = prolog.query("shared(X)")
+        values = {row["X"] for row in results}
+        assert values == {1, 2}
+
+    def test_discontiguous_no_parens(self):
+        prolog = PrologInterpreter()
+        prolog.consult_string(
+            ":- discontiguous alpha/1.\nalpha(1).\nbeta(1).\nalpha(2)."
+        )
+        results = prolog.query("alpha(X)")
+        assert {row["X"] for row in results} == {1, 2}
 

@@ -82,11 +82,18 @@ class PredicatePropertyDirective:
 PROLOG_GRAMMAR = r"""
     start: (clause | directive)+
 
-    clause: fact | rule | dcg_rule
-    fact: term "."
+    clause: rule | dcg_rule | fact
+    fact: atom_or_compound "."
     rule: term ":-" goals "."
     dcg_rule: term "-->" goals "."
-    directive: ":-" (property_directive | term) "."
+    atom_or_compound: atom
+        | atom "(" args ")"
+    
+    directive: ":-" (prefix_directive | property_directive | term) "."
+
+    prefix_directive: "dynamic" predicate_indicators -> dynamic_directive
+        | "multifile" predicate_indicators -> multifile_directive
+        | "discontiguous" predicate_indicators -> discontiguous_directive
 
     property_directive: "dynamic" "(" predicate_indicators ")"    -> dynamic_directive
         | "multifile" "(" predicate_indicators ")"   -> multifile_directive
@@ -109,8 +116,7 @@ PROLOG_GRAMMAR = r"""
 
     comparison_term: module_term (COMP_OP module_term)?
 
-    prefix_term: PREFIX_OP prefix_term  -> prefix_op
-        | expr
+    prefix_term: expr
 
     // Module qualification operator (right-associative, xfy)
     module_term: prefix_term (":" module_term)?
@@ -121,7 +127,11 @@ PROLOG_GRAMMAR = r"""
 
     mul_expr: pow_expr (MUL_OP pow_expr)*
 
-    pow_expr: primary (POW_OP primary)*
+    pow_expr: unary_expr (POW_OP unary_expr)*
+
+    unary_expr: PREFIX_OP unary_expr  -> prefix_op
+        | "-" unary_expr  -> prefix_op
+        | primary
 
     primary: operator_atom
         | compound
@@ -130,6 +140,7 @@ PROLOG_GRAMMAR = r"""
         | cut
         | char_code
         | number
+        | "-" number -> negative_number
         | atom
         | variable
         | list
@@ -202,6 +213,15 @@ class PrologTransformer(Transformer):
     def clause(self, items):
         return items[0]
 
+    def atom_or_compound(self, items):
+        if len(items) == 1:
+            return items[0]  # Just an atom
+        else:
+            # atom "(" args ")"
+            atom = items[0]
+            args = items[1]
+            return Compound(atom.name, tuple(args))
+
     @v_args(meta=True)
     def directive(self, meta, items):
         return Directive(goal=items[0], meta=meta)
@@ -210,13 +230,38 @@ class PrologTransformer(Transformer):
         return items
 
     def dynamic_directive(self, items):
-        return PredicatePropertyDirective("dynamic", tuple(items[0]))
+        indicators = self._flatten_comma_separated(items[0])
+        return PredicatePropertyDirective("dynamic", tuple(indicators))
 
     def multifile_directive(self, items):
-        return PredicatePropertyDirective("multifile", tuple(items[0]))
+        indicators = self._flatten_comma_separated(items[0])
+        return PredicatePropertyDirective("multifile", tuple(indicators))
 
     def discontiguous_directive(self, items):
-        return PredicatePropertyDirective("discontiguous", tuple(items[0]))
+        indicators = self._flatten_comma_separated(items[0])
+        return PredicatePropertyDirective("discontiguous", tuple(indicators))
+
+    def _flatten_comma_separated(self, items):
+        """Flatten comma-separated predicates into a list.
+        
+        If items is a list with a single Compound with functor ',',
+        unwrap it into a flat list of indicators.
+        """
+        if isinstance(items, list) and len(items) == 1:
+            item = items[0]
+            if isinstance(item, Compound) and item.functor == ',':
+                # Flatten comma compound
+                return self._collect_comma_terms(item)
+        return items
+
+    def _collect_comma_terms(self, compound):
+        """Recursively collect terms from a comma compound."""
+        if isinstance(compound, Compound) and compound.functor == ',':
+            left = self._collect_comma_terms(compound.args[0])
+            right = self._collect_comma_terms(compound.args[1])
+            return left + right
+        else:
+            return [compound]
 
     @v_args(meta=True)
     def fact(self, meta, items):
@@ -233,7 +278,15 @@ class PrologTransformer(Transformer):
         return Clause(head=head, body=body, dcg=True, meta=meta)
 
     def goals(self, items):
-        return items
+        # Flatten any comma compounds in the goal list
+        # This handles cases where ambiguous parsing creates comma compounds
+        result = []
+        for item in items:
+            if isinstance(item, Compound) and item.functor == ',':
+                result.extend(self._collect_comma_terms(item))
+            else:
+                result.append(item)
+        return result
 
     def term(self, items):
         return items[0]
@@ -272,9 +325,28 @@ class PrologTransformer(Transformer):
         return items[0]
 
     def prefix_op(self, items):
-        # items[0] is the operator, items[1] is the term
-        op, term = items
-        return Compound(str(op), (term,))
+        # items can be [op, term] or just [term] depending on the rule
+        if len(items) == 2:
+            op, term = items
+            op_str = str(op)
+            # Special case: convert unary minus applied to a number into a negative number
+            if op_str == "-" and isinstance(term, Number):
+                if isinstance(term.value, int):
+                    return Number(-term.value)
+                else:
+                    return Number(-term.value)
+            return Compound(op_str, (term,))
+        else:
+            # For "-" prefix_term rule, items is just [term]
+            # The "-" is implicit in the rule
+            term = items[0]
+            # Special case: convert unary minus applied to a number into a negative number
+            if isinstance(term, Number):
+                if isinstance(term.value, int):
+                    return Number(-term.value)
+                else:
+                    return Number(-term.value)
+            return Compound("-", (term,))
 
     def module_term(self, items):
         # Module qualification: left:right (right-associative)
@@ -310,20 +382,23 @@ class PrologTransformer(Transformer):
         return result
 
     def pow_expr(self, items):
-        if len(items) == 1:
-            return items[0]
-        # Build right-associative tree for exponentiation
-        result = items[-1]
-        for i in range(len(items) - 2, -1, -2):
-            if i > 0:
-                result = Compound(str(items[i]), (items[i - 1], result))
-        if len(items) % 2 == 0:
-            # If even number of items, first item hasn't been added yet
-            result = Compound(str(items[1]), (items[0], result))
-        return result
+       if len(items) == 1:
+           return items[0]
+       # Build right-associative tree for exponentiation
+       result = items[-1]
+       for i in range(len(items) - 2, -1, -2):
+           if i > 0:
+               result = Compound(str(items[i]), (items[i - 1], result))
+       if len(items) % 2 == 0:
+           # If even number of items, first item hasn't been added yet
+           result = Compound(str(items[1]), (items[0], result))
+       return result
+
+    def unary_expr(self, items):
+       return items[0]
 
     def primary(self, items):
-        return items[0]
+       return items[0]
 
     def compound(self, items):
         functor = items[0]
@@ -424,6 +499,17 @@ class PrologTransformer(Transformer):
         else:
             # Regular integer
             return Number(int(value))
+
+    def negative_number(self, items):
+        # items[0] is the dash, items[1] is the number
+        num = items[1]
+        # Negate the number
+        if isinstance(num, Number):
+            if isinstance(num.value, int):
+                return Number(-num.value)
+            else:
+                return Number(-num.value)
+        return num
 
     def _parse_base_number(self, value):
         """Parse base'digits syntax like 16'ff or -2'abcd."""
@@ -532,7 +618,7 @@ class PrologParser:
 
     def __init__(self, operator_table=None):
         self.parser = Lark(
-            PROLOG_GRAMMAR, parser="lalr", propagate_positions=True
+            PROLOG_GRAMMAR, parser="earley", propagate_positions=True, ambiguity='resolve'
         )
         # operator_table is reserved for future dynamic operator parsing; currently unused
         self.operator_table = operator_table

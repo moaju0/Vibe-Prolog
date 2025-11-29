@@ -97,6 +97,10 @@ class ArithmeticBuiltins:
                     op, args, subst, engine
                 ),
             )
+        register_builtin(registry, "between", 3, ArithmeticBuiltins._builtin_between)
+        register_builtin(registry, "succ", 2, ArithmeticBuiltins._builtin_succ)
+        register_builtin(registry, "plus", 3, ArithmeticBuiltins._builtin_plus)
+        register_builtin(registry, "divmod", 4, ArithmeticBuiltins._builtin_divmod)
 
     @staticmethod
     def _builtin_is(
@@ -149,6 +153,190 @@ class ArithmeticBuiltins:
         except Exception:
             # Unexpected errors - convert to evaluation error
             raise PrologThrow(PrologError.evaluation_error("error", f"{op}/2"))
+
+    @staticmethod
+    def _builtin_between(
+        args: BuiltinArgs, subst: Substitution, engine: PrologEngine
+    ) -> Substitution | None:
+        """between/3 - Generate or test integers in a range."""
+        low, high, value = args
+
+        # Dereference arguments
+        low_deref = deref(low, subst)
+        high_deref = deref(high, subst)
+        value_deref = deref(value, subst)
+
+        # Check Low and High are instantiated
+        if isinstance(low_deref, Variable):
+            raise PrologThrow(PrologError.instantiation_error("between/3"))
+        if isinstance(high_deref, Variable):
+            raise PrologThrow(PrologError.instantiation_error("between/3"))
+
+        # Check Low and High are integers
+        if not isinstance(low_deref, Number) or not isinstance(low_deref.value, int):
+            raise PrologThrow(PrologError.type_error("integer", low_deref, "between/3"))
+        if not isinstance(high_deref, Number) or not isinstance(high_deref.value, int):
+            raise PrologThrow(PrologError.type_error("integer", high_deref, "between/3"))
+
+        low_val = int(low_deref.value)
+        high_val = int(high_deref.value)
+
+        # Check Low <= High
+        if low_val > high_val:
+            return  # Fail
+
+        # If Value is bound, check if it's in range
+        if not isinstance(value_deref, Variable):
+            if not isinstance(value_deref, Number) or not isinstance(value_deref.value, int):
+                raise PrologThrow(PrologError.type_error("integer", value_deref, "between/3"))
+            val = int(value_deref.value)
+            if low_val <= val <= high_val:
+                yield subst
+        else:
+            # Generate values from Low to High
+            for i in range(low_val, high_val + 1):
+                new_subst = unify(value, Number(i), subst)
+                if new_subst is not None:
+                    yield new_subst
+
+    @staticmethod
+    def _builtin_succ(
+        args: BuiltinArgs, subst: Substitution, engine: PrologEngine
+    ) -> Substitution | None:
+        """succ/2 - Successor relation between integers."""
+        int1, int2 = args
+
+        int1_deref = deref(int1, subst)
+        int2_deref = deref(int2, subst)
+
+        # At least one must be instantiated
+        if isinstance(int1_deref, Variable) and isinstance(int2_deref, Variable):
+            raise PrologThrow(PrologError.instantiation_error("succ/2"))
+
+        # If both are instantiated, check if int2 = int1 + 1
+        if not isinstance(int1_deref, Variable) and not isinstance(int2_deref, Variable):
+            if not isinstance(int1_deref, Number) or not isinstance(int1_deref.value, int):
+                raise PrologThrow(PrologError.type_error("integer", int1_deref, "succ/2"))
+            if not isinstance(int2_deref, Number) or not isinstance(int2_deref.value, int):
+                raise PrologThrow(PrologError.type_error("integer", int2_deref, "succ/2"))
+            if int(int2_deref.value) == int(int1_deref.value) + 1:
+                yield subst
+        # If int1 is bound, unify int2 with int1 + 1
+        elif not isinstance(int1_deref, Variable):
+            if not isinstance(int1_deref, Number) or not isinstance(int1_deref.value, int):
+                raise PrologThrow(PrologError.type_error("integer", int1_deref, "succ/2"))
+            val1 = int(int1_deref.value)
+            val2 = val1 + 1
+            if val2 < 0:
+                return  # Fail, negative not allowed
+            new_subst = unify(int2, Number(val2), subst)
+            if new_subst is not None:
+                yield new_subst
+        # If int2 is bound, unify int1 with int2 - 1
+        else:
+            if not isinstance(int2_deref, Number) or not isinstance(int2_deref.value, int):
+                raise PrologThrow(PrologError.type_error("integer", int2_deref, "succ/2"))
+            val2 = int(int2_deref.value)
+            val1 = val2 - 1
+            if val1 < 0:
+                return  # Fail
+            new_subst = unify(int1, Number(val1), subst)
+            if new_subst is not None:
+                yield new_subst
+
+    @staticmethod
+    def _builtin_plus(
+        args: BuiltinArgs, subst: Substitution, engine: PrologEngine
+    ) -> Substitution | None:
+        """plus/3 - Addition relation."""
+        int1, int2, int3 = args
+
+        int1_deref = deref(int1, subst)
+        int2_deref = deref(int2, subst)
+        int3_deref = deref(int3, subst)
+
+        # Count instantiated arguments
+        instantiated = [
+            not isinstance(int1_deref, Variable),
+            not isinstance(int2_deref, Variable),
+            not isinstance(int3_deref, Variable)
+        ]
+        if sum(instantiated) < 2:
+            raise PrologThrow(PrologError.instantiation_error("plus/3"))
+
+        # Check types of instantiated args
+        if instantiated[0] and (not isinstance(int1_deref, Number) or not isinstance(int1_deref.value, int)):
+            raise PrologThrow(PrologError.type_error("integer", int1_deref, "plus/3"))
+        if instantiated[1] and (not isinstance(int2_deref, Number) or not isinstance(int2_deref.value, int)):
+            raise PrologThrow(PrologError.type_error("integer", int2_deref, "plus/3"))
+        if instantiated[2] and (not isinstance(int3_deref, Number) or not isinstance(int3_deref.value, int)):
+            raise PrologThrow(PrologError.type_error("integer", int3_deref, "plus/3"))
+
+        # Determine which arg is unbound
+        if not instantiated[0]:  # int1 unbound
+            val2 = int(int2_deref.value)
+            val3 = int(int3_deref.value)
+            val1 = val3 - val2
+            if val1 < 0:
+                return
+            new_subst = unify(int1, Number(val1), subst)
+            if new_subst is not None:
+                yield new_subst
+        elif not instantiated[1]:  # int2 unbound
+            val1 = int(int1_deref.value)
+            val3 = int(int3_deref.value)
+            val2 = val3 - val1
+            if val2 < 0:
+                return
+            new_subst = unify(int2, Number(val2), subst)
+            if new_subst is not None:
+                yield new_subst
+        else:  # int3 unbound
+            val1 = int(int1_deref.value)
+            val2 = int(int2_deref.value)
+            val3 = val1 + val2
+            if val3 < 0:
+                return
+            new_subst = unify(int3, Number(val3), subst)
+            if new_subst is not None:
+                yield new_subst
+
+    @staticmethod
+    def _builtin_divmod(
+        args: BuiltinArgs, subst: Substitution, engine: PrologEngine
+    ) -> Substitution | None:
+        """divmod/4 - Compute quotient and remainder."""
+        dividend, divisor, quotient, remainder = args
+
+        dividend_deref = deref(dividend, subst)
+        divisor_deref = deref(divisor, subst)
+
+        # Check instantiated
+        if isinstance(dividend_deref, Variable):
+            raise PrologThrow(PrologError.instantiation_error("divmod/4"))
+        if isinstance(divisor_deref, Variable):
+            raise PrologThrow(PrologError.instantiation_error("divmod/4"))
+
+        # Check types
+        if not isinstance(dividend_deref, Number) or not isinstance(dividend_deref.value, int):
+            raise PrologThrow(PrologError.type_error("integer", dividend_deref, "divmod/4"))
+        if not isinstance(divisor_deref, Number) or not isinstance(divisor_deref.value, int):
+            raise PrologThrow(PrologError.type_error("integer", divisor_deref, "divmod/4"))
+
+        div_val = int(dividend_deref.value)
+        div_by = int(divisor_deref.value)
+
+        if div_by == 0:
+            raise PrologThrow(PrologError.evaluation_error("zero_divisor", "divmod/4"))
+
+        quot, rem = divmod(div_val, div_by)
+
+        # Unify quotient and remainder
+        new_subst = unify(quotient, Number(quot), subst)
+        if new_subst is not None:
+            new_subst = unify(remainder, Number(rem), new_subst)
+            if new_subst is not None:
+                yield new_subst
 
     @staticmethod
     def _evaluate_arithmetic(
