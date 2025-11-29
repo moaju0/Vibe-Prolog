@@ -239,15 +239,16 @@ class ControlBuiltins:
         args: BuiltinArgs, subst: Substitution, engine: EngineContext
     ) -> Iterator[Substitution]:
         """apply/2 - Call a predicate with arguments supplied as a list."""
-        goal_term = deref(args[0], subst)
-        args_term = deref(args[1], subst)
+        goal_term_raw, args_term_raw = args
 
-        engine._check_instantiated(goal_term, subst, "apply/2")
+        engine._check_instantiated(goal_term_raw, subst, "apply/2")
+        engine._check_instantiated(args_term_raw, subst, "apply/2")
+
+        goal_term = deref(goal_term_raw, subst)
+        args_term = deref(args_term_raw, subst)
+
         engine._check_type(goal_term, (Compound, Atom), "callable", subst, "apply/2")
-
-        if not isinstance(args_term, List):
-            error_term = PrologError.type_error("list", args_term, "apply/2")
-            raise PrologThrow(error_term)
+        engine._check_type(args_term, List, "list", subst, "apply/2")
 
         try:
             arg_values = list_to_python(args_term, subst)
