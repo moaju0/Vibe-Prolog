@@ -688,7 +688,7 @@ def extract_op_directives(source: str) -> list[tuple[int, str, str]]:
     
     # Match :- op(Precedence, Type, Operator).
     # Handles atom, single-quoted atoms, and lists
-    pattern = r':-\s*op\s*\(\s*(\d+)\s*,\s*(\w+)\s*,\s*([^)]+)\s*\)'
+    pattern = r':-\s*op\s*\(\s*(\d+)\s*,\s*(\w+)\s*,\s*([^)]+)\s*\)\s*\.'
     
     for match in re.finditer(pattern, source):
         precedence_str = match.group(1)
