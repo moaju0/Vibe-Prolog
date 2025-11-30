@@ -216,6 +216,7 @@ Status legend:
 | `assertz/1`                            | ✅      |                                                                     |
 | `assert/1`                             | ✅      |                                                                     |
 | `retract/1`                            | ✅      |                                                                     |
+| `retractall/1`                         | ✅      | **ISO-required** - Retract all matching clauses                     |
 | `abolish/1`                            | ✅      |                                                                     |
 | `clause/2`                             | ✅      |                                                                     |
 | Permission errors on static predicates | ⚠️     | Enforced, but requires further validation across modules            |

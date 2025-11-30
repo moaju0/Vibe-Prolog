@@ -25,6 +25,7 @@ class DatabaseBuiltins:
         register_builtin(registry, "assertz", 1, DatabaseBuiltins._builtin_assertz)
         register_builtin(registry, "assert", 1, DatabaseBuiltins._builtin_assertz)
         register_builtin(registry, "retract", 1, DatabaseBuiltins._builtin_retract)
+        register_builtin(registry, "retractall", 1, DatabaseBuiltins._builtin_retractall)
         register_builtin(registry, "abolish", 1, DatabaseBuiltins._builtin_abolish)
 
     @staticmethod
@@ -205,6 +206,158 @@ class DatabaseBuiltins:
         # Update the index for retracted predicates
         for functor, arity in retracted_predicates:
             engine._remove_predicate_from_index_if_empty(functor, arity)
+
+    @staticmethod
+    def _builtin_retractall(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext
+    ) -> Substitution | None:
+        """Retract all clauses matching the given pattern.
+
+        Unlike retract/1, this predicate:
+        - Removes all matching clauses at once
+        - Always succeeds (even if no clauses match)
+        - Is deterministic (succeeds exactly once, no backtracking)
+        - Matches only on the clause head (not the body)
+        """
+        clause_term = deref(args[0], subst)
+
+        # Handle module-qualified patterns: Module:Head
+        target_module = None
+        if (
+            isinstance(clause_term, Compound)
+            and clause_term.functor == ":"
+            and len(clause_term.args) == 2
+        ):
+            module_term = clause_term.args[0]
+            if isinstance(module_term, Atom):
+                target_module = module_term.name
+            clause_term = clause_term.args[1]
+
+        # Handle predicate indicator form: Name/Arity (e.g., retractall(foo/2))
+        # Convert to a pattern with fresh variables
+        if (
+            isinstance(clause_term, Compound)
+            and clause_term.functor == "/"
+            and len(clause_term.args) == 2
+        ):
+            name_term = deref(clause_term.args[0], subst)
+            arity_term = deref(clause_term.args[1], subst)
+            if isinstance(name_term, Atom) and isinstance(arity_term, Number):
+                functor_name = name_term.name
+                arity = int(arity_term.value)
+                if arity == 0:
+                    # Zero-arity: just the atom
+                    clause_term = Atom(functor_name)
+                else:
+                    # Create a pattern with fresh variables
+                    from vibeprolog.terms import Variable
+                    var_args = tuple(Variable(f"_G{i}") for i in range(arity))
+                    clause_term = Compound(functor_name, var_args)
+
+        # Extract the head pattern from the argument
+        # retractall(Head) matches clauses whose head unifies with Head
+        # retractall((Head :- Body)) matches full clause terms like retract/1
+        if (
+            isinstance(clause_term, Compound)
+            and clause_term.functor == ":-"
+            and len(clause_term.args) == 2
+        ):
+            # Full clause pattern: retractall((head :- body))
+            head_pattern = clause_term.args[0]
+            body_pattern = clause_term.args[1]
+            match_body = True
+        else:
+            # Head-only pattern: retractall(head)
+            head_pattern = clause_term
+            body_pattern = None
+            match_body = False
+
+        matches = []
+        retracted_predicates = set()
+
+        for i, clause in enumerate(engine.clauses):
+            # If a target module is specified, only match clauses from that module
+            if target_module is not None:
+                clause_module = getattr(clause, 'module', 'user')
+                if clause_module != target_module:
+                    continue
+
+            renamed_clause = engine._rename_variables(clause)
+
+            # Try to unify the head
+            new_subst = unify(head_pattern, renamed_clause.head, subst)
+            if new_subst is None:
+                continue
+
+            # If we have a body pattern, also need to match the body
+            if match_body:
+                if renamed_clause.is_fact():
+                    clause_body = Atom("true")
+                else:
+                    if len(renamed_clause.body) == 1:
+                        clause_body = renamed_clause.body[0]
+                    else:
+                        clause_body = renamed_clause.body[0]
+                        for goal in renamed_clause.body[1:]:
+                            clause_body = Compound(",", (clause_body, goal))
+
+                new_subst = unify(body_pattern, clause_body, new_subst)
+                if new_subst is None:
+                    continue
+
+            matches.append(i)
+            # Track which predicate is being retracted
+            head = clause.head
+            if isinstance(head, Compound):
+                key = (head.functor, len(head.args))
+            elif isinstance(head, Atom):
+                key = (head.name, 0)
+            else:
+                continue
+            retracted_predicates.add(key)
+
+        # Check dynamic permission for all matched predicates
+        for key in retracted_predicates:
+            engine._ensure_dynamic_permission(key, "retractall/1")
+
+        # Remove all matching clauses in reverse order to preserve indices
+        for i in reversed(matches):
+            clause = engine.clauses[i]
+            # Remove from first-argument index before removing from clauses
+            engine._remove_clause_from_index(clause, i)
+            engine.clauses.pop(i)
+
+            # Update indices for clauses that come after this one
+            for index_list in engine._first_arg_index.values():
+                for j in range(len(index_list)):
+                    if index_list[j] > i:
+                        index_list[j] -= 1
+            for index_list in engine._variable_first_arg_clauses.values():
+                for j in range(len(index_list)):
+                    if index_list[j] > i:
+                        index_list[j] -= 1
+
+            # Also remove from module predicates
+            if hasattr(engine, 'interpreter') and engine.interpreter:
+                module_name = getattr(clause, 'module', 'user')
+                mod = engine.interpreter.modules.get(module_name)
+                head = clause.head
+                clause_key = None
+                if isinstance(head, Compound):
+                    clause_key = (head.functor, len(head.args))
+                elif isinstance(head, Atom):
+                    clause_key = (head.name, 0)
+
+                if mod and clause_key and clause_key in mod.predicates:
+                    if clause in mod.predicates[clause_key]:
+                        mod.predicates[clause_key].remove(clause)
+
+        # Update the index for retracted predicates
+        for functor, arity in retracted_predicates:
+            engine._remove_predicate_from_index_if_empty(functor, arity)
+
+        # Always succeed, even if no clauses matched
+        return subst
 
     @staticmethod
     def _builtin_abolish(
