@@ -226,16 +226,16 @@ Status legend:
 
 | Predicate       | Status | Notes                            |
 | --------------- | ------ | -------------------------------- |
-| `get_char/1-2`  | ⚠️     | Only `/1` implemented            |
-| `put_char/1-2`  | ⚠️     | Only `/1` implemented            |
-| `get_code/1-2`  | ❌      | **ISO-required**                 |
-| `put_code/1-2`  | ❌      | **ISO-required**                 |
-| `peek_char/1-2` | ❌      | **ISO-required** - Look ahead    |
-| `peek_code/1-2` | ❌      | **ISO-required** - Look ahead    |
-| `peek_byte/1-2` | ❌      | **ISO-required**                 |
-| `get_byte/1-2`  | ❌      | **ISO-required**                 |
-| `put_byte/1-2`  | ❌      | **ISO-required**                 |
-| `nl/0-1`        | ⚠️     | Only `/0` implemented            |
+| `get_char/1-2`  | ✅      |                                  |
+| `put_char/1-2`  | ✅      |                                  |
+| `get_code/1-2`  | ✅      | **ISO-required**                 |
+| `put_code/1-2`  | ✅      | **ISO-required**                 |
+| `peek_char/1-2` | ✅      | **ISO-required** - Look ahead    |
+| `peek_code/1-2` | ✅      | **ISO-required** - Look ahead    |
+| `peek_byte/1-2` | ✅      | **ISO-required**                 |
+| `get_byte/1-2`  | ✅      | **ISO-required**                 |
+| `put_byte/1-2`  | ✅      | **ISO-required**                 |
+| `nl/0-1`        | ✅      |                                  |
 
 ---
 
