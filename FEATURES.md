@@ -25,8 +25,8 @@ Status legend:
 | `/* … */` block comments         | ✅      | Nested supported                          |
 | Character code syntax (`0'X`)    | ✅      | Minor ISO edge gaps                       |
 | Built-in operator syntax         | ✅      |                                           |
-| `:- op/3` declaration            | ⚠️     | Operator table updated, parser ignores it |
-| Dynamic operator parsing         | ❌      | **ISO-blocking**                          |
+| `:- op/3` declaration            | ✅      | Full support - defines operators dynamically |
+| Custom operator syntax in source | ❌      | Parser doesn't use dynamic operators (future) |
 | `:- char_conversion/2`           | ❌      | **ISO-mandatory**                         |
 
 ---
@@ -51,14 +51,14 @@ Status legend:
 
 ## §7.4 — Directives
 
-| Directive              | Status | Notes                                |
-| ---------------------- | ------ | ------------------------------------ |
-| `:- dynamic/1`         | ✅      |                                      |
-| `:- multifile/1`       | ✅      |                                      |
-| `:- discontiguous/1`   | ✅      |                                      |
-| `:- initialization/1`  | ✅      |                                      |
-| `:- op/3`              | ⚠️     | Declaration only; parsing unaffected |
-| `:- char_conversion/2` | ❌      | **ISO-required**                     |
+| Directive              | Status | Notes                                    |
+| ---------------------- | ------ | ---------------------------------------- |
+| `:- dynamic/1`         | ✅      |                                          |
+| `:- multifile/1`       | ✅      |                                          |
+| `:- discontiguous/1`   | ✅      |                                          |
+| `:- initialization/1`  | ✅      |                                          |
+| `:- op/3`              | ✅      | Full support - defines operators with validation |
+| `:- char_conversion/2` | ❌      | **ISO-required**                         |
 
 ---
 
@@ -333,7 +333,7 @@ Status legend:
 | Term I/O (§8.12)          | ✅ Strong - All ISO-required predicates implemented        |
 | Stream control (§8.13)    | ✅ Strong - All ISO-required predicates implemented        |
 | Errors & exceptions       | ✅ Strong                                                   |
-| Parsing & syntax          | ❌ Blocking gaps (op/3, char_conversion)                   |
+| Parsing & syntax          | ⚠️ op/3 ✅, char_conversion ❌, custom operator syntax parsing ❌ |
 | Modules                   | ✅ Largely ISO-consistent (Part 1)                          |
 | Reflection                | ⚠️ Partial                                                 |
 
@@ -341,8 +341,8 @@ Status legend:
 
 ## ISO Blocking Issues
 
-1. `op/3` must affect parsing (§6.3)
-2. `char_conversion/2` missing (§6.4, §7.4)
+1. `char_conversion/2` missing (§6.4, §7.4)
+2. **Custom operator syntax parsing not implemented** - `op/3` defines operators but parser doesn't recognize custom syntax
 3. **List sorting missing** - `msort/2`, `keysort/2` unimplemented (ISO-required)
 4. **Character I/O incomplete (§8.11)** - Missing `get_code`, `put_code`, `peek_*` predicates
 5. **Term I/O incomplete (§8.12)** - Missing `read_term`, `write_term`, `writeq`, `write_canonical`

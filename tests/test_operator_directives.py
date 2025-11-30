@@ -20,8 +20,9 @@ class TestOperatorDirectives:
 
     def test_invalid_specifier_domain_error(self):
         prolog = PrologInterpreter()
+        # Use a truly invalid specifier like 'zfz'
         with pytest.raises(PrologThrow):
-            prolog.consult_string(":- op(500, yfy, foo).")
+            prolog.consult_string(":- op(500, zfz, foo).")
 
     def test_define_multiple_operators_from_list(self):
         prolog = PrologInterpreter()

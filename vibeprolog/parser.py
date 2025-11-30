@@ -89,7 +89,7 @@ PROLOG_GRAMMAR = r"""
     atom_or_compound: atom
         | atom "(" args ")"
     
-    directive: ":-" (prefix_directive | property_directive | term) "."
+    directive: ":-" (op_directive | prefix_directive | property_directive | term) "."
 
     prefix_directive: "dynamic" predicate_indicators -> dynamic_directive
         | "multifile" predicate_indicators -> multifile_directive
@@ -98,6 +98,18 @@ PROLOG_GRAMMAR = r"""
     property_directive: "dynamic" "(" predicate_indicators ")"    -> dynamic_directive
         | "multifile" "(" predicate_indicators ")"   -> multifile_directive
         | "discontiguous" "(" predicate_indicators ")" -> discontiguous_directive
+    
+    op_directive: "op" "(" number "," ATOM "," op_arg_list ")" -> op_directive
+    
+    op_arg_list: op_symbol_or_atom
+        | "[" op_symbol_or_atom ("," op_symbol_or_atom)* "]" -> op_arg_list_items
+    
+    // operator symbol or atom for op/3 - avoid parsing as expressions
+    op_symbol_or_atom: OP_SYMBOL | ATOM | SPECIAL_ATOM | OPERATOR_ATOM
+    
+    // Operator symbols - must match complete sequences before breaking into component operators
+    // Higher priority than other operators
+    OP_SYMBOL.15: /[+\-*\/<>=\\@#$&|!~:?^.]+/
 
     predicate_indicators: comparison_term ("," comparison_term)*
 
@@ -166,7 +178,7 @@ PROLOG_GRAMMAR = r"""
     list_items: comparison_term ("," comparison_term)*
 
     string: STRING
-    atom: ATOM | SPECIAL_ATOM | SPECIAL_ATOM_OPS
+    atom: ATOM | SPECIAL_ATOM | SPECIAL_ATOM_OPS | OP_SYMBOL
     variable: VARIABLE
     char_code: CHAR_CODE
     number: NUMBER
@@ -240,6 +252,52 @@ class PrologTransformer(Transformer):
     def discontiguous_directive(self, items):
         indicators = self._flatten_comma_separated(items[0])
         return PredicatePropertyDirective("discontiguous", tuple(indicators))
+
+    def op_directive(self, items):
+        """Handle op/3 directive: op(Precedence, Type, Name).
+        
+        Creates a Compound term op(Prec, Type, Name) that the engine will process.
+        """
+        # items[0] = number (precedence)
+        # items[1] = atom (type: xfx, yfx, etc.) - raw token
+        # items[2] = op_arg_list (either single atom or list of atoms)
+        precedence = items[0]
+        op_type_token = items[1]
+        op_names = items[2]
+        
+        # Convert operator type token to Atom
+        op_type = Atom(str(op_type_token))
+        
+        # op_names is either a single Atom or a list of Atoms
+        if isinstance(op_names, list):
+            # op_arg_list_items case - convert to list representation
+            return Compound("op", (precedence, op_type, List(elements=tuple(op_names))))
+        else:
+            # Single op_symbol_or_atom case
+            return Compound("op", (precedence, op_type, op_names))
+
+    def op_arg_list(self, items):
+        """Handle operator argument list - either single or bracketed list."""
+        return items[0]
+
+    def op_arg_list_items(self, items):
+        """Handle list of operators: [op1, op2, ...]"""
+        return items
+
+    def op_symbol_or_atom(self, items):
+        """Operator symbol or atom - convert raw token to Atom."""
+        token = items[0]
+        if isinstance(token, Atom):
+            return token
+        else:
+            # Raw token from OP_SYMBOL, ATOM, SPECIAL_ATOM, or OPERATOR_ATOM
+            s = str(token)
+            # Remove quotes if present (for SPECIAL_ATOM)
+            if (s.startswith("'") and s.endswith("'")):
+                s = s[1:-1]
+                # In Prolog, single quotes are escaped by doubling them
+                s = s.replace("''", "'")
+            return Atom(s)
 
     def _flatten_comma_separated(self, items):
         """Flatten comma-separated predicates into a list.
@@ -613,15 +671,143 @@ class PrologTransformer(Transformer):
         return Cut()
 
 
+def extract_op_directives(source: str) -> list[tuple[int, str, str]]:
+    """Extract op/3 directives from source code.
+    
+    Args:
+        source: Prolog source code string
+        
+    Returns:
+        List of (precedence, type, operator) tuples, in order of appearance
+        
+    Examples:
+        >>> extract_op_directives(":- op(500, xfx, @).")
+        [(500, 'xfx', '@')]
+    """
+    operators = []
+    
+    # Match :- op(Precedence, Type, Operator).
+    # Handles atom, single-quoted atoms, and lists
+    pattern = r':-\s*op\s*\(\s*(\d+)\s*,\s*(\w+)\s*,\s*([^)]+)\s*\)'
+    
+    for match in re.finditer(pattern, source):
+        precedence_str = match.group(1)
+        op_type = match.group(2)
+        operator_part = match.group(3).strip()
+        
+        try:
+            precedence = int(precedence_str)
+            
+            # Handle single operator or list
+            # For now, simple cases: atoms or quoted atoms
+            operator_names = []
+            
+            # Try to parse as a list [op1, op2, ...]
+            if operator_part.startswith('[') and operator_part.endswith(']'):
+                # Simple list parsing
+                list_content = operator_part[1:-1]
+                for item in re.split(r',', list_content):
+                    item = item.strip()
+                    # Remove quotes if present
+                    if (item.startswith("'") and item.endswith("'")) or \
+                       (item.startswith('"') and item.endswith('"')):
+                        operator_names.append(item[1:-1])
+                    else:
+                        operator_names.append(item)
+            else:
+                # Single operator (quoted or unquoted)
+                if (operator_part.startswith("'") and operator_part.endswith("'")) or \
+                   (operator_part.startswith('"') and operator_part.endswith('"')):
+                    operator_names.append(operator_part[1:-1])
+                else:
+                    operator_names.append(operator_part)
+            
+            for op_name in operator_names:
+                operators.append((precedence, op_type, op_name))
+        except (ValueError, AttributeError):
+            # Skip malformed directives - they'll be caught by parser
+            pass
+    
+    return operators
+
+
+def escape_for_lark(s: str) -> str:
+    """Escape special characters for use in Lark grammar.
+    
+    Args:
+        s: String to escape
+        
+    Returns:
+        Escaped string safe for Lark grammar
+    """
+    # Escape backslashes and quotes
+    s = s.replace("\\", "\\\\")
+    s = s.replace('"', '\\"')
+    return s
+
+
+def generate_operator_rules(operators: list[tuple[int, str, str]]) -> str:
+    """Generate grammar extension rules for custom operators.
+    
+    Args:
+        operators: List of (precedence, type, operator) tuples
+        
+    Returns:
+        String containing additional grammar rules for custom operators
+    """
+    if not operators:
+        return ""
+    
+    # Group operators by their precedence and type
+    # Build rules to integrate custom operators into the expression hierarchy
+    infix_ops = {}  # precedence -> list of operators
+    prefix_ops = {}  # precedence -> list of operators
+    postfix_ops = {}  # precedence -> list of operators
+    
+    for prec, op_type, op_name in operators:
+        if op_type in ('xfx', 'xfy', 'yfx', 'yfy'):
+            if prec not in infix_ops:
+                infix_ops[prec] = []
+            infix_ops[prec].append((op_type, op_name))
+        elif op_type in ('fx', 'fy'):
+            if prec not in prefix_ops:
+                prefix_ops[prec] = []
+            prefix_ops[prec].append((op_type, op_name))
+        elif op_type in ('xf', 'yf'):
+            if prec not in postfix_ops:
+                postfix_ops[prec] = []
+            postfix_ops[prec].append((op_type, op_name))
+    
+    # For now, return empty - full implementation would need careful precedence handling
+    # This is a placeholder for the complex grammar generation logic
+    return ""
+
+
 class PrologParser:
-    """Parse Prolog source code."""
+    """Parse Prolog source code with support for dynamic operators."""
 
     def __init__(self, operator_table=None):
-        self.parser = Lark(
-            PROLOG_GRAMMAR, parser="earley", propagate_positions=True, ambiguity='resolve'
-        )
-        # operator_table is reserved for future dynamic operator parsing; currently unused
         self.operator_table = operator_table
+        self._grammar_cache = {}  # Cache compiled grammars by operator set
+        self.parser = self._create_parser(None)
+
+    def _create_parser(self, operators: list[tuple[int, str, str]] | None):
+        """Create a Lark parser, optionally with custom operators.
+        
+        Args:
+            operators: List of (precedence, type, operator) tuples, or None for base grammar
+            
+        Returns:
+            Lark parser instance
+        """
+        grammar = PROLOG_GRAMMAR
+        
+        # TODO: Future enhancement - generate grammar with custom operators
+        # For now, we use the base grammar but operators are available for future use
+        
+        return Lark(
+            grammar, parser="earley", propagate_positions=True, ambiguity='resolve'
+        )
 
     def _strip_block_comments(self, text: str) -> tuple[str, list[tuple[int, str]]]:
         """Strip block comments from text, handling nesting and quoted strings.
