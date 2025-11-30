@@ -45,7 +45,7 @@ class _TermReader:
         self.pushback_buffer = self.stream.pushback_buffer
         # Check if this is an interactive TTY stream
         self.is_tty = hasattr(self.stream.file_obj, 'isatty') and self.stream.file_obj.isatty()
-        self.line_buffer: list[str] = []
+        self.line_buffer: "deque[str]" = deque()
 
     def _next_char(self) -> str:
         if self.pushback_buffer:
@@ -57,9 +57,9 @@ class _TermReader:
                 line = self.stream.file_obj.readline()
                 if not line:
                     return ""
-                self.line_buffer = list(line)
+                self.line_buffer = deque(line)
             if self.line_buffer:
-                return self.line_buffer.pop(0)
+                return self.line_buffer.popleft()
             return ""
 
         return self.stream.file_obj.read(1)
@@ -153,7 +153,7 @@ class _TermReader:
             ):
                 if self.is_tty:
                     while self.line_buffer and self.line_buffer[0].isspace():
-                        self.line_buffer.pop(0)
+                        self.line_buffer.popleft()
                     if not self.line_buffer and not self.pushback_buffer:
                         return "".join(self.buffer)
 
