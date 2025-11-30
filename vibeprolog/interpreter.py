@@ -635,8 +635,11 @@ class PrologInterpreter:
             # Handle period (end of clause)
             if char == '.' and not in_single_quote and not in_double_quote:
                 current.append(char)
-                # Check for float (period followed by digit)
-                if i + 1 < len(prolog_code) and prolog_code[i + 1].isdigit():
+                # Heuristic to check if this period is part of a number (e.g., 1.2 or 1.)
+                # to avoid splitting clauses incorrectly.
+                is_decimal_point = (i > 0 and prolog_code[i-1].isdigit()) or \
+                                   (i + 1 < len(prolog_code) and prolog_code[i+1].isdigit())
+                if is_decimal_point:
                     i += 1
                     continue
                 # End of clause
