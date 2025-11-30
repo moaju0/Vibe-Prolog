@@ -117,7 +117,7 @@ def build_changes_to_make(pr_output: str, custom_prompt: str | None = None) -> s
     default_prompt = (
         "Read the PR comments below and generate precise instructions to address them. "
         "We only want to include things that we want to fix, so be sure to remove comments have been marked as resolved or are made redundant by subsequent updates. "
-        "Include the diff blocks and line numbers. Format as Markdown"
+        "Include the diff blocks and line numbers. Format as Markdown."
     )
     prompt = custom_prompt if custom_prompt is not None else default_prompt
     return run(["llm", "-s", prompt], input_text=pr_output)
@@ -249,7 +249,9 @@ def create_commit_from_pr_output(pr_output: str) -> None:
             "llm",
             "--extract",
             "-s",
-            "give me a git commit message for changes that address these review comments",
+            """Give me a git commit message for changes that address these review comments. 
+            I want just the comment I can paste directly, so additonal commentary.
+              Do not offer to do what to do next. Here are the commits:\n""",
         ],
         input_text=pr_output,
     ).strip()

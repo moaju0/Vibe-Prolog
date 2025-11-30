@@ -117,12 +117,27 @@ def term_sort_key(term: Any, subst: Substitution | None = None) -> tuple:
         )
     if isinstance(term, List):
         normalized_elements = list(term.elements)
-        current_tail = deref(term.tail, subst) if term.tail is not None else None
+        tail = term.tail
+
+        # Flatten contiguous list tails to normalize equivalent representations like [1,2] and [1|[2]].
+        current_tail = deref(tail, subst) if tail is not None else None
         while isinstance(current_tail, List):
             normalized_elements.extend(current_tail.elements)
-            current_tail = deref(current_tail.tail, subst) if current_tail.tail is not None else None
+            if current_tail.tail is None or (
+                isinstance(current_tail.tail, List)
+                and not current_tail.tail.elements
+                and current_tail.tail.tail is None
+            ):
+                element_keys = tuple(
+                    term_sort_key(elem, subst) for elem in normalized_elements
+                )
+                return (4, len(normalized_elements), element_keys, (4, 0))
+            current_tail = deref(current_tail.tail, subst)
 
-        final_tail_term = Atom('[]') if current_tail is None else current_tail
-        return (4, tuple(term_sort_key(e, subst) for e in normalized_elements), term_sort_key(final_tail_term, subst))
+        tail_key = (
+            term_sort_key(current_tail, subst) if current_tail is not None else (4, 0)
+        )
+        element_keys = tuple(term_sort_key(elem, subst) for elem in normalized_elements)
+        return (4, len(normalized_elements), element_keys, tail_key)
 
     return (5, str(term))

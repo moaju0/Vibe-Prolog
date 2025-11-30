@@ -348,7 +348,8 @@ def build_pr_title_body(issue_number: str, model: str) -> dict[str, Any]:
     git_log_output = run(["git", "log", "origin/main.."])
     prompt = (
         "Looking at this git log output, summarise into a `title` and `body` suitable for a pull request. "
-        f"The `body` MUST start with `Closes #{issue_number}`"
+        f"The `body` MUST start with `Closes #{issue_number}`. "
+        "We are going to paste your message directly into the PR so provide no commentary and do not offer suggestions of what to do next."
     )
     pr_title_body_json = run(
         [

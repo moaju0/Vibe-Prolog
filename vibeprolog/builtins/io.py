@@ -19,6 +19,7 @@ from vibeprolog.terms import Atom, Compound, Number, Variable
 from vibeprolog.unification import Substitution, deref, unify
 from vibeprolog.utils.list_utils import list_to_python, python_to_list
 from vibeprolog.utils.term_utils import term_to_string
+from vibeprolog.utils.variable_utils import collect_vars_in_order
 
 _DEFAULT_OPERATOR_TABLE = OperatorTable()
 
@@ -157,6 +158,7 @@ class IOBuiltins:
     @staticmethod
     def register(registry: BuiltinRegistry, _engine: EngineContext | None) -> None:
         """Register I/O predicate handlers."""
+        # Existing predicates
         register_builtin(registry, "write", 1, IOBuiltins._builtin_write)
         register_builtin(registry, "writeln", 1, IOBuiltins._builtin_writeln)
         register_builtin(registry, "format", 3, IOBuiltins._builtin_format)
@@ -187,12 +189,44 @@ class IOBuiltins:
         register_builtin(registry, "put_char", 1, IOBuiltins._builtin_put_char)
         register_builtin(registry, "put_char", 2, IOBuiltins._builtin_put_char_to_stream)
 
+        # New ISO predicates
+        register_builtin(registry, "read_term", 2, IOBuiltins._builtin_read_term)
+        register_builtin(registry, "read_term", 3, IOBuiltins._builtin_read_term_from_stream)
+        register_builtin(registry, "write_term", 2, IOBuiltins._builtin_write_term)
+        register_builtin(registry, "write_term", 3, IOBuiltins._builtin_write_term_to_stream)
+        register_builtin(registry, "writeq", 1, IOBuiltins._builtin_writeq)
+        register_builtin(registry, "writeq", 2, IOBuiltins._builtin_writeq_to_stream)
+        register_builtin(registry, "write_canonical", 1, IOBuiltins._builtin_write_canonical)
+        register_builtin(registry, "write_canonical", 2, IOBuiltins._builtin_write_canonical_to_stream)
+        register_builtin(registry, "print", 1, IOBuiltins._builtin_print)
+        register_builtin(registry, "print", 2, IOBuiltins._builtin_print_to_stream)
+        register_builtin(registry, "write", 2, IOBuiltins._builtin_write_to_stream)
+        register_builtin(registry, "writeln", 2, IOBuiltins._builtin_writeln_to_stream)
+        register_builtin(registry, "set_input", 1, IOBuiltins._builtin_set_input)
+        register_builtin(registry, "set_output", 1, IOBuiltins._builtin_set_output)
+        register_builtin(registry, "flush_output", 0, IOBuiltins._builtin_flush_output)
+        register_builtin(registry, "flush_output", 1, IOBuiltins._builtin_flush_output_stream)
+        register_builtin(registry, "at_end_of_stream", 0, IOBuiltins._builtin_at_end_of_stream)
+        register_builtin(registry, "at_end_of_stream", 1, IOBuiltins._builtin_at_end_of_stream_stream)
+        register_builtin(registry, "stream_property", 2, IOBuiltins._builtin_stream_property)
+        register_builtin(registry, "set_stream_position", 2, IOBuiltins._builtin_set_stream_position)
+        register_builtin(registry, "open", 4, IOBuiltins._builtin_open_with_options)
+        register_builtin(registry, "close", 2, IOBuiltins._builtin_close_with_options)
+
     @staticmethod
     def _builtin_write(
-        args: BuiltinArgs, subst: Substitution, _engine: EngineContext | None
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext | None
     ) -> Substitution | None:
         term = deref(args[0], subst)
         output = term_to_string(term)
+        if engine is not None:
+            current_output = getattr(engine, '_current_output_stream', USER_OUTPUT_STREAM)
+            stream = engine.get_stream(current_output)
+            if stream is not None:
+                stream.file_obj.write(output)
+                stream.file_obj.flush()
+                return subst
+        # Fallback to stdout
         print(output, end="")
         return subst
 
@@ -203,6 +237,67 @@ class IOBuiltins:
         term = deref(args[0], subst)
         output = term_to_string(term)
         print(output)
+        return subst
+
+    @staticmethod
+    def _builtin_write_to_stream(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext | None
+    ) -> Substitution | None:
+        """write/2 - Write term to specified stream."""
+        if engine is None:
+            return None
+
+        stream_term, term = args
+
+        engine._check_instantiated(stream_term, subst, "write/2")
+        engine._check_type(stream_term, Atom, "stream_or_alias", subst, "write/2")
+
+        stream_term = deref(stream_term, subst)
+
+        stream = engine.get_stream(stream_term)
+        if stream is None:
+            error_term = PrologError.existence_error("stream", stream_term, "write/2")
+            raise PrologThrow(error_term)
+
+        if stream.mode not in ("write", "append"):
+            error_term = PrologError.permission_error("output", "stream", stream_term, "write/2")
+            raise PrologThrow(error_term)
+
+        term = deref(term, subst)
+        output = term_to_string(term)
+        stream.file_obj.write(output)
+        stream.file_obj.flush()
+        return subst
+
+    @staticmethod
+    def _builtin_writeln_to_stream(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext | None
+    ) -> Substitution | None:
+        """writeln/2 - Write term with newline to specified stream."""
+        if engine is None:
+            return None
+
+        stream_term, term = args
+
+        engine._check_instantiated(stream_term, subst, "writeln/2")
+        engine._check_type(stream_term, Atom, "stream_or_alias", subst, "writeln/2")
+
+        stream_term = deref(stream_term, subst)
+
+        stream = engine.get_stream(stream_term)
+        if stream is None:
+            error_term = PrologError.existence_error("stream", stream_term, "writeln/2")
+            raise PrologThrow(error_term)
+
+        if stream.mode not in ("write", "append"):
+            error_term = PrologError.permission_error("output", "stream", stream_term, "writeln/2")
+            raise PrologThrow(error_term)
+
+        term = deref(term, subst)
+        output = term_to_string(term)
+        stream.file_obj.write(output)
+        stream.file_obj.write("\n")
+        stream.file_obj.flush()
         return subst
 
     @staticmethod
@@ -250,8 +345,9 @@ class IOBuiltins:
         if engine is None:
             return None
         arg = deref(args[0], subst)
-        # Get the user_input stream from the registry
-        stream = engine.get_stream(USER_INPUT_STREAM)
+        # Get the current input stream
+        current_input = getattr(engine, '_current_input_stream', USER_INPUT_STREAM)
+        stream = engine.get_stream(current_input)
         if stream is None:
             return None
         return unify(arg, stream.handle, subst)
@@ -263,8 +359,9 @@ class IOBuiltins:
         if engine is None:
             return None
         arg = deref(args[0], subst)
-        # Get the user_output stream from the registry
-        stream = engine.get_stream(USER_OUTPUT_STREAM)
+        # Get the current output stream
+        current_output = getattr(engine, '_current_output_stream', USER_OUTPUT_STREAM)
+        stream = engine.get_stream(current_output)
         if stream is None:
             return None
         return unify(arg, stream.handle, subst)
@@ -446,7 +543,7 @@ class IOBuiltins:
         operator_table = _engine.operator_table if _engine is not None else None
 
         output_str = IOBuiltins._term_to_chars_string(
-            term, subst, ignore_ops, numbervars, quoted, operator_table=operator_table
+            term, subst, ignore_ops, numbervars, quoted, None, operator_table
         )
 
         # Convert string to list of character atoms
@@ -456,17 +553,136 @@ class IOBuiltins:
         return unify(chars_var, chars_list, subst)
 
     @staticmethod
+    def _builtin_parse_write_options(options_term, subst: Substitution) -> dict:
+        """Parse write_term/2 options into a dict, returning defaults if omitted.
+        Raises PrologThrow on errors to align with existing error handling."""
+        options_deref = deref(options_term, subst)
+        if not isinstance(options_deref, List):
+            error_term = PrologError.type_error("list", options_term, "write_term/2")
+            raise PrologThrow(error_term)
+
+
+        # Defaults
+        parsed = {
+            "quoted": False,
+            "ignore_ops": False,
+            "numbervars": False,
+            "max_depth": None,
+        }
+
+        for opt in options_deref.elements:
+            opt = deref(opt, subst)
+            if isinstance(opt, Compound):
+                if opt.functor == "quoted" and len(opt.args) == 1:
+                    val = deref(opt.args[0], subst)
+                    parsed["quoted"] = isinstance(val, Atom) and val.name == "true"
+                elif opt.functor == "ignore_ops" and len(opt.args) == 1:
+                    val = deref(opt.args[0], subst)
+                    parsed["ignore_ops"] = isinstance(val, Atom) and val.name == "true"
+                elif opt.functor == "numbervars" and len(opt.args) == 1:
+                    val = deref(opt.args[0], subst)
+                    parsed["numbervars"] = isinstance(val, Atom) and val.name == "true"
+                elif opt.functor == "max_depth" and len(opt.args) == 1:
+                    val = deref(opt.args[0], subst)
+                    if isinstance(val, Number) and isinstance(val.value, int) and val.value >= 0:
+                        parsed["max_depth"] = val.value
+                    else:
+                        error_term = PrologError.domain_error("write_option", opt, "write_term/2")
+                        raise PrologThrow(error_term)
+                else:
+                    error_term = PrologError.domain_error("write_option", opt, "write_term/2")
+                    raise PrologThrow(error_term)
+            else:
+                error_term = PrologError.domain_error("write_option", opt, "write_term/2")
+                raise PrologThrow(error_term)
+        return parsed
+    @staticmethod
+    def _builtin_write_term(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext | None
+    ) -> Substitution | None:
+        """write_term/2 - Write term to current output with options."""
+        if engine is None:
+            return None
+
+        term, options_term = args
+        term = deref(term, subst)
+        options_term = deref(options_term, subst)
+
+        # Use shared helper to parse options
+        parsed = IOBuiltins._builtin_parse_write_options(options_term, subst)
+        quoted = parsed["quoted"]
+        ignore_ops = parsed["ignore_ops"]
+        numbervars = parsed["numbervars"]
+        max_depth = parsed["max_depth"]
+
+        # Write to current output
+        operator_table = engine.operator_table if engine is not None else None
+        output_str = IOBuiltins._term_to_chars_string_with_options(
+            term, subst, ignore_ops, numbervars, quoted, max_depth, operator_table
+        )
+        print(output_str, end="")
+        return subst
+
+    @staticmethod
+    def _builtin_write_term_to_stream(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext | None
+    ) -> Substitution | None:
+        """write_term/3 - Write term to specified stream with options."""
+        if engine is None:
+            return None
+
+        stream_term, term, options_term = args
+
+        engine._check_instantiated(stream_term, subst, "write_term/3")
+        engine._check_type(stream_term, Atom, "stream_or_alias", subst, "write_term/3")
+
+        stream_term = deref(stream_term, subst)
+        term = deref(term, subst)
+        options_term = deref(options_term, subst)
+
+        stream = engine.get_stream(stream_term)
+        if stream is None:
+            error_term = PrologError.existence_error("stream", stream_term, "write_term/3")
+            raise PrologThrow(error_term)
+
+        if stream.mode not in ("write", "append"):
+            error_term = PrologError.permission_error("output", "stream", stream_term, "write_term/3")
+            raise PrologThrow(error_term)
+
+        # Use shared helper to parse options
+        parsed = IOBuiltins._builtin_parse_write_options(options_term, subst)
+        quoted = parsed["quoted"]
+        ignore_ops = parsed["ignore_ops"]
+        numbervars = parsed["numbervars"]
+        max_depth = parsed["max_depth"]
+
+        # Write to stream
+        operator_table = engine.operator_table if engine is not None else None
+        output_str = IOBuiltins._term_to_chars_string_with_options(
+            term, subst, ignore_ops, numbervars, quoted, max_depth, operator_table
+        )
+        stream.file_obj.write(output_str)
+        stream.file_obj.flush()
+        return subst
+
+    @staticmethod
     def _term_to_chars_string(
         term: Any,
         subst: Substitution,
         ignore_ops: bool,
         numbervars: bool,
         quoted: bool,
-        parent_prec: int = 1200,
+        max_depth: int | None,
         operator_table=None,
+        current_depth: int = 0,
+        parent_prec: int = 1200,
     ) -> str:
-        """Convert a term to string with specified options."""
+        """Convert a term to string with full options support including max_depth."""
         term = deref(term, subst)
+
+        # Check max_depth
+        if max_depth is not None and current_depth >= max_depth:
+            return "..."
 
         # Handle $VAR(N) for numbervars
         if numbervars and isinstance(term, Compound) and term.functor == "$VAR" and len(term.args) == 1:
@@ -510,7 +726,7 @@ class IOBuiltins:
             # Handle list elements
             elements_str = [
                 IOBuiltins._term_to_chars_string(
-                    e, subst, ignore_ops, numbervars, quoted, 1200, operator_table
+                    e, subst, ignore_ops, numbervars, quoted, max_depth, operator_table, current_depth + 1, 1200
                 )
                 for e in term.elements
             ]
@@ -520,7 +736,7 @@ class IOBuiltins:
                 isinstance(term.tail, List) and not term.tail.elements and term.tail.tail is None
             ):
                 tail_str = IOBuiltins._term_to_chars_string(
-                    term.tail, subst, ignore_ops, numbervars, quoted, 1200, operator_table
+                    term.tail, subst, ignore_ops, numbervars, quoted, max_depth, operator_table, current_depth + 1, 1200
                 )
                 return f"[{','.join(elements_str)}|{tail_str}]"
 
@@ -529,7 +745,7 @@ class IOBuiltins:
         if isinstance(term, Compound):
             if not ignore_ops:
                 operator_rendered = IOBuiltins._format_operator_term(
-                    term, subst, ignore_ops, numbervars, quoted, parent_prec, operator_table
+                    term, subst, ignore_ops, numbervars, quoted, parent_prec, max_depth, operator_table, current_depth
                 )
                 if operator_rendered is not None:
                     return operator_rendered
@@ -540,7 +756,110 @@ class IOBuiltins:
                 return term.functor
             args_str = ','.join(
                 IOBuiltins._term_to_chars_string(
-                    arg, subst, ignore_ops, numbervars, quoted, 1200, operator_table
+                    arg, subst, ignore_ops, numbervars, quoted, max_depth, operator_table, current_depth + 1, 1200
+                )
+                for arg in term.args
+            )
+            functor = term.functor
+            if quoted and IOBuiltins._needs_quoting(functor):
+                escaped = functor.replace('\\', '\\\\').replace("'", "\\'")
+                functor = f"'{escaped}'"
+            return f"{functor}({args_str})"
+
+        return str(term)
+
+    @staticmethod
+    def _term_to_chars_string_with_options(
+        term: Any,
+        subst: Substitution,
+        ignore_ops: bool,
+        numbervars: bool,
+        quoted: bool,
+        max_depth: int | None,
+        operator_table=None,
+        current_depth: int = 0,
+        parent_prec: int = 1200,
+    ) -> str:
+        """Convert a term to string with full options support including max_depth."""
+        term = deref(term, subst)
+
+        # Check max_depth
+        if max_depth is not None and current_depth >= max_depth:
+            return "..."
+
+        # Handle $VAR(N) for numbervars
+        if numbervars and isinstance(term, Compound) and term.functor == "$VAR" and len(term.args) == 1:
+            arg = deref(term.args[0], subst)
+            if isinstance(arg, Number) and isinstance(arg.value, int) and arg.value >= 0:
+                # Convert to A, B, C, ..., Z, A1, B1, ...
+                n = arg.value
+                var_name = chr(ord('A') + (n % 26))
+                if n >= 26:
+                    var_name += str(n // 26)
+                return var_name
+
+        if isinstance(term, Atom):
+            if quoted and IOBuiltins._needs_quoting(term.name):
+                # Escape special characters
+                escaped = term.name.replace('\\', '\\\\').replace("'", "\\'")
+                return f"'{escaped}'"
+            return term.name
+
+        if isinstance(term, Number):
+            val = term.value
+            if isinstance(val, float):
+                # Handle scientific notation
+                s = str(val)
+                if 'e' in s:
+                    return s
+                # Check if we need scientific notation
+                if abs(val) >= 1e10 or (abs(val) < 1e-4 and val != 0):
+                    return f"{val:e}"
+                return s
+            return str(val)
+
+        if isinstance(term, Variable):
+            return f"_{term.name}"
+
+        if isinstance(term, List):
+            # Handle empty list
+            if not term.elements and term.tail is None:
+                return "[]"
+
+            # Handle list elements
+            elements_str = [
+                IOBuiltins._term_to_chars_string_with_options(
+                    e, subst, ignore_ops, numbervars, quoted, max_depth, operator_table, current_depth + 1
+                )
+                for e in term.elements
+            ]
+
+            # Handle tail
+            if term.tail is not None and not (
+                isinstance(term.tail, List) and not term.tail.elements and term.tail.tail is None
+            ):
+                tail_str = IOBuiltins._term_to_chars_string_with_options(
+                    term.tail, subst, ignore_ops, numbervars, quoted, max_depth, operator_table, current_depth + 1
+                )
+                return f"[{','.join(elements_str)}|{tail_str}]"
+
+            return f"[{','.join(elements_str)}]"
+
+        if isinstance(term, Compound):
+            if not ignore_ops:
+                operator_rendered = IOBuiltins._format_operator_term(
+                    term, subst, ignore_ops, numbervars, quoted, parent_prec, max_depth, operator_table, current_depth
+                )
+                if operator_rendered is not None:
+                    return operator_rendered
+            if not term.args:
+                if quoted and IOBuiltins._needs_quoting(term.functor):
+                    escaped = term.functor.replace('\\', '\\\\').replace("'", "\\'")
+                    return f"'{escaped}'"
+                return term.functor
+            args_str = ','.join(
+                IOBuiltins._term_to_chars_string_with_options(
+                    arg, subst, ignore_ops, numbervars, quoted, max_depth, operator_table, current_depth + 1
                 )
                 for arg in term.args
             )
@@ -560,7 +879,9 @@ class IOBuiltins:
         numbervars: bool,
         quoted: bool,
         parent_prec: int,
-        operator_table,
+        max_depth: int | None,
+        operator_table=None,
+        current_depth: int = 0,
     ) -> str | None:
         op_info = IOBuiltins._lookup_operator(term.functor, len(term.args), operator_table)
         if op_info is None:
@@ -568,18 +889,18 @@ class IOBuiltins:
 
         if op_info.is_prefix:
             arg_limit = IOBuiltins._child_precedence_limit(op_info, "right")
-            arg_str = IOBuiltins._term_to_chars_string(
-                term.args[0], subst, ignore_ops, numbervars, quoted, arg_limit, operator_table
+            arg_str = IOBuiltins._term_to_chars_string_with_options(
+                term.args[0], subst, ignore_ops, numbervars, quoted, max_depth, operator_table, current_depth + 1, arg_limit
             )
             rendered = IOBuiltins._render_prefix(term.functor, arg_str)
         else:
             left_limit = IOBuiltins._child_precedence_limit(op_info, "left")
             right_limit = IOBuiltins._child_precedence_limit(op_info, "right")
-            left_str = IOBuiltins._term_to_chars_string(
-                term.args[0], subst, ignore_ops, numbervars, quoted, left_limit, operator_table
+            left_str = IOBuiltins._term_to_chars_string_with_options(
+                term.args[0], subst, ignore_ops, numbervars, quoted, max_depth, operator_table, current_depth + 1, left_limit
             )
-            right_str = IOBuiltins._term_to_chars_string(
-                term.args[1], subst, ignore_ops, numbervars, quoted, right_limit, operator_table
+            right_str = IOBuiltins._term_to_chars_string_with_options(
+                term.args[1], subst, ignore_ops, numbervars, quoted, max_depth, operator_table, current_depth + 1, right_limit
             )
             rendered = IOBuiltins._render_infix(term.functor, left_str, right_str)
 
@@ -756,6 +1077,114 @@ class IOBuiltins:
             raise PrologThrow(error_term)
 
     @staticmethod
+    def _read_term_with_options(
+        stream: Stream, term_arg: Any, options_arg: Any, subst: Substitution, context: str
+    ) -> Substitution | None:
+        """Read term with options support for read_term/2-3."""
+
+        # Parse options
+        options_term = deref(options_arg, subst)
+        if not isinstance(options_term, List):
+            error_term = PrologError.type_error("list", options_term, context)
+            raise PrologThrow(error_term)
+
+        # Extract option values
+        variable_names = False
+        variables = False
+        singletons = False
+
+        for opt in options_term.elements:
+            opt = deref(opt, subst)
+            if isinstance(opt, Compound):
+                if opt.functor == "variable_names" and len(opt.args) == 1:
+                    variable_names = True
+                    var_names_var = opt.args[0]
+                elif opt.functor == "variables" and len(opt.args) == 1:
+                    variables = True
+                    vars_var = opt.args[0]
+                elif opt.functor == "singletons" and len(opt.args) == 1:
+                    singletons = True
+                    singletons_var = opt.args[0]
+                else:
+                    error_term = PrologError.domain_error("read_option", opt, context)
+                    raise PrologThrow(error_term)
+            else:
+                error_term = PrologError.domain_error("read_option", opt, context)
+                raise PrologThrow(error_term)
+
+        # Read the term
+        term_text = IOBuiltins._read_term_text(stream, context)
+        if term_text is None:
+            return unify(term_arg, Atom("end_of_file"), subst)
+
+        cleaned = term_text.strip()
+        if cleaned.endswith("."):
+            cleaned = cleaned[:-1].strip()
+
+        try:
+            parser = PrologParser()
+            parsed_term = parser.parse_term(cleaned, context)
+
+            # Collect variable information
+            all_vars = collect_vars_in_order(parsed_term, subst)
+
+            # Apply options
+            new_subst = unify(term_arg, parsed_term, subst)
+            if new_subst is None:
+                return None
+
+            if variable_names:
+                # Create variable name mappings: Name=Var
+                var_name_pairs = []
+                for var_name in all_vars:
+                    var_term = Variable(var_name)
+                    pair = Compound("=", (Atom(var_name), var_term))
+                    var_name_pairs.append(pair)
+                var_names_list = python_to_list(var_name_pairs)
+                new_subst = unify(var_names_var, var_names_list, new_subst)
+                if new_subst is None:
+                    return None
+
+            if variables:
+                # List of all variables in order
+                var_terms = [Variable(name) for name in all_vars]
+                vars_list = python_to_list(var_terms)
+                new_subst = unify(vars_var, vars_list, new_subst)
+                if new_subst is None:
+                    return None
+
+            if singletons:
+                # Variables that appear only once
+                var_counts = {}
+                def count_vars(term):
+                    term = deref(term, new_subst)
+                    if isinstance(term, Variable):
+                        var_counts[term.name] = var_counts.get(term.name, 0) + 1
+                    elif isinstance(term, Compound):
+                        for arg in term.args:
+                            count_vars(arg)
+                    elif isinstance(term, List):
+                        for elem in term.elements:
+                            count_vars(elem)
+                        if term.tail:
+                            count_vars(term.tail)
+
+                count_vars(parsed_term)
+                singleton_vars = [Variable(name) for name, count in var_counts.items() if count == 1]
+                singletons_list = python_to_list(singleton_vars)
+                new_subst = unify(singletons_var, singletons_list, new_subst)
+                if new_subst is None:
+                    return None
+
+            return new_subst
+
+        except (ValueError, LarkError, PrologThrow) as exc:
+            if isinstance(exc, PrologThrow):
+                raise exc
+            error_term = PrologError.syntax_error(str(exc), context)
+            raise PrologThrow(error_term)
+
+    @staticmethod
     def _builtin_read(
         args: BuiltinArgs, subst: Substitution, engine: EngineContext | None
     ) -> Substitution | None:
@@ -763,9 +1192,10 @@ class IOBuiltins:
             return None
 
         term_arg = args[0]
-        stream = engine.get_stream(USER_INPUT_STREAM)
+        current_input = getattr(engine, '_current_input_stream', USER_INPUT_STREAM)
+        stream = engine.get_stream(current_input)
         if stream is None:
-            error_term = PrologError.existence_error("stream", USER_INPUT_STREAM, "read/1")
+            error_term = PrologError.existence_error("stream", current_input, "read/1")
             raise PrologThrow(error_term)
 
         if stream.mode not in ("read", "append"):
@@ -798,6 +1228,118 @@ class IOBuiltins:
             raise PrologThrow(error_term)
 
         return IOBuiltins._read_and_unify_stream(stream, term_arg, subst, "read/2")
+
+    @staticmethod
+    def _builtin_open_with_options(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext | None
+    ) -> Substitution | None:
+        """open/4 - Open file with additional options."""
+        if engine is None:
+            return None
+
+        filename_term, mode_term, stream_var, options_term = args
+
+        # Validate arguments
+        engine._check_instantiated(filename_term, subst, "open/4")
+        engine._check_type(filename_term, Atom, "atom", subst, "open/4")
+        engine._check_instantiated(mode_term, subst, "open/4")
+        engine._check_type(mode_term, Atom, "atom", subst, "open/4")
+        engine._check_instantiated(options_term, subst, "open/4")
+
+        # Get values
+        filename_term = deref(filename_term, subst)
+        mode_term = deref(mode_term, subst)
+        options_term = deref(options_term, subst)
+
+        filename = filename_term.name
+        mode = mode_term.name
+
+        # Validate mode
+        if mode not in ('read', 'write', 'append'):
+            error_term = PrologError.domain_error("io_mode", mode_term, "open/4")
+            raise PrologThrow(error_term)
+
+        # Parse options (for now, ignore them as they're not implemented)
+        if not isinstance(options_term, List):
+            error_term = PrologError.type_error("list", options_term, "open/4")
+            raise PrologThrow(error_term)
+
+        # For now, delegate to open/3 (options ignored)
+        return IOBuiltins._builtin_open((filename_term, mode_term, stream_var), subst, engine)
+
+    @staticmethod
+    def _builtin_close_with_options(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext | None
+    ) -> Substitution | None:
+        """close/2 - Close stream with options."""
+        if engine is None:
+            return None
+
+        stream_term, options_term = args
+
+        engine._check_instantiated(stream_term, subst, "close/2")
+        engine._check_type(stream_term, Atom, "stream_or_alias", subst, "close/2")
+        engine._check_instantiated(options_term, subst, "close/2")
+
+        # Parse options (for now, ignore them as they're not implemented)
+        options_term = deref(options_term, subst)
+        if not isinstance(options_term, List):
+            error_term = PrologError.type_error("list", options_term, "close/2")
+            raise PrologThrow(error_term)
+
+        # For now, delegate to close/1 (options ignored)
+        return IOBuiltins._builtin_close((stream_term,), subst, engine)
+
+    @staticmethod
+    def _builtin_read_term(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext | None
+    ) -> Substitution | None:
+        """read_term/2 - Read term from current input with options."""
+        if engine is None:
+            return None
+
+        term_arg, options_arg = args
+
+        # Check options is instantiated
+        engine._check_instantiated(options_arg, subst, "read_term/2")
+
+        stream = engine.get_stream(USER_INPUT_STREAM)
+        if stream is None:
+            error_term = PrologError.existence_error("stream", USER_INPUT_STREAM, "read_term/2")
+            raise PrologThrow(error_term)
+
+        if stream.mode not in ("read", "append"):
+            error_term = PrologError.permission_error("input", "stream", stream.handle, "read_term/2")
+            raise PrologThrow(error_term)
+
+        return IOBuiltins._read_term_with_options(stream, term_arg, options_arg, subst, "read_term/2")
+
+    @staticmethod
+    def _builtin_read_term_from_stream(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext | None
+    ) -> Substitution | None:
+        """read_term/3 - Read term from specified stream with options."""
+        if engine is None:
+            return None
+
+        stream_term, term_arg, options_arg = args
+
+        engine._check_instantiated(stream_term, subst, "read_term/3")
+        engine._check_instantiated(options_arg, subst, "read_term/3")
+        engine._check_type(stream_term, Atom, "stream_or_alias", subst, "read_term/3")
+
+        stream_term = deref(stream_term, subst)
+
+        stream = engine.get_stream(stream_term)
+        if stream is None:
+            error_term = PrologError.existence_error("stream", stream_term, "read_term/3")
+            raise PrologThrow(error_term)
+
+        if stream.mode not in ("read", "append"):
+            error_term = PrologError.permission_error("input", "stream", stream_term, "read_term/3")
+            raise PrologThrow(error_term)
+
+        return IOBuiltins._read_term_with_options(stream, term_arg, options_arg, subst, "read_term/3")
 
     @staticmethod
     def _builtin_open(
@@ -1091,6 +1633,383 @@ class IOBuiltins:
             raise PrologThrow(error_term)
 
         return IOBuiltins._write_char_to_stream(stream, char_term.name, "put_char/2")
+
+    @staticmethod
+    def _builtin_set_input(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext | None
+    ) -> Substitution | None:
+        """set_input/1 - Change current input stream."""
+        if engine is None:
+            return None
+
+        stream_term = args[0]
+
+        engine._check_instantiated(stream_term, subst, "set_input/1")
+        engine._check_type(stream_term, Atom, "stream_or_alias", subst, "set_input/1")
+
+        stream_term = deref(stream_term, subst)
+
+        # Check if the stream exists
+        stream = engine.get_stream(stream_term)
+        if stream is None:
+            error_term = PrologError.existence_error("stream", stream_term, "set_input/1")
+            raise PrologThrow(error_term)
+
+        # Check if it's an input stream
+        if stream.mode not in ("read", "append"):
+            error_term = PrologError.permission_error("input", "stream", stream_term, "set_input/1")
+            raise PrologThrow(error_term)
+
+        # Set as current input stream
+        engine._current_input_stream = stream_term
+        return subst
+
+    @staticmethod
+    def _builtin_set_output(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext | None
+    ) -> Substitution | None:
+        """set_output/1 - Change current output stream."""
+        if engine is None:
+            return None
+
+        stream_term = args[0]
+
+        engine._check_instantiated(stream_term, subst, "set_output/1")
+        engine._check_type(stream_term, Atom, "stream_or_alias", subst, "set_output/1")
+
+        stream_term = deref(stream_term, subst)
+
+        # Check if the stream exists
+        stream = engine.get_stream(stream_term)
+        if stream is None:
+            error_term = PrologError.existence_error("stream", stream_term, "set_output/1")
+            raise PrologThrow(error_term)
+
+        # Check if it's an output stream
+        if stream.mode not in ("write", "append"):
+            error_term = PrologError.permission_error("output", "stream", stream_term, "set_output/1")
+            raise PrologThrow(error_term)
+
+        # Set as current output stream
+        engine._current_output_stream = stream_term
+        return subst
+
+    @staticmethod
+    def _builtin_flush_output(
+        _args: BuiltinArgs, subst: Substitution, engine: EngineContext | None
+    ) -> Substitution | None:
+        """flush_output/0 - Flush current output stream buffer."""
+        if engine is None:
+            return None
+
+        current_output = getattr(engine, '_current_output_stream', USER_OUTPUT_STREAM)
+        stream = engine.get_stream(current_output)
+        if stream is None:
+            error_term = PrologError.existence_error("stream", current_output, "flush_output/0")
+            raise PrologThrow(error_term)
+
+        try:
+            stream.file_obj.flush()
+        except (OSError, IOError) as e:
+            error_term = PrologError.permission_error("output", "stream", stream.handle, "flush_output/0")
+            raise PrologThrow(error_term)
+
+        return subst
+
+    @staticmethod
+    def _builtin_flush_output_stream(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext | None
+    ) -> Substitution | None:
+        """flush_output/1 - Flush specified stream buffer."""
+        if engine is None:
+            return None
+
+        stream_term = args[0]
+
+        engine._check_instantiated(stream_term, subst, "flush_output/1")
+        engine._check_type(stream_term, Atom, "stream_or_alias", subst, "flush_output/1")
+
+        stream_term = deref(stream_term, subst)
+
+        stream = engine.get_stream(stream_term)
+        if stream is None:
+            error_term = PrologError.existence_error("stream", stream_term, "flush_output/1")
+            raise PrologThrow(error_term)
+
+        if stream.mode not in ("write", "append"):
+            error_term = PrologError.permission_error("output", "stream", stream_term, "flush_output/1")
+            raise PrologThrow(error_term)
+
+        try:
+            stream.file_obj.flush()
+        except (OSError, IOError) as e:
+            error_term = PrologError.permission_error("output", "stream", stream_term, "flush_output/1")
+            raise PrologThrow(error_term)
+
+        return subst
+
+    @staticmethod
+    def _is_at_eof(stream: Stream) -> bool:
+        """Private helper to determine if a stream is at EOF, accounting for peek/seek/dunno-what-backs."""
+        try:
+            if hasattr(stream.file_obj, 'peek'):
+                peeked = stream.file_obj.peek(1)
+                return len(peeked) == 0
+            elif hasattr(stream.file_obj, 'tell') and hasattr(stream.file_obj, 'read'):
+                pos = stream.file_obj.tell()
+                ch = stream.file_obj.read(1)
+                at_eof = len(ch) == 0
+                if not at_eof:
+                    stream.file_obj.seek(pos)
+                    stream.pushback_buffer.append(ch)
+                return at_eof
+        except (OSError, IOError):
+            return False
+        return False
+
+    def _builtin_at_end_of_stream(
+        _args: BuiltinArgs, subst: Substitution, engine: EngineContext | None
+    ) -> Substitution | None:
+        """at_end_of_stream/0 - Test if current input is at EOF."""
+        if engine is None:
+            return None
+
+        current_input = getattr(engine, '_current_input_stream', USER_INPUT_STREAM)
+        stream = engine.get_stream(current_input)
+        if stream is None:
+            error_term = PrologError.existence_error("stream", current_input, "at_end_of_stream/0")
+            raise PrologThrow(error_term)
+
+        if stream.mode not in ("read", "append"):
+            error_term = PrologError.permission_error("input", "stream", stream.handle, "at_end_of_stream/0")
+            raise PrologThrow(error_term)
+
+        try:
+            at_eof = IOBuiltins._is_at_eof(stream)
+            return subst if at_eof else None
+        except (OSError, IOError):
+            return None
+
+    @staticmethod
+    def _builtin_stream_property(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext | None
+    ) -> Substitution | None:
+        """stream_property/2 - Query stream properties (can backtrack over all streams)."""
+        if engine is None:
+            return None
+
+        stream_term, property_term = args
+
+        # Get all streams
+        all_streams = list(engine._streams.values())
+
+        for stream in all_streams:
+            # Try to unify stream
+            stream_subst = unify(stream_term, stream.handle, subst)
+            if stream_subst is None:
+                continue
+
+            # Extract properties
+            properties = []
+
+            # type property
+            if stream.mode in ("read", "append"):
+                properties.append(Compound("type", (Atom("text"),)))
+            else:
+                properties.append(Compound("type", (Atom("text"),)))  # Default to text for now
+
+            # mode property
+            properties.append(Compound("mode", (Atom(stream.mode),)))
+
+            # alias property (if it's a standard stream)
+            if stream.handle.name in ("user_input", "user_output", "user_error"):
+                properties.append(Compound("alias", (stream.handle,)))
+
+            # position property (if seekable)
+            if hasattr(stream.file_obj, 'tell'):
+                try:
+                    pos = stream.file_obj.tell()
+                    properties.append(Compound("position", (Number(pos),)))
+                except (OSError, IOError):
+                    pass
+
+            # end_of_stream property
+            try:
+                at_eof = IOBuiltins._is_at_eof(stream)
+                if at_eof:
+                    properties.append(Compound("end_of_stream", (Atom("at"),)))
+                else:
+                    properties.append(Compound("end_of_stream", (Atom("not"),)))
+            except (OSError, IOError):
+                properties.append(Compound("end_of_stream", (Atom("not"),)))
+
+            # eof_action property (default to error for now)
+            properties.append(Compound("eof_action", (Atom("error"),)))
+
+            # reposition property (can seek)
+            can_seek = hasattr(stream.file_obj, 'seek') and hasattr(stream.file_obj, 'tell')
+            properties.append(Compound("reposition", (Atom("true") if can_seek else Atom("false"),)))
+
+            # file_name property (if it's a file)
+            if stream.filename:
+                properties.append(Compound("file_name", (Atom(stream.filename),)))
+
+            # Try to unify with each property
+            for prop in properties:
+                prop_subst = unify(property_term, prop, stream_subst)
+                if prop_subst is not None:
+                    return prop_subst
+
+        return None
+
+    @staticmethod
+    def _builtin_set_stream_position(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext | None
+    ) -> Substitution | None:
+        """set_stream_position/2 - Seek to position in stream."""
+        if engine is None:
+            return None
+
+        stream_term, position_term = args
+
+        engine._check_instantiated(stream_term, subst, "set_stream_position/2")
+        engine._check_instantiated(position_term, subst, "set_stream_position/2")
+        engine._check_type(stream_term, Atom, "stream_or_alias", subst, "set_stream_position/2")
+
+        stream_term = deref(stream_term, subst)
+        position_term = deref(position_term, subst)
+
+        stream = engine.get_stream(stream_term)
+        if stream is None:
+            error_term = PrologError.existence_error("stream", stream_term, "set_stream_position/2")
+            raise PrologThrow(error_term)
+
+        # Check if stream supports seeking
+        if not hasattr(stream.file_obj, 'seek'):
+            error_term = PrologError.permission_error("reposition", "stream", stream_term, "set_stream_position/2")
+            raise PrologThrow(error_term)
+
+        # Validate position
+        if not isinstance(position_term, Number) or not isinstance(position_term.value, int) or position_term.value < 0:
+            error_term = PrologError.domain_error("stream_position", position_term, "set_stream_position/2")
+            raise PrologThrow(error_term)
+
+        try:
+            stream.file_obj.seek(position_term.value)
+        except (OSError, IOError, ValueError) as e:
+            error_term = PrologError.domain_error("stream_position", position_term, "set_stream_position/2")
+            raise PrologThrow(error_term)
+
+        return subst
+
+    @staticmethod
+    def _builtin_at_end_of_stream_stream(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext | None
+    ) -> Substitution | None:
+        """at_end_of_stream/1 - Test if specified stream is at EOF."""
+        if engine is None:
+            return None
+
+        stream_term = args[0]
+
+        engine._check_instantiated(stream_term, subst, "at_end_of_stream/1")
+        engine._check_type(stream_term, Atom, "stream_or_alias", subst, "at_end_of_stream/1")
+
+        stream_term = deref(stream_term, subst)
+
+        stream = engine.get_stream(stream_term)
+        if stream is None:
+            error_term = PrologError.existence_error("stream", stream_term, "at_end_of_stream/1")
+            raise PrologThrow(error_term)
+
+        if stream.mode not in ("read", "append"):
+            error_term = PrologError.permission_error("input", "stream", stream_term, "at_end_of_stream/1")
+            raise PrologThrow(error_term)
+
+        try:
+            at_eof = IOBuiltins._is_at_eof(stream)
+            return subst if at_eof else None
+        except (OSError, IOError):
+            return None
+
+    @staticmethod
+    def _builtin_writeq(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext | None
+    ) -> Substitution | None:
+        """writeq/1 - Write term with atoms quoted when necessary."""
+        if engine is None:
+            return None
+
+        term = args[0]
+        # Delegate to write_term with quoted(true)
+        options = List([Compound("quoted", (Atom("true"),))])
+        return IOBuiltins._builtin_write_term((term, options), subst, engine)
+
+    @staticmethod
+    def _builtin_writeq_to_stream(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext | None
+    ) -> Substitution | None:
+        """writeq/2 - Write term with quotes to specified stream."""
+        if engine is None:
+            return None
+
+        stream_term, term = args
+        # Delegate to write_term with quoted(true)
+        options = List([Compound("quoted", (Atom("true"),))])
+        return IOBuiltins._builtin_write_term_to_stream((stream_term, term, options), subst, engine)
+
+    @staticmethod
+    def _builtin_write_canonical(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext | None
+    ) -> Substitution | None:
+        """write_canonical/1 - Write term in canonical form."""
+        if engine is None:
+            return None
+
+        term = args[0]
+        # Delegate to write_term with quoted(true) and ignore_ops(true)
+        options = List([
+            Compound("quoted", (Atom("true"),)),
+            Compound("ignore_ops", (Atom("true"),))
+        ])
+        return IOBuiltins._builtin_write_term((term, options), subst, engine)
+
+    @staticmethod
+    def _builtin_write_canonical_to_stream(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext | None
+    ) -> Substitution | None:
+        """write_canonical/2 - Write term canonically to specified stream."""
+        if engine is None:
+            return None
+
+        stream_term, term = args
+        # Delegate to write_term with quoted(true) and ignore_ops(true)
+        options = List([
+            Compound("quoted", (Atom("true"),)),
+            Compound("ignore_ops", (Atom("true"),))
+        ])
+        return IOBuiltins._builtin_write_term_to_stream((stream_term, term, options), subst, engine)
+
+    @staticmethod
+    def _builtin_print(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext | None
+    ) -> Substitution | None:
+        """print/1 - Pretty-print term."""
+        if engine is None:
+            return None
+
+        term = args[0]
+        # For now, delegate to write/1 (hook support can be added later)
+        return IOBuiltins._builtin_write((term,), subst, engine)
+
+    @staticmethod
+    def _builtin_print_to_stream(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext | None
+    ) -> Substitution | None:
+        """print/2 - Pretty-print to specified stream."""
+        # For now, print/2 is an alias for write/2.
+        # This can be changed later to support portray/1 hooks.
+        return IOBuiltins._builtin_write_to_stream(args, subst, engine)
 
     @staticmethod
     def _write_char_to_stream(stream: Stream, char: str, context: str) -> Substitution | None:

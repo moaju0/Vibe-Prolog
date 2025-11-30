@@ -244,13 +244,13 @@ Status legend:
 | Predicate               | Status | Notes                            |
 | ----------------------- | ------ | -------------------------------- |
 | `read/1-2`              | ✅      |                                  |
-| `read_term/2-3`         | ❌      | **ISO-required** - With options  |
-| `write/1-2`             | ⚠️     | Only `/1` implemented            |
-| `writeq/1-2`            | ❌      | **ISO-required** - With quotes   |
-| `write_canonical/1-2`   | ❌      | **ISO-required** - Canonical form|
-| `write_term/2-3`        | ❌      | **ISO-required** - With options  |
-| `print/1-2`             | ❌      | Common extension                 |
-| `writeln/1-2`           | ⚠️     | Only `/1` implemented (extension)|
+| `read_term/2-3`         | ✅      | **ISO-required** - With options  |
+| `write/1-2`             | ✅      |                                  |
+| `writeq/1-2`            | ✅      | **ISO-required** - With quotes   |
+| `write_canonical/1-2`   | ✅      | **ISO-required** - Canonical form|
+| `write_term/2-3`        | ✅      | **ISO-required** - With options  |
+| `print/1-2`             | ✅      | Common extension                 |
+| `writeln/1-2`           | ✅      | Extension                        |
 | `format/2-3`            | ✅📘    | Extension                        |
 | `write_term_to_chars/3` | ⚠️     | Minor formatting differences     |
 
@@ -260,16 +260,16 @@ Status legend:
 
 | Predicate                | Status | Notes                        |
 | ------------------------ | ------ | ---------------------------- |
-| `open/3-4`               | ⚠️     | Only `/3` implemented        |
-| `close/1-2`              | ⚠️     | Only `/1` implemented        |
+| `open/3-4`               | ✅      |                              |
+| `close/1-2`              | ✅      |                              |
 | `current_input/1`        | ✅      |                              |
 | `current_output/1`       | ✅      |                              |
-| `set_input/1`            | ❌      | **ISO-required**             |
-| `set_output/1`           | ❌      | **ISO-required**             |
-| `flush_output/0-1`       | ❌      | **ISO-required**             |
-| `at_end_of_stream/0-1`   | ❌      | **ISO-required** - EOF test  |
-| `stream_property/2`      | ❌      | **ISO-required**             |
-| `set_stream_position/2`  | ❌      | **ISO-required** - Seek      |
+| `set_input/1`            | ✅      | **ISO-required**             |
+| `set_output/1`           | ✅      | **ISO-required**             |
+| `flush_output/0-1`       | ✅      | **ISO-required**             |
+| `at_end_of_stream/0-1`   | ✅      | **ISO-required** - EOF test  |
+| `stream_property/2`      | ✅      | **ISO-required**             |
+| `set_stream_position/2`  | ✅      | **ISO-required** - Seek      |
 
 ---
 
@@ -330,8 +330,8 @@ Status legend:
 | Meta-predicates           | ⚠️ Core meta-preds implemented; higher-order list ops missing |
 | Database operations       | ✅ Strong                                                   |
 | Character I/O (§8.11)     | ⚠️ Basic ✅, missing code/peek predicates                  |
-| Term I/O (§8.12)          | ⚠️ Basic read/write ✅, missing options & variants         |
-| Stream control (§8.13)    | ⚠️ Basic ✅, missing flush, seek, properties               |
+| Term I/O (§8.12)          | ✅ Strong - All ISO-required predicates implemented        |
+| Stream control (§8.13)    | ✅ Strong - All ISO-required predicates implemented        |
 | Errors & exceptions       | ✅ Strong                                                   |
 | Parsing & syntax          | ❌ Blocking gaps (op/3, char_conversion)                   |
 | Modules                   | ✅ Largely ISO-consistent (Part 1)                          |
