@@ -508,13 +508,13 @@ class ListOperationsBuiltins:
             raise PrologThrow(PrologError.domain_error("not_empty_list", lst))
 
         # Check all are numbers and collect values
-        values = []
-        for item in py_list:
+        # Check all are numbers and find max value in one pass
+        max_val = None
+        for i, item in enumerate(py_list):
             if not isinstance(item, Number):
                 raise PrologThrow(PrologError.type_error("number", item))
-            values.append(item.value)
-
-        max_val = max(values)
+            if i == 0 or item.value > max_val:
+                max_val = item.value
         new_subst = unify(max_result, Number(max_val), subst)
         if new_subst is not None:
             yield new_subst
