@@ -30,6 +30,7 @@ class TypeTestBuiltins:
         register_builtin(registry, "atomic", 1, TypeTestBuiltins._builtin_atomic)
         register_builtin(registry, "callable", 1, TypeTestBuiltins._builtin_callable)
         register_builtin(registry, "ground", 1, TypeTestBuiltins._builtin_ground)
+        register_builtin(registry, "is_list", 1, TypeTestBuiltins._builtin_is_list)
 
     @staticmethod
     def _builtin_atom(
@@ -140,6 +141,36 @@ class TypeTestBuiltins:
                 return TypeTestBuiltins._is_ground(term.tail, subst)
             return True
         return True
+
+    @staticmethod
+    def _is_proper_list(term: Any) -> bool:
+        """Check if term is a proper list, handling cycles and Atom('[]') terminator.
+        Uses an iterative approach to avoid recursion depth issues and to correctly
+        treat Atom('[]') as a valid list terminator (extension behavior).
+        """
+        visited = set()
+        current = term
+        while isinstance(current, List):
+            term_id = id(current)
+            if term_id in visited:
+                return False  # cycle detected
+            visited.add(term_id)
+            if current.tail is None:
+                return True
+            current = current.tail
+        # A proper list can also terminate with the atom '[]'
+        if isinstance(current, Atom) and current.name == "[]":
+            return True
+        return False
+
+    @staticmethod
+    def _builtin_is_list(
+        args: BuiltinArgs, subst: Substitution, _engine: EngineContext | None
+    ) -> Substitution | None:
+        term = deref(args[0], subst)
+        if TypeTestBuiltins._is_proper_list(term):
+            return subst
+        return None
 
 
 __all__ = ["TypeTestBuiltins"]

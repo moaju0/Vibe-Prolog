@@ -109,7 +109,7 @@ Status legend:
 | `compound/1` | ✅      |                                      |
 | `callable/1` | ✅      |                                      |
 | `ground/1`   | ✅      |                                      |
-| `is_list/1`  | ❌      | Common extension (de facto standard) |
+| `is_list/1`  | ✅      | Common extension (de facto standard); supports Atom('[]') as list terminator |
 
 ---
 
@@ -346,7 +346,7 @@ These predicates are specific to SWI-Prolog and not part of the ISO standard.
 | Core execution model      | ✅ Strong                                                   |
 | Control constructs        | ✅ Strong                                                   |
 | Unification & comparison  | ✅ Strong                                                   |
-| Type testing              | ✅ Strong (missing `is_list/1` extension)                   |
+| Type testing              | ✅ Strong                                                   |
 | Term manipulation         | ✅ Strong                                                   |
 | Atom processing (§8.16)   | ✅ Strong                                                   |
 | Arithmetic                | ✅ Strong                                                   |
@@ -370,7 +370,6 @@ These predicates are specific to SWI-Prolog and not part of the ISO standard.
 2. `char_conversion/2` missing (§6.4, §7.4)
 3. **Database operations incomplete** - `retractall/1` missing (ISO-required)
 4. **Higher-order list predicates missing** - `maplist/3-5`, `include/3`, `exclude/3`, `partition/4`, `foldl/4-6`
-5. **Type testing incomplete** - `is_list/1` missing (de facto standard)
 
 ## Common Extensions Worth Implementing
 
@@ -378,4 +377,3 @@ Based on analysis of real-world Prolog programs, these commonly-used predicates 
 
 1. **List utilities** - `is_set/1`, `list_to_set/2`, `list_to_ord_set/2`, `ord_subtract/3`, `numlist/3`, `permutation/2`
 2. **Higher-order** - `maplist/3-5` (currently only `/2` implemented), `include/3`, `exclude/3`
-3. **Type testing** - `is_list/1` (appears in many programs)
