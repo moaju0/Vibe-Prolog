@@ -88,11 +88,27 @@ class PrologInterpreter:
             eng.interpreter = self
             self._builtins_seeded = True
 
-    def _process_items(self, items: list, source_name: str):
-        """Process parsed clauses and directives."""
+    def _process_items(
+        self,
+        items: list,
+        source_name: str,
+        closed_predicates: set[tuple[str, int]] | None = None,
+        last_predicate: tuple[str, int] | None = None,
+    ) -> tuple[str, int] | None:
+        """Process parsed clauses and directives.
+        
+        Args:
+            items: List of parsed clauses and directives
+            source_name: Name of the source being consulted
+            closed_predicates: Set of predicates that have been "closed"
+            last_predicate: The last predicate key that was added
+            
+        Returns:
+            The last predicate key processed
+        """
         self._ensure_builtin_properties()
-        closed_predicates: set[tuple[str, int]] = set()
-        last_predicate: tuple[str, int] | None = None
+        if closed_predicates is None:
+            closed_predicates = set()
 
         for item in items:
             if isinstance(item, Clause):
@@ -132,6 +148,8 @@ class PrologInterpreter:
                 if item.doc:
                     # For now, ignore directive docs
                     pass
+        
+        return last_predicate
 
     def _handle_directive(
         self, directive: Directive, closed_predicates: set[tuple[str, int]], source_name=None
@@ -467,7 +485,6 @@ class PrologInterpreter:
         if (
             key in closed_predicates
             and "discontiguous" not in properties
-            and source_name in sources
         ):
             indicator = self._indicator_from_key(key)
             error_term = PrologError.permission_error(
@@ -517,18 +534,36 @@ class PrologInterpreter:
         # Parse and process incrementally to support char_conversion taking effect
         # between clauses/directives. We split by period-terminated statements.
         all_items = []
-        for chunk in self._split_clauses(prolog_code):
+        try:
+            chunks = self._split_clauses(prolog_code)
+        except ValueError as exc:
+            error_term = PrologError.syntax_error(str(exc), "consult/1")
+            raise PrologThrow(error_term)
+        
+        # Keep closed_predicates across chunks to enforce discontiguous requirements
+        closed_predicates: set[tuple[str, int]] = set()
+        last_predicate: tuple[str, int] | None = None
+        
+        for chunk in chunks:
             chunk = chunk.strip()
             if not chunk:
                 continue
             try:
-                items = self.parser.parse(chunk, "consult/1")
+                # char_conversion directives should not be affected by char conversions
+                # since they need to be parsed as-is to set the conversions
+                import re
+                is_char_conversion = re.match(r"\s*:-\s*char_conversion\b", chunk)
+                items = self.parser.parse(
+                    chunk,
+                    "consult/1",
+                    apply_char_conversions=not is_char_conversion
+                )
             except (ValueError, LarkError) as exc:
                 error_term = PrologError.syntax_error(str(exc), "consult/1")
                 raise PrologThrow(error_term)
             # Process each item immediately so char_conversion directives
             # take effect before subsequent parsing
-            self._process_items(items, source_name)
+            last_predicate = self._process_items(items, source_name, closed_predicates, last_predicate)
             all_items.extend(items)
 
         self.engine = PrologEngine(
@@ -689,7 +724,8 @@ class PrologInterpreter:
         # We'll use a dummy rule structure
         prolog_code = f"dummy :- {query_str}"
         try:
-            clauses = self.parser.parse(prolog_code, "query/1")
+            # Don't apply char conversions to interactive queries
+            clauses = self.parser.parse(prolog_code, "query/1", apply_char_conversions=False)
         except (ValueError, LarkError) as exc:
             self._raise_syntax_error(exc, "query/1")
 
@@ -700,7 +736,8 @@ class PrologInterpreter:
         # Single goal case
         prolog_code = query_str
         try:
-            clauses = self.parser.parse(prolog_code, "query/1")
+            # Don't apply char conversions to interactive queries
+            clauses = self.parser.parse(prolog_code, "query/1", apply_char_conversions=False)
         except (ValueError, LarkError) as exc:
             self._raise_syntax_error(exc, "query/1")
         if clauses:

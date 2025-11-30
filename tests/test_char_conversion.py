@@ -21,8 +21,8 @@ class TestCharConversionDirective:
             :- char_conversion(a, b).
             test_fact(abc).
         """)
-        # After conversion, 'abc' becomes 'bbc' during parsing
-        assert prolog.has_solution("test_fact(bbc)")
+        # After conversion, all 'a' chars become 'b': test_fact -> test_fbct, abc -> bbc
+        assert prolog.has_solution("test_fbct(bbc)")
         assert not prolog.has_solution("test_fact(abc)")
 
     def test_conversion_affects_atom_names(self):
@@ -43,8 +43,8 @@ class TestCharConversionDirective:
             :- char_conversion(a, b).
             test_fact('abc').
         """)
-        # Quoted 'abc' should remain unchanged
-        assert prolog.has_solution("test_fact(abc)")
+        # Quoted 'abc' should remain unchanged, but functor 'test_fact' is converted
+        assert prolog.has_solution("test_fbct(abc)")
         assert not prolog.has_solution("test_fact(bbc)")
 
     def test_conversion_does_not_affect_double_quoted_strings(self):
@@ -54,8 +54,8 @@ class TestCharConversionDirective:
             :- char_conversion(a, b).
             test_fact("abc").
         """)
-        # Double-quoted "abc" should remain unchanged  
-        result = prolog.query_once("test_fact(X)")
+        # Double-quoted "abc" should remain unchanged, but functor 'test_fact' is converted
+        result = prolog.query_once("test_fbct(X)")
         assert result is not None
         assert result["X"] == "abc"
 
@@ -68,8 +68,8 @@ class TestCharConversionDirective:
             :- char_conversion(a, a).
             fact2(abc).
         """)
-        # fact1 was converted, fact2 was not (identity removed the conversion)
-        assert prolog.has_solution("fact1(bbc)")
+        # fact1 was converted (both functor and args), fact2 was not (identity removed the conversion)
+        assert prolog.has_solution("fbct1(bbc)")
         assert prolog.has_solution("fact2(abc)")
 
     def test_multiple_conversions(self):
@@ -78,10 +78,10 @@ class TestCharConversionDirective:
         prolog.consult_string("""
             :- char_conversion(a, x).
             :- char_conversion(b, y).
-            fact(abc).
+            mytest(abc).
         """)
-        # 'abc' -> 'xyc'
-        assert prolog.has_solution("fact(xyc)")
+        # 'abc' -> 'xyc', and functor 'mytest' contains no converted chars
+        assert prolog.has_solution("mytest(xyc)")
 
     def test_conversion_chain_not_transitive(self):
         """Conversion chains should NOT be transitive (a->b, b->c should not cause a->c)."""
@@ -89,11 +89,12 @@ class TestCharConversionDirective:
         prolog.consult_string("""
             :- char_conversion(a, b).
             :- char_conversion(b, c).
-            fact(aaa).
+            mytest(aaa).
         """)
         # 'aaa' becomes 'bbb' (a->b applied), NOT 'ccc' (chains don't compose)
-        assert prolog.has_solution("fact(bbb)")
-        assert not prolog.has_solution("fact(ccc)")
+        # functor 'mytest' contains no converted chars
+        assert prolog.has_solution("mytest(bbb)")
+        assert not prolog.has_solution("mytest(ccc)")
 
     def test_conversion_overwrites_previous(self):
         """A new conversion for the same character overwrites the old one."""
@@ -104,15 +105,18 @@ class TestCharConversionDirective:
             :- char_conversion(a, c).
             fact2(aaa).
         """)
-        assert prolog.has_solution("fact1(bbb)")
-        assert prolog.has_solution("fact2(ccc)")
+        # fact1 uses the first conversion (a -> b), fact2 uses the second (a -> c)
+        # Note: 'a' in 'fact' also gets converted: fact1 -> fbct1, fact2 -> fcct2
+        assert prolog.has_solution("fbct1(bbb)")
+        assert prolog.has_solution("fcct2(ccc)")
 
     def test_conversion_persists_across_consults(self):
         """Conversions should persist across multiple consult_string calls."""
         prolog = PrologInterpreter()
         prolog.consult_string(":- char_conversion(a, b).")
-        prolog.consult_string("fact(aaa).")
-        assert prolog.has_solution("fact(bbb)")
+        prolog.consult_string("mytest(aaa).")
+        # functor 'mytest' contains no 'a', so it stays 'mytest'
+        assert prolog.has_solution("mytest(bbb)")
 
 
 class TestCharConversionErrors:

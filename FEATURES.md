@@ -25,8 +25,8 @@ Status legend:
 | `/* … */` block comments         | ✅      | Nested supported                          |
 | Character code syntax (`0'X`)    | ✅      | Minor ISO edge gaps                       |
 | Built-in operator syntax         | ✅      |                                           |
-| `:- op/3` declaration            | ⚠️     | Operator table updated, parser ignores it |
-| Dynamic operator parsing         | ❌      | **ISO-blocking**                          |
+| `:- op/3` declaration            | ✅      | Full support - defines operators dynamically |
+| Custom operator syntax in source | ❌      | Parser doesn't use dynamic operators (future) |
 | `:- char_conversion/2`           | ❌      | **ISO-mandatory**                         |
 
 ---
@@ -51,14 +51,14 @@ Status legend:
 
 ## §7.4 — Directives
 
-| Directive              | Status | Notes                                |
-| ---------------------- | ------ | ------------------------------------ |
-| `:- dynamic/1`         | ✅      |                                      |
-| `:- multifile/1`       | ✅      |                                      |
-| `:- discontiguous/1`   | ✅      |                                      |
-| `:- initialization/1`  | ✅      |                                      |
-| `:- op/3`              | ⚠️     | Declaration only; parsing unaffected |
-| `:- char_conversion/2` | ❌      | **ISO-required**                     |
+| Directive              | Status | Notes                                    |
+| ---------------------- | ------ | ---------------------------------------- |
+| `:- dynamic/1`         | ✅      |                                          |
+| `:- multifile/1`       | ✅      |                                          |
+| `:- discontiguous/1`   | ✅      |                                          |
+| `:- initialization/1`  | ✅      |                                          |
+| `:- op/3`              | ✅      | Full support - defines operators with validation |
+| `:- char_conversion/2` | ❌      | **ISO-required**                         |
 
 ---
 
@@ -358,7 +358,7 @@ These predicates are specific to SWI-Prolog and not part of the ISO standard.
 | Term I/O (§8.12)          | ✅ Strong - All ISO-required predicates implemented        |
 | Stream control (§8.13)    | ✅ Strong - All ISO-required predicates implemented        |
 | Errors & exceptions       | ✅ Strong                                                   |
-| Parsing & syntax          | ❌ Blocking gaps (op/3, char_conversion)                   |
+| Parsing & syntax          | ⚠️ op/3 ✅, char_conversion ❌, custom operator syntax parsing ❌ |
 | Modules                   | ✅ Largely ISO-consistent (Part 1)                          |
 | Reflection                | ⚠️ Partial                                                 |
 

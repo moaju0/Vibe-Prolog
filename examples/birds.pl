@@ -105,6 +105,7 @@ ask(A, V):-
 ask(A, V):-
   write(A:V), % ask user
   write('? : '),
+  flush_output,
   read(Y), % get the answer
   asserta(known(Y, A, V)), % remember it
   Y == yes. % succeed or fail
@@ -123,6 +124,20 @@ wings(X):- ask(wings, X).
 neck(X):- ask(neck, X).
 
 color(X):- ask(color, X).
+
+nostrils(X):- ask(nostrils, X).
+
+live(X):- ask(live, X).
+
+bill(X):- ask(bill, X).
+
+voice(X):- ask(voice, X).
+
+season(X):- ask(season, X).
+
+cheek(X):- ask(cheek, X).
+
+head(X):- ask(head, X).
 
 multivalued(voice).
 multivalued(feed).

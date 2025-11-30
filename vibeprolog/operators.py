@@ -28,7 +28,7 @@ class OperatorInfo:
 
     @property
     def is_infix(self) -> bool:
-        return self.spec in ("xfx", "xfy", "yfx")
+        return self.spec in ("xfx", "xfy", "yfx", "yfy")
 
 
 class OperatorTable:
@@ -118,7 +118,7 @@ class OperatorTable:
         return precedence
 
     def _parse_specifier(self, spec_term, context: str) -> str:
-        valid_specs = {"xfx", "xfy", "yfx", "fx", "fy", "xf", "yf"}
+        valid_specs = {"xfx", "xfy", "yfx", "yfy", "fx", "fy", "xf", "yf"}
         if isinstance(spec_term, Variable):
             error_term = PrologError.instantiation_error(context)
             raise PrologThrow(error_term)
