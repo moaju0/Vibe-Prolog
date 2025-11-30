@@ -91,7 +91,7 @@ Status legend:
 | `@</2`, `@=</2`, `@>/2`, `@>=/2` | ✅      |                                                                                                          |
 | `compare/3`                      | ✅      | **ISO-required** - Three-way term comparison                                                             |
 | `unify_with_occurs_check/2`      | ✅      | **ISO-required** - Logically sound unification                                                           |
-| ISO standard term order          | ❌      | Lists treated separately (explicitly defined for deterministic ordering; ISO requires lists ⊂ compounds) |
+| ISO standard term order          | ✅      | Lists now correctly ordered as compounds                                                                 |
 
 ---
 
@@ -343,7 +343,7 @@ Status legend:
 
 1. `op/3` must affect parsing (§6.3)
 2. `char_conversion/2` missing (§6.4, §7.4)
-3. Incorrect term ordering (§6.4.10)
-4. Module-local clause resolution (§10)
-5. **List sorting missing** - `msort/2`, `keysort/2` unimplemented (ISO-required)
-6. **Character I/O incomplete (§8.11)** - Missing `get_code`, `put_code`, `peek_*` predicates
+3. **List sorting missing** - `msort/2`, `keysort/2` unimplemented (ISO-required)
+4. **Character I/O incomplete (§8.11)** - Missing `get_code`, `put_code`, `peek_*` predicates
+5. **Term I/O incomplete (§8.12)** - Missing `read_term`, `write_term`, `writeq`, `write_canonical`
+6. **Stream operations incomplete (§8.13)** - Missing `flush_output`, `at_end_of_stream`, `stream_property`
