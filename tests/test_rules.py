@@ -146,15 +146,15 @@ class TestRulesWithLists:
     def test_list_sum_rule(self):
         prolog = PrologInterpreter()
         prolog.consult_string("""
-            sum_list([], 0).
-            sum_list([H|T], S) :- sum_list(T, S1), S is H + S1.
+            my_sum_list([], 0).
+            my_sum_list([H|T], S) :- my_sum_list(T, S1), S is H + S1.
         """)
 
-        result = prolog.query_once("sum_list([1, 2, 3, 4], S)")
+        result = prolog.query_once("my_sum_list([1, 2, 3, 4], S)")
         assert result is not None
         assert result['S'] == 10
 
-        result = prolog.query_once("sum_list([], S)")
+        result = prolog.query_once("my_sum_list([], S)")
         assert result is not None
         assert result['S'] == 0
 
