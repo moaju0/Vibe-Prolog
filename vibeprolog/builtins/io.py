@@ -5,6 +5,7 @@ Implements basic output predicates including formatted printing.
 
 from __future__ import annotations
 
+from collections import deque
 from typing import Any, Callable
 
 from lark.exceptions import LarkError
