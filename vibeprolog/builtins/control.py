@@ -26,6 +26,7 @@ class ControlBuiltins:
         register_builtin(registry, "=", 2, ControlBuiltins._builtin_unify)
         register_builtin(registry, r"\=", 2, ControlBuiltins._builtin_not_unifiable)
         register_builtin(registry, r"\+", 1, ControlBuiltins._negation_as_failure)
+        register_builtin(registry, r"\+", 2, ControlBuiltins._negation_as_failure)
         register_builtin(registry, ";", 2, ControlBuiltins._builtin_disjunction)
         register_builtin(registry, "->", 2, ControlBuiltins._builtin_if_then)
         register_builtin(registry, ",", 2, ControlBuiltins._builtin_conjunction)
@@ -59,7 +60,20 @@ class ControlBuiltins:
     def _negation_as_failure(
         args: BuiltinArgs, subst: Substitution, engine: EngineContext
     ) -> Iterator[Substitution]:
-        goal = args[0]
+        r"""Negation-as-failure (\+/1 and \+/2+).
+        
+        \+/1: Standard negation-as-failure for a single goal.
+        \+/2+: Due to operator precedence, \+(p(X), q(X)) may parse as a 2-argument
+               compound. This handles that case by converting multiple arguments
+               into a conjunction.
+        """
+        # Handle multiple arguments by converting to conjunction
+        if len(args) == 1:
+            goal = args[0]
+        else:
+            # Convert multiple arguments to a conjunction: \+(A, B, C) -> \+((A, B, C))
+            goal = Compound(",", args)
+        
         for _ in engine._solve_goals([goal], subst):
             return iter_empty()
         return iter([subst])
