@@ -22,8 +22,7 @@ class TestClassicIO:
 
             # Read from file
             result = prolog.query_once("read(X)")
-            assert result is not None
-            # Should have read fact(hello)
+            assert result == {'X': {'fact': ['hello']}}
 
             prolog.query_once("seen")
         finally:
@@ -59,13 +58,13 @@ class TestClassicIO:
 class TestCharacterCodeIO:
     """Test get/put for character codes."""
 
-    def test_put_writes_code(self):
+    def test_put_writes_code(self, capsys):
         """put/1 writes character code."""
         prolog = PrologInterpreter()
-        # This is hard to test without capturing output
-        # Would need output capture
         result = prolog.query_once("put(65)")  # 'A'
         assert result is not None
+        captured = capsys.readouterr()
+        assert captured.out == 'A'
 
     def test_put_invalid_code(self):
         """put/1 with invalid code raises error."""
@@ -86,11 +85,8 @@ class TestStreamProperties:
         try:
             prolog = PrologInterpreter()
             # Open and query in one session
-            results = list(prolog.query(f"open('{filename}', write, S), stream_property(S, P)"))
+            results = list(prolog.query(f"open('{filename}', write, S), stream_property(S, P), close(S)"))
             assert len(results) > 0
-
-            # Close in separate query
-            prolog.query_once(f"open('{filename}', write, S), close(S)")
         finally:
             os.unlink(filename)
 

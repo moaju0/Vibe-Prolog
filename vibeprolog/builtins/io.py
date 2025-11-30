@@ -383,7 +383,9 @@ class IOBuiltins:
 
             yield subst
 
-        except Exception as e:
+        except FileNotFoundError:
+            raise PrologThrow(PrologError.existence_error("source_sink", filename, "tell/1"))
+        except PermissionError:
             raise PrologThrow(PrologError.permission_error("open", "source_sink", filename, "tell/1"))
 
     @staticmethod
