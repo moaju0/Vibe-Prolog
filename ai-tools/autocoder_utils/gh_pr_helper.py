@@ -7,6 +7,36 @@ import sys
 from typing import Sequence
 
 
+GRAPHQL_REVIEW_COMMENTS_QUERY = """
+query FetchReviewComments($owner: String!, $repo: String!, $pr: Int!) {
+  repository(owner: $owner, name: $repo) {
+    pullRequest(number: $pr) {
+      reviewThreads(first: 100) {
+        edges {
+          node {
+            isResolved
+            path
+            line
+            startLine
+            comments(first: 100) {
+              nodes {
+                author {
+                  login
+                }
+                body
+                url
+                diffHunk
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+"""
+
+
 def parse_pr_path(pr_path: str) -> tuple[str, str, str]:
     """
     Parse a PR path like 'nlothian/Vibe-Prolog/pull/10' into (owner, repo, pr_number).
@@ -52,13 +82,84 @@ def fetch_api(api_path: str) -> list[dict]:
         raise SystemExit(1)
 
 
+def fetch_review_comments_graphql(owner: str, repo: str, pr_number: str) -> list[dict]:
+    """
+    Fetch review comments via the GitHub GraphQL API, excluding resolved threads.
+    """
+    cmd = [
+        "gh",
+        "api",
+        "graphql",
+        "-f",
+        f"owner={owner}",
+        "-f",
+        f"repo={repo}",
+        "-F",
+        f"pr={pr_number}",
+        "-f",
+        f"query={GRAPHQL_REVIEW_COMMENTS_QUERY}",
+    ]
+
+    try:
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        payload = json.loads(result.stdout)
+    except subprocess.CalledProcessError as exc:
+        print(f"Error calling gh GraphQL API: {exc.stderr}", file=sys.stderr)
+        raise SystemExit(1)
+    except json.JSONDecodeError as exc:
+        print(f"Error parsing GraphQL JSON response: {exc}", file=sys.stderr)
+        raise SystemExit(1)
+
+    if "errors" in payload and payload["errors"]:
+        print(f"GraphQL errors: {payload['errors']}", file=sys.stderr)
+        raise SystemExit(1)
+
+    try:
+        threads = payload["data"]["repository"]["pullRequest"]["reviewThreads"]["edges"]
+    except (KeyError, TypeError) as exc:
+        print("Unexpected GraphQL response format when fetching review comments.", file=sys.stderr)
+        raise SystemExit(1) from exc
+
+    review_comments: list[dict] = []
+    for edge in threads or []:
+        thread = edge.get("node") or {}
+        if thread.get("isResolved"):
+            continue
+
+        path = thread.get("path", "unknown")
+        line = thread.get("line")
+        start_line = thread.get("startLine")
+        comment_nodes = (thread.get("comments") or {}).get("nodes") or []
+
+        for comment in comment_nodes:
+            author_login = (comment.get("author") or {}).get("login", "unknown")
+            review_comments.append(
+                {
+                    "path": path,
+                    "line": line,
+                    "start_line": start_line,
+                    "original_line": line,
+                    "diff_hunk": comment.get("diffHunk"),
+                    "user": {"login": author_login},
+                    "body": comment.get("body", ""),
+                    "url": comment.get("url"),
+                }
+            )
+
+    return review_comments
+
+
 def fetch_pr_comments(owner: str, repo: str, pr_number: str) -> tuple[list[dict], list[dict]]:
     """
     Fetch both review comments (inline on diff) and issue comments (general PR comments).
     Returns (review_comments, issue_comments)
     """
-    review_comments_path = f"/repos/{owner}/{repo}/pulls/{pr_number}/comments"
-    review_comments = fetch_api(review_comments_path)
+    review_comments = fetch_review_comments_graphql(owner, repo, pr_number)
 
     issue_comments_path = f"/repos/{owner}/{repo}/issues/{pr_number}/comments"
     issue_comments = fetch_api(issue_comments_path)
