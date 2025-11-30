@@ -613,6 +613,122 @@ class PrologTransformer(Transformer):
         return Cut()
 
 
+def tokenize_prolog_statements(prolog_code: str) -> list[str]:
+    """Split Prolog code into individual clause/directive strings.
+
+    Handles quoted strings, comments, and decimal points in numbers to avoid
+    splitting valid clauses. Each returned string ends with a period.
+    """
+    chunks = []
+    current = []
+    i = 0
+    in_single_quote = False
+    in_double_quote = False
+    in_line_comment = False
+    in_block_comment = 0
+    escape_next = False
+
+    while i < len(prolog_code):
+        char = prolog_code[i]
+
+        # Handle line comments
+        if in_line_comment:
+            current.append(char)
+            if char == '\n':
+                in_line_comment = False
+            i += 1
+            continue
+
+        # Handle block comments
+        if in_block_comment > 0:
+            current.append(char)
+            if prolog_code[i:i+2] == '/*':
+                in_block_comment += 1
+                current.append(prolog_code[i+1])
+                i += 2
+                continue
+            if prolog_code[i:i+2] == '*/':
+                in_block_comment -= 1
+                current.append(prolog_code[i+1])
+                i += 2
+                continue
+            i += 1
+            continue
+
+        # Handle escape sequences
+        if escape_next:
+            current.append(char)
+            escape_next = False
+            i += 1
+            continue
+
+        if char == '\\' and (in_single_quote or in_double_quote):
+            current.append(char)
+            escape_next = True
+            i += 1
+            continue
+
+        # Handle entering/exiting quotes
+        if char == "'" and not in_double_quote:
+            # Check for doubled quote
+            if in_single_quote and i + 1 < len(prolog_code) and prolog_code[i + 1] == "'":
+                current.append(char)
+                current.append(prolog_code[i + 1])
+                i += 2
+                continue
+            in_single_quote = not in_single_quote
+            current.append(char)
+            i += 1
+            continue
+
+        if char == '"' and not in_single_quote:
+            in_double_quote = not in_double_quote
+            current.append(char)
+            i += 1
+            continue
+
+        # Check for comment starts
+        if not in_single_quote and not in_double_quote:
+            if char == '%':
+                in_line_comment = True
+                current.append(char)
+                i += 1
+                continue
+            if prolog_code[i:i+2] == '/*':
+                in_block_comment = 1
+                current.append(char)
+                current.append(prolog_code[i+1])
+                i += 2
+                continue
+
+        # Handle period (end of clause)
+        if char == '.' and not in_single_quote and not in_double_quote:
+            current.append(char)
+            # Heuristic to check if this period is part of a number (e.g., 1.2 or 1.)
+            # to avoid splitting clauses incorrectly.
+            is_decimal_point = (i > 0 and prolog_code[i-1].isdigit()) or \
+                               (i + 1 < len(prolog_code) and prolog_code[i+1].isdigit())
+            if is_decimal_point:
+                i += 1
+                continue
+            # End of clause
+            chunks.append(''.join(current))
+            current = []
+            i += 1
+            continue
+
+        current.append(char)
+        i += 1
+
+    # Add any remaining content (should not happen in well-formed code)
+    if current:
+        remainder = ''.join(current).strip()
+        if remainder:
+            chunks.append(remainder)
+
+    return chunks
+
+
 class PrologParser:
     """Parse Prolog source code."""
 
