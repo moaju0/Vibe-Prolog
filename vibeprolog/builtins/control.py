@@ -10,9 +10,11 @@ from typing import Iterator
 
 from vibeprolog.builtins import BuiltinRegistry, register_builtin
 from vibeprolog.builtins.common import BuiltinArgs, EngineContext, iter_empty
-from vibeprolog.parser import Compound
+from vibeprolog.exceptions import PrologError, PrologThrow
+from vibeprolog.parser import Compound, List
 from vibeprolog.terms import Atom
 from vibeprolog.unification import Substitution, deref, unify
+from vibeprolog.utils.list_utils import list_to_python
 
 
 class ControlBuiltins:
@@ -37,6 +39,9 @@ class ControlBuiltins:
         register_builtin(
             registry, "call_cleanup", 2, ControlBuiltins._builtin_call_cleanup
         )
+        register_builtin(registry, "forall", 2, ControlBuiltins._builtin_forall)
+        register_builtin(registry, "ignore", 1, ControlBuiltins._builtin_ignore)
+        register_builtin(registry, "apply", 2, ControlBuiltins._builtin_apply)
 
     @staticmethod
     def _builtin_unify(
@@ -182,6 +187,82 @@ class ControlBuiltins:
             cleanup_goal_d = deref(cleanup_goal, last_subst)
             for _ in engine._solve_goals([cleanup_goal_d], last_subst):
                 break  # Just call cleanup once, ignore its result
+
+    @staticmethod
+    def _builtin_forall(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext
+    ) -> Iterator[Substitution]:
+        """forall/2 - Universal quantification."""
+        condition_term, action_term = args
+
+        engine._check_instantiated(condition_term, subst, "forall/2")
+        engine._check_type(condition_term, (Compound, Atom), "callable", subst, "forall/2")
+
+        any_solution = False
+        for condition_subst in engine._solve_goals([deref(condition_term, subst)], subst):
+            any_solution = True
+            action_goal = deref(action_term, condition_subst)
+            engine._check_instantiated(action_goal, condition_subst, "forall/2")
+            engine._check_type(action_goal, (Compound, Atom), "callable", condition_subst, "forall/2")
+
+            action_succeeded = False
+            for _ in engine._solve_goals([action_goal], condition_subst):
+                action_succeeded = True
+                break
+
+            if not action_succeeded:
+                return iter_empty()
+
+        if not any_solution:
+            return iter([subst])
+
+        return iter([subst])
+
+    @staticmethod
+    def _builtin_ignore(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext
+    ) -> Iterator[Substitution]:
+        """ignore/1 - Execute goal and always succeed."""
+        goal_term = deref(args[0], subst)
+        engine._check_instantiated(goal_term, subst, "ignore/1")
+        engine._check_type(goal_term, (Compound, Atom), "callable", subst, "ignore/1")
+        engine._check_predicate_exists(goal_term, "ignore/1")
+
+        for solution in engine._solve_goals([goal_term], subst):
+            yield solution
+            return
+
+        yield subst
+
+    @staticmethod
+    def _builtin_apply(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext
+    ) -> Iterator[Substitution]:
+        """apply/2 - Call a predicate with arguments supplied as a list."""
+        goal_term_raw, args_term_raw = args
+
+        engine._check_instantiated(goal_term_raw, subst, "apply/2")
+        engine._check_instantiated(args_term_raw, subst, "apply/2")
+
+        goal_term = deref(goal_term_raw, subst)
+        args_term = deref(args_term_raw, subst)
+
+        engine._check_type(goal_term, (Compound, Atom), "callable", subst, "apply/2")
+        engine._check_type(args_term, List, "list", subst, "apply/2")
+
+        try:
+            arg_values = list_to_python(args_term, subst)
+        except TypeError:
+            error_term = PrologError.type_error("list", args_term, "apply/2")
+            raise PrologThrow(error_term)
+
+        if isinstance(goal_term, Atom):
+            callable_goal = Compound(goal_term.name, tuple(arg_values))
+        else:
+            callable_goal = Compound(goal_term.functor, goal_term.args + tuple(arg_values))
+
+        engine._check_predicate_exists(callable_goal, "apply/2")
+        yield from engine._solve_goals([callable_goal], subst)
 
 
 __all__ = ["ControlBuiltins"]

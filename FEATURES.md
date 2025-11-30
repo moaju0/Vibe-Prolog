@@ -121,9 +121,9 @@ Status legend:
 | `arg/3`             | ✅      |                         |
 | `=../2` (univ)      | ✅      |                         |
 | `copy_term/2`       | ✅      |                         |
-| `term_variables/2`  | ❌      | **ISO-required**        |
-| `numbervars/3`      | ❌      | Common extension        |
-| `subsumes_term/2`   | ❌      | ISO extension (Part 2)  |
+| `term_variables/2`  | ✅      | **ISO-required**        |
+| `numbervars/3`      | ✅      | Common extension        |
+| `subsumes_term/2`   | ✅      | ISO extension (Part 2)  |
 
 ---
 
@@ -201,9 +201,9 @@ Status legend:
 
 | Predicate   | Status | Notes                               |
 | ----------- | ------ | ----------------------------------- |
-| `forall/2`  | ❌      | Common extension - Universal quantification |
-| `ignore/1`  | ❌      | Common extension - Always succeed   |
-| `apply/2`   | ❌      | Common extension - Call with args   |
+| `forall/2`  | ✅      | Common extension - Universal quantification |
+| `ignore/1`  | ✅      | Common extension - Always succeed   |
+| `apply/2`   | ✅      | Common extension - Call with args   |
 
 ---
 
@@ -322,12 +322,12 @@ Status legend:
 | Control constructs        | ✅ Strong                                                   |
 | Unification & comparison  | ✅ Strong                                                   |
 | Type testing              | ✅ Strong (missing `is_list/1` extension)                   |
-| Term manipulation         | ⚠️ Missing `term_variables/2`, `numbervars/3`              |
+| Term manipulation         | ✅ Strong                                                   |
 | Atom processing (§8.16)   | ✅ Strong                                                   |
 | Arithmetic                | ✅ Strong                                                   |
 | List operations           | ⚠️ Basic ops ✅, missing `msort/2`, `keysort/2`, nth, etc. |
 | All-solutions             | ✅ Strong                                                   |
-| Meta-predicates           | ⚠️ Missing `forall/2`, higher-order list ops               |
+| Meta-predicates           | ⚠️ Core meta-preds implemented; higher-order list ops missing |
 | Database operations       | ✅ Strong                                                   |
 | Character I/O (§8.11)     | ⚠️ Basic ✅, missing code/peek predicates                  |
 | Term I/O (§8.12)          | ⚠️ Basic read/write ✅, missing options & variants         |
