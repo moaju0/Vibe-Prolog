@@ -2007,31 +2007,9 @@ class IOBuiltins:
         args: BuiltinArgs, subst: Substitution, engine: EngineContext | None
     ) -> Substitution | None:
         """print/2 - Pretty-print to specified stream."""
-        if engine is None:
-            return None
-
-        stream_term, term = args
-
-        engine._check_instantiated(stream_term, subst, "print/2")
-        engine._check_type(stream_term, Atom, "stream_or_alias", subst, "print/2")
-
-        stream_term = deref(stream_term, subst)
-
-        stream = engine.get_stream(stream_term)
-        if stream is None:
-            error_term = PrologError.existence_error("stream", stream_term, "print/2")
-            raise PrologThrow(error_term)
-
-        if stream.mode not in ("write", "append"):
-            error_term = PrologError.permission_error("output", "stream", stream_term, "print/2")
-            raise PrologThrow(error_term)
-
-        # For now, delegate to write/2 (hook support can be added later)
-        term = deref(term, subst)
-        output = term_to_string(term)
-        stream.file_obj.write(output)
-        stream.file_obj.flush()
-        return subst
+        # For now, print/2 is an alias for write/2.
+        # This can be changed later to support portray/1 hooks.
+        return IOBuiltins._builtin_write_to_stream(args, subst, engine)
 
     @staticmethod
     def _write_char_to_stream(stream: Stream, char: str, context: str) -> Substitution | None:
