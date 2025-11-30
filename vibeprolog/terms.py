@@ -22,6 +22,7 @@ class Atom(Term):
     """An atom (constant)."""
 
     name: str
+    quoted: bool = False
 
     def __repr__(self):
         return self.name

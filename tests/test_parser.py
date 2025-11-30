@@ -2,7 +2,7 @@
 
 import pytest
 from vibeprolog.parser import (
-    PrologParser, Clause, Compound, Atom, Variable, Number, List, Cut
+    PrologParser, Clause, Compound, Atom, Variable, Number, List, Cut, tokenize_prolog_statements
 )
 from vibeprolog.exceptions import PrologThrow
 from vibeprolog import PrologInterpreter
@@ -868,3 +868,54 @@ class TestComplexExamples:
         # Body should contain if-then-else structure
         assert len(clause.body) == 1
         assert isinstance(clause.body[0], Compound)
+
+
+class TestTokenizePrologStatements:
+    """Tests for tokenize_prolog_statements function."""
+
+    def test_tokenize_simple_clauses(self):
+        """Test tokenizing simple clauses."""
+        code = "fact.fact2."
+        chunks = tokenize_prolog_statements(code)
+        assert chunks == ["fact.", "fact2."]
+
+    def test_tokenize_with_decimals(self):
+        """Test tokenizing clauses containing decimal numbers."""
+        code = "p(1.0). q(2.3). r(.5)."
+        chunks = tokenize_prolog_statements(code)
+        assert chunks == ["p(1.0).", " q(2.3).", " r(.5)."]
+
+    def test_tokenize_with_quotes(self):
+        """Test tokenizing with quoted strings."""
+        code = "write('hello. world'). fact."
+        chunks = tokenize_prolog_statements(code)
+        assert chunks == ["write('hello. world').", " fact."]
+
+    def test_tokenize_with_quotes(self):
+        """Test tokenizing with quoted strings."""
+        code = "write('hello. world'). fact."
+        chunks = tokenize_prolog_statements(code)
+        assert chunks == ["write('hello. world').", " fact."]
+
+    def test_tokenize_mixed_decimals_and_clauses(self):
+        """Test tokenizing code with decimals in clauses and multiple clauses."""
+        code = "p(1.). q(2.3). r(a)."
+        chunks = tokenize_prolog_statements(code)
+        assert chunks == ["p(1.).", " q(2.3).", " r(a)."]
+
+    def test_tokenize_decimal_boundary_cases(self):
+        """Test decimal points at clause boundaries."""
+        # Test trailing decimal
+        code = "p(1.)."
+        chunks = tokenize_prolog_statements(code)
+        assert chunks == ["p(1.)."]
+
+        # Test decimal with following clause
+        code = "p(1.). q(2)."
+        chunks = tokenize_prolog_statements(code)
+        assert chunks == ["p(1.).", " q(2)."]
+
+        # Test decimal starting with dot
+        code = "p(.5)."
+        chunks = tokenize_prolog_statements(code)
+        assert chunks == ["p(.5)."]

@@ -445,28 +445,28 @@ class PrologTransformer(Transformer):
         return result
 
     def pow_expr(self, items):
-       if len(items) == 1:
-           return items[0]
-       # Build right-associative tree for exponentiation
-       result = items[-1]
-       for i in range(len(items) - 2, -1, -2):
-           if i > 0:
-               result = Compound(str(items[i]), (items[i - 1], result))
-       if len(items) % 2 == 0:
-           # If even number of items, first item hasn't been added yet
-           result = Compound(str(items[1]), (items[0], result))
-       return result
+        if len(items) == 1:
+            return items[0]
+        # Build right-associative tree for exponentiation
+        result = items[-1]
+        for i in range(len(items) - 2, -1, -2):
+            if i > 0:
+                result = Compound(str(items[i]), (items[i - 1], result))
+        if len(items) % 2 == 0:
+            # If even number of items, first item hasn't been added yet
+            result = Compound(str(items[1]), (items[0], result))
+        return result
 
     def unary_expr(self, items):
-       return items[0]
+        return items[0]
 
     def primary(self, items):
-       return items[0]
-    
+        return items[0]
+
     def special_atom_token(self, items):
-       """Convert SPECIAL_ATOM_OPS token to an Atom."""
-       token_str = str(items[0])
-       return Atom(token_str)
+        """Convert SPECIAL_ATOM_OPS token to an Atom."""
+        token_str = str(items[0])
+        return Atom(token_str)
 
     def compound(self, items):
         functor = items[0]
@@ -503,7 +503,7 @@ class PrologTransformer(Transformer):
             s = s.replace("''", "'")
             # Also handle backslash escapes
             s = self._unescape_string(s)
-        return Atom(s)
+        return Atom(s, quoted=True)
 
     def _unescape_string(self, s):
         """Handle backslash escape sequences."""
@@ -688,6 +688,144 @@ class PrologTransformer(Transformer):
         return Cut()
 
 
+def tokenize_prolog_statements(prolog_code: str) -> list[str]:
+    """Split Prolog code into individual clause/directive strings.
+
+    Handles quoted strings, comments, and decimal points in numbers to avoid
+    splitting valid clauses. Each returned string ends with a period.
+    """
+    chunks = []
+    current: list[str] = []
+    i = 0
+    in_single_quote = False
+    in_double_quote = False
+    in_line_comment = False
+    in_block_comment = 0
+    escape_next = False
+    has_code = False
+
+    while i < len(prolog_code):
+        char = prolog_code[i]
+
+        # Handle line comments
+        if in_line_comment:
+            current.append(char)
+            if char == '\n':
+                in_line_comment = False
+            i += 1
+            continue
+
+        # Handle block comments
+        if in_block_comment > 0:
+            current.append(char)
+            if prolog_code[i:i+2] == '/*':
+                in_block_comment += 1
+                current.append(prolog_code[i+1])
+                i += 2
+                continue
+            if prolog_code[i:i+2] == '*/':
+                in_block_comment -= 1
+                current.append(prolog_code[i+1])
+                i += 2
+                continue
+            i += 1
+            continue
+
+        # Handle escape sequences
+        if escape_next:
+            current.append(char)
+            escape_next = False
+            i += 1
+            continue
+
+        if char == '\\' and (in_single_quote or in_double_quote):
+            current.append(char)
+            escape_next = True
+            i += 1
+            continue
+
+        # Handle entering/exiting quotes
+        if char == "'" and not in_double_quote:
+            has_code = True
+            # Check for doubled quote
+            if in_single_quote and i + 1 < len(prolog_code) and prolog_code[i + 1] == "'":
+                current.append(char)
+                current.append(prolog_code[i + 1])
+                i += 2
+                continue
+            in_single_quote = not in_single_quote
+            current.append(char)
+            i += 1
+            continue
+
+        if char == '"' and not in_single_quote:
+            has_code = True
+            in_double_quote = not in_double_quote
+            current.append(char)
+            i += 1
+            continue
+
+        # Check for comment starts
+        if not in_single_quote and not in_double_quote:
+            if char == '%':
+                in_line_comment = True
+                current.append(char)
+                i += 1
+                continue
+            if prolog_code[i:i+2] == '/*':
+                in_block_comment = 1
+                current.append(char)
+                current.append(prolog_code[i+1])
+                i += 2
+                continue
+
+        # Handle period (end of clause)
+        if char == '.' and not in_single_quote and not in_double_quote:
+            if prolog_code[i:i+2] == '..':
+                current.append('.')
+                current.append('.')
+                has_code = True
+                i += 2
+                continue
+            current.append(char)
+            # Heuristic to check if this period is part of a number (e.g., 1.2 or 1.)
+            # to avoid splitting clauses incorrectly.
+            is_decimal_point = (i > 0 and prolog_code[i-1].isdigit()) or \
+                               (i + 1 < len(prolog_code) and prolog_code[i+1].isdigit())
+            if is_decimal_point:
+                i += 1
+                continue
+            # End of clause
+            if has_code:
+                chunks.append(''.join(current))
+            current = []
+            has_code = False
+            i += 1
+            continue
+
+        if not char.isspace():
+            has_code = True
+
+        current.append(char)
+        i += 1
+
+    # Check for unclosed comments or strings at end of code
+    if in_block_comment > 0:
+        raise ValueError("Unterminated block comment")
+    if in_single_quote:
+        raise ValueError("Unterminated quoted atom")
+    if in_double_quote:
+        raise ValueError("Unterminated string")
+    
+    # Add any remaining content (should not happen in well-formed code)
+    if current:
+        remainder = ''.join(current).strip()
+        if remainder and has_code:
+            chunks.append(remainder)
+    
+    return chunks
+
+
 def extract_op_directives(source: str) -> list[tuple[int, str, str]]:
     """Extract op/3 directives from source code.
     
@@ -805,8 +943,90 @@ class PrologParser:
 
     def __init__(self, operator_table=None):
         self.operator_table = operator_table
+        # Character conversion table: maps single chars to single chars
+        # Initially identity (no conversions active)
+        self._char_conversions: dict[str, str] = {}
         self._grammar_cache = {}  # Cache compiled grammars by operator set
         self.parser = self._create_parser(None)
+
+    def set_char_conversion(self, from_char: str, to_char: str) -> None:
+        """Set a character conversion.
+        
+        If from_char == to_char, removes the conversion (identity mapping).
+        Otherwise, adds/updates the conversion.
+        """
+        if from_char == to_char:
+            # Identity conversion: remove from table
+            self._char_conversions.pop(from_char, None)
+        else:
+            self._char_conversions[from_char] = to_char
+
+    def get_char_conversions(self) -> dict[str, str]:
+        """Return copy of current character conversion table."""
+        return dict(self._char_conversions)
+
+    def convert_atom_name(self, name: str) -> str:
+        """Apply character conversions to an atom/functor name."""
+        if not self._char_conversions:
+            return name
+        return ''.join(self._char_conversions.get(ch, ch) for ch in name)
+
+    def _apply_char_conversions(self, text: str) -> str:
+        """Apply character conversions to text, excluding quoted strings.
+        
+        Per ISO Prolog, character conversions apply to source text but NOT
+        to the contents of quoted atoms or strings.
+        """
+        if not self._char_conversions:
+            return text
+        
+        result = []
+        i = 0
+        in_single_quote = False
+        in_double_quote = False
+        escape_next = False
+        
+        while i < len(text):
+            char = text[i]
+            
+            if escape_next:
+                result.append(char)
+                escape_next = False
+                i += 1
+                continue
+            
+            if char == '\\' and (in_single_quote or in_double_quote):
+                result.append(char)
+                escape_next = True
+                i += 1
+                continue
+            
+            if char == "'" and not in_double_quote:
+                # Check for doubled quote escape inside single-quoted strings
+                if in_single_quote and i + 1 < len(text) and text[i + 1] == "'":
+                    result.append(char)
+                    result.append(text[i + 1])
+                    i += 2
+                    continue
+                in_single_quote = not in_single_quote
+                result.append(char)
+                i += 1
+                continue
+            
+            if char == '"' and not in_single_quote:
+                in_double_quote = not in_double_quote
+                result.append(char)
+                i += 1
+                continue
+            
+            # Apply conversion only outside quoted strings
+            if not in_single_quote and not in_double_quote:
+                char = self._char_conversions.get(char, char)
+            
+            result.append(char)
+            i += 1
+        
+        return ''.join(result)
 
     def _create_parser(self, operators: list[tuple[int, str, str]] | None):
         """Create a Lark parser, optionally with custom operators.
@@ -971,9 +1191,18 @@ class PrologParser:
                     payload.doc = last_comment_text
                 last_comment_text = None
 
-    def parse(self, text: str, context: str = "parse/1") -> list[Clause | Directive]:
+    def parse(
+        self,
+        text: str,
+        context: str = "parse/1",
+        *,
+        apply_char_conversions: bool = True,
+    ) -> list[Clause | Directive]:
         """Parse Prolog source code and return list of clauses."""
         try:
+            # Apply character conversions before parsing
+            if apply_char_conversions:
+                text = self._apply_char_conversions(text)
             text, pldoc_comments = self._collect_pldoc_comments(text)
             tree = self.parser.parse(text)
             transformer = PrologTransformer()
@@ -1006,11 +1235,20 @@ class PrologParser:
             error_term = PrologError.syntax_error(str(e), context)
             raise PrologThrow(error_term)
 
-    def parse_term(self, text: str, context: str = "parse_term/1") -> Any:
+    def parse_term(
+        self,
+        text: str,
+        context: str = "parse_term/1",
+        *,
+        apply_char_conversions: bool = True,
+    ) -> Any:
         """Parse a single Prolog term."""
         try:
             # Add a period to make it a valid clause
-            text, _ = self._collect_pldoc_comments(f"dummy({text}).")
+            clause_text = f"dummy({text})."
+            if apply_char_conversions:
+                clause_text = self._apply_char_conversions(clause_text)
+            text, _ = self._collect_pldoc_comments(clause_text)
             tree = self.parser.parse(text)
             transformer = PrologTransformer()
             result = transformer.transform(tree)

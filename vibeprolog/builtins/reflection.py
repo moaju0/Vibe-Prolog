@@ -62,6 +62,12 @@ class ReflectionBuiltins:
             2,
             ReflectionBuiltins._builtin_predicate_documentation,
         )
+        register_builtin(
+            registry,
+            "current_char_conversion",
+            2,
+            ReflectionBuiltins._builtin_current_char_conversion,
+        )
 
     @staticmethod
     def _builtin_predicate_property(
@@ -258,6 +264,66 @@ class ReflectionBuiltins:
         result = unify(doc_term, Atom(doc), subst)
         if result is not None:
             yield result
+
+
+    @staticmethod
+    def _builtin_current_char_conversion(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext
+    ) -> Iterator[Substitution]:
+        """current_char_conversion(?InChar, ?OutChar) - Enumerate character conversions.
+        
+        Succeeds for each active character conversion where InChar is converted to OutChar.
+        Both InChar and OutChar are single-character atoms.
+        """
+        in_char_term, out_char_term = args
+        in_char_term = deref(in_char_term, subst)
+        out_char_term = deref(out_char_term, subst)
+
+        # Access the interpreter's parser to get conversions
+        interp = getattr(engine, "interpreter", None)
+        if interp is None:
+            return iter(())
+
+        conversions = interp.parser.get_char_conversions()
+        
+        # If both arguments are bound, check if this specific conversion exists
+        if isinstance(in_char_term, Atom) and isinstance(out_char_term, Atom):
+            if len(in_char_term.name) == 1 and len(out_char_term.name) == 1:
+                from_char = in_char_term.name
+                to_char = out_char_term.name
+                if conversions.get(from_char) == to_char:
+                    yield subst
+            return
+
+        # If InChar is bound, check if it has a conversion
+        if isinstance(in_char_term, Atom):
+            if len(in_char_term.name) == 1:
+                from_char = in_char_term.name
+                if from_char in conversions:
+                    to_char = conversions[from_char]
+                    result = unify(out_char_term, Atom(to_char), subst)
+                    if result is not None:
+                        yield result
+            return
+
+        # If OutChar is bound, find all conversions to it
+        if isinstance(out_char_term, Atom):
+            if len(out_char_term.name) == 1:
+                to_char = out_char_term.name
+                for from_char, mapped_to in sorted(conversions.items()):
+                    if mapped_to == to_char:
+                        result = unify(in_char_term, Atom(from_char), subst)
+                        if result is not None:
+                            yield result
+            return
+
+        # Both are variables: enumerate all conversions
+        for from_char, to_char in sorted(conversions.items()):
+            new_subst = unify(in_char_term, Atom(from_char), subst)
+            if new_subst is not None:
+                result = unify(out_char_term, Atom(to_char), new_subst)
+                if result is not None:
+                    yield result
 
 
 __all__ = ["ReflectionBuiltins"]

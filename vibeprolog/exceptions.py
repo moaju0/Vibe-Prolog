@@ -13,6 +13,11 @@ class PrologThrow(Exception):
     def __init__(self, term: Any):
         self.term = term
 
+    @property
+    def error_term(self) -> Any:
+        """Compatibility alias for code that expects .error_term."""
+        return self.term
+
 
 class PrologError:
     """Helper to construct ISO Prolog error terms."""

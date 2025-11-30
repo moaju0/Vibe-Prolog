@@ -88,11 +88,27 @@ class PrologInterpreter:
             eng.interpreter = self
             self._builtins_seeded = True
 
-    def _process_items(self, items: list, source_name: str):
-        """Process parsed clauses and directives."""
+    def _process_items(
+        self,
+        items: list,
+        source_name: str,
+        closed_predicates: set[tuple[str, int]] | None = None,
+        last_predicate: tuple[str, int] | None = None,
+    ) -> tuple[str, int] | None:
+        """Process parsed clauses and directives.
+        
+        Args:
+            items: List of parsed clauses and directives
+            source_name: Name of the source being consulted
+            closed_predicates: Set of predicates that have been "closed"
+            last_predicate: The last predicate key that was added
+            
+        Returns:
+            The last predicate key processed
+        """
         self._ensure_builtin_properties()
-        closed_predicates: set[tuple[str, int]] = set()
-        last_predicate: tuple[str, int] | None = None
+        if closed_predicates is None:
+            closed_predicates = set()
 
         for item in items:
             if isinstance(item, Clause):
@@ -132,6 +148,8 @@ class PrologInterpreter:
                 if item.doc:
                     # For now, ignore directive docs
                     pass
+        
+        return last_predicate
 
     def _handle_directive(
         self, directive: Directive, closed_predicates: set[tuple[str, int]], source_name=None
@@ -240,6 +258,22 @@ class PrologInterpreter:
         if isinstance(goal, Compound) and goal.functor == "op" and len(goal.args) == 3:
             prec_term, spec_term, name_term = goal.args
             self.operator_table.define(prec_term, spec_term, name_term, "op/3")
+            return
+
+        # Handle char_conversion/2 directive
+        if isinstance(goal, Compound) and goal.functor == "char_conversion" and len(goal.args) == 2:
+            from_term, to_term = goal.args
+            # Validate both arguments are single-character atoms
+            if isinstance(from_term, Variable) or isinstance(to_term, Variable):
+                error_term = PrologError.instantiation_error("char_conversion/2")
+                raise PrologThrow(error_term)
+            
+            # Extract characters
+            from_char = self._extract_character(from_term, "char_conversion/2")
+            to_char = self._extract_character(to_term, "char_conversion/2")
+            
+            # Update the parser's conversion table
+            self.parser.set_char_conversion(from_char, to_char)
             return
 
         # Handle supported directives
@@ -399,6 +433,19 @@ class PrologInterpreter:
         name, arity = key
         return Compound("/", (Atom(name), Number(arity)))
 
+    def _extract_character(self, term: Any, context: str) -> str:
+        """Extract a single character from a term for char_conversion.
+        
+        The term must be a single-character atom.
+        Raises type_error(character, term) if invalid.
+        """
+        if isinstance(term, Atom):
+            if len(term.name) == 1:
+                return term.name
+        # Not a single-character atom
+        error_term = PrologError.type_error("character", term, context)
+        raise PrologThrow(error_term)
+
     def _add_clause(
         self,
         clause: Clause,
@@ -438,7 +485,6 @@ class PrologInterpreter:
         if (
             key in closed_predicates
             and "discontiguous" not in properties
-            and source_name in sources
         ):
             indicator = self._indicator_from_key(key)
             error_term = PrologError.permission_error(
@@ -480,17 +526,46 @@ class PrologInterpreter:
         Args:
             prolog_code: String containing Prolog code to process
         """
-        try:
-            items = self.parser.parse(prolog_code, "consult/1")
-        except (ValueError, LarkError) as exc:
-            error_term = PrologError.syntax_error(str(exc), "consult/1")
-            raise PrologThrow(error_term)
         # Reset module context to `user` at start of a consult
         self.current_module = "user"
         # Ensure a default user module exists
         self.modules.setdefault("user", Module("user", None))
 
-        self._process_items(items, source_name)
+        # Parse and process incrementally to support char_conversion taking effect
+        # between clauses/directives. We split by period-terminated statements.
+        all_items = []
+        try:
+            chunks = self._split_clauses(prolog_code)
+        except ValueError as exc:
+            error_term = PrologError.syntax_error(str(exc), "consult/1")
+            raise PrologThrow(error_term)
+        
+        # Keep closed_predicates across chunks to enforce discontiguous requirements
+        closed_predicates: set[tuple[str, int]] = set()
+        last_predicate: tuple[str, int] | None = None
+        
+        for chunk in chunks:
+            chunk = chunk.strip()
+            if not chunk:
+                continue
+            try:
+                # char_conversion directives should not be affected by char conversions
+                # since they need to be parsed as-is to set the conversions
+                import re
+                is_char_conversion = re.match(r"\s*:-\s*char_conversion\b", chunk)
+                items = self.parser.parse(
+                    chunk,
+                    "consult/1",
+                    apply_char_conversions=not is_char_conversion
+                )
+            except (ValueError, LarkError) as exc:
+                error_term = PrologError.syntax_error(str(exc), "consult/1")
+                raise PrologThrow(error_term)
+            # Process each item immediately so char_conversion directives
+            # take effect before subsequent parsing
+            last_predicate = self._process_items(items, source_name, closed_predicates, last_predicate)
+            all_items.extend(items)
+
         self.engine = PrologEngine(
             self.clauses,
             self.argv,
@@ -503,6 +578,15 @@ class PrologInterpreter:
         # Expose interpreter to engine for module-aware resolution
         self.engine.interpreter = self
         self._execute_initialization_goals()
+
+    def _split_clauses(self, prolog_code: str) -> list[str]:
+        """Split Prolog code into individual clause/directive strings.
+
+        Handles quoted strings and comments to avoid splitting inside them.
+        Each returned string ends with a period.
+        """
+        from vibeprolog.parser import tokenize_prolog_statements
+        return tokenize_prolog_statements(prolog_code)
 
     def consult(self, filepath: str | Path):
         """Load Prolog clauses from a file."""
@@ -640,7 +724,8 @@ class PrologInterpreter:
         # We'll use a dummy rule structure
         prolog_code = f"dummy :- {query_str}"
         try:
-            clauses = self.parser.parse(prolog_code, "query/1")
+            # Don't apply char conversions to interactive queries
+            clauses = self.parser.parse(prolog_code, "query/1", apply_char_conversions=False)
         except (ValueError, LarkError) as exc:
             self._raise_syntax_error(exc, "query/1")
 
@@ -651,7 +736,8 @@ class PrologInterpreter:
         # Single goal case
         prolog_code = query_str
         try:
-            clauses = self.parser.parse(prolog_code, "query/1")
+            # Don't apply char conversions to interactive queries
+            clauses = self.parser.parse(prolog_code, "query/1", apply_char_conversions=False)
         except (ValueError, LarkError) as exc:
             self._raise_syntax_error(exc, "query/1")
         if clauses:
