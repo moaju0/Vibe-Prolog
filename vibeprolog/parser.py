@@ -532,7 +532,14 @@ class PrologTransformer(Transformer):
         return s
 
     def atom(self, items):
-        return Atom(str(items[0]))
+        atom_str = str(items[0])
+        # Reject a bare dot as it's a special terminator token
+        if atom_str == ".":
+            raise PrologThrow(PrologError.syntax_error(
+                "Unexpected '.' - dot is a clause terminator and cannot be used as an atom",
+                "atom/1"
+            ))
+        return Atom(atom_str)
 
     def operator_atom(self, items):
         return Atom(str(items[0]))
