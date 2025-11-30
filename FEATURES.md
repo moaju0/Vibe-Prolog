@@ -148,12 +148,14 @@ Status legend:
 | --------------------------------- | ------ | ------------------------------------- |
 | `is/2`                            | ✅      |                                       |
 | Arithmetic comparison operators   | ✅      |                                       |
-| `+ - * / // mod`                  | ✅      |                                       |
+| Arithmetic evaluation: `+/2`, `-/2`, `*/2`, `//2`, `///2`, `mod/2` | ✅ | **ISO-required** - Used within `is/2` |
+| Unary operators: `-/1`, `+/1`     | ✅      | **ISO-required** - Negation and plus  |
 | `abs/1`                           | ✅      |                                       |
 | `min/2`, `max/2`                  | ✅      |                                       |
 | `sqrt/1`                          | ✅      |                                       |
 | Trig / exp / log                  | ✅      |                                       |
 | `floor/1`, `ceiling/1`, `round/1` | ✅      |                                       |
+| `rem/2`                           | ✅      | **ISO-required** - Integer remainder  |
 | `between/3`                       | ✅      | **ISO-required** - Integer generation |
 | `succ/2`                          | ✅      | **ISO-required** - Successor relation |
 | `plus/3`                          | ✅      | **ISO-required** - Addition relation  |
@@ -179,6 +181,12 @@ Status legend:
 | `sumlist/2`             | ✅      | Common extension                              |
 | `max_list/2`            | ✅      | Common extension                              |
 | `min_list/2`            | ✅      | Common extension                              |
+| `is_set/1`              | ❌      | Common extension - Test if list has no duplicates |
+| `list_to_set/2`         | ❌      | Common extension - Remove duplicates          |
+| `list_to_ord_set/2`     | ❌      | Common extension - Convert to ordered set     |
+| `ord_subtract/3`        | ❌      | Common extension - Ordered set difference     |
+| `numlist/3`             | ❌      | Common extension - Generate list of integers  |
+| `permutation/2`         | ❌      | Common extension - Generate permutations      |
 | `maplist/3-5`           | ❌      | Higher-order (only `/2` implemented)          |
 | `include/3`             | ❌      | Higher-order - Filter list                    |
 | `exclude/3`             | ❌      | Higher-order - Filter list (negated)          |
@@ -216,6 +224,7 @@ Status legend:
 | `assertz/1`                            | ✅      |                                                                     |
 | `assert/1`                             | ✅      |                                                                     |
 | `retract/1`                            | ✅      |                                                                     |
+| `retractall/1`                         | ❌      | **ISO-required** - Retract all matching clauses                     |
 | `abolish/1`                            | ✅      |                                                                     |
 | `clause/2`                             | ✅      |                                                                     |
 | Permission errors on static predicates | ⚠️     | Enforced, but requires further validation across modules            |
@@ -300,6 +309,22 @@ Status legend:
 
 ---
 
+## SWI-Prolog Specific Extensions (Non-ISO)
+
+These predicates are specific to SWI-Prolog and not part of the ISO standard.
+
+| Category | Predicates | Status | Notes |
+| -------- | ---------- | ------ | ----- |
+| **Networking** | `tcp_socket/1`, `tcp_connect/4` | 🚫 Won't Implement | SWI-specific socket operations - out of scope |
+| **DDE (Windows)** | `open_dde_conversation/3`, `close_dde_conversation/1`, `dde_request/3`, `dde_execute/2`, `dde_poke/3`, `dde_register_service/2` | 🚫 Won't Implement | Windows Dynamic Data Exchange - obsolete technology |
+| **CLP(FD)** | `#=/2`, `#</2`, `#>/2`, `#=</2`, `#>=/2`, `ins/2`, `in/2` | ❌ | Constraint Logic Programming over Finite Domains |
+| **Tabling** | `:- table/1` directive | 🔽 Low Priority | Tabled execution (memoization) - advanced optimization |
+| **CHR** | `:- chr_constraint/1` | ❌ | Constraint Handling Rules |
+| **RDF** | `:- rdf_meta/1` | 🔽 Low Priority | RDF (Resource Description Framework) support - specialized use case |
+| **Random** | `random/1` | ❌ | Random number generation (non-ISO) |
+
+---
+
 ## §10 — Modules (ISO Part 1)
 
 | Feature                           | Status | Notes                                                          |
@@ -325,11 +350,11 @@ Status legend:
 | Term manipulation         | ✅ Strong                                                   |
 | Atom processing (§8.16)   | ✅ Strong                                                   |
 | Arithmetic                | ✅ Strong                                                   |
-| List operations           | ⚠️ Basic ops ✅, missing `msort/2`, `keysort/2`, nth, etc. |
+| List operations           | ⚠️ Core ops ✅, missing higher-order predicates (maplist, foldl, etc.) |
 | All-solutions             | ✅ Strong                                                   |
 | Meta-predicates           | ⚠️ Core meta-preds implemented; higher-order list ops missing |
-| Database operations       | ✅ Strong                                                   |
-| Character I/O (§8.11)     | ⚠️ Basic ✅, missing code/peek predicates                  |
+| Database operations       | ⚠️ Strong, missing `retractall/1`                           |
+| Character I/O (§8.11)     | ✅ Strong - All ISO-required predicates implemented         |
 | Term I/O (§8.12)          | ✅ Strong - All ISO-required predicates implemented        |
 | Stream control (§8.13)    | ✅ Strong - All ISO-required predicates implemented        |
 | Errors & exceptions       | ✅ Strong                                                   |
@@ -343,7 +368,14 @@ Status legend:
 
 1. `op/3` must affect parsing (§6.3)
 2. `char_conversion/2` missing (§6.4, §7.4)
-3. **List sorting missing** - `msort/2`, `keysort/2` unimplemented (ISO-required)
-4. **Character I/O incomplete (§8.11)** - Missing `get_code`, `put_code`, `peek_*` predicates
-5. **Term I/O incomplete (§8.12)** - Missing `read_term`, `write_term`, `writeq`, `write_canonical`
-6. **Stream operations incomplete (§8.13)** - Missing `flush_output`, `at_end_of_stream`, `stream_property`
+3. **Database operations incomplete** - `retractall/1` missing (ISO-required)
+4. **Higher-order list predicates missing** - `maplist/3-5`, `include/3`, `exclude/3`, `partition/4`, `foldl/4-6`
+5. **Type testing incomplete** - `is_list/1` missing (de facto standard)
+
+## Common Extensions Worth Implementing
+
+Based on analysis of real-world Prolog programs, these commonly-used predicates would improve compatibility:
+
+1. **List utilities** - `is_set/1`, `list_to_set/2`, `list_to_ord_set/2`, `ord_subtract/3`, `numlist/3`, `permutation/2`
+2. **Higher-order** - `maplist/3-5` (currently only `/2` implemented), `include/3`, `exclude/3`
+3. **Type testing** - `is_list/1` (appears in many programs)
