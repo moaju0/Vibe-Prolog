@@ -43,10 +43,25 @@ class _TermReader:
         self.started = False
         # Bind to the stream's pushback buffer (assumes it now exists via default_factory)
         self.pushback_buffer = self.stream.pushback_buffer
+        # Check if this is an interactive TTY stream
+        self.is_tty = hasattr(self.stream.file_obj, 'isatty') and self.stream.file_obj.isatty()
+        self.line_buffer: list[str] = []
 
     def _next_char(self) -> str:
         if self.pushback_buffer:
             return self.pushback_buffer.pop()
+
+        # For TTY streams, read line-by-line to avoid blocking
+        if self.is_tty:
+            if not self.line_buffer:
+                line = self.stream.file_obj.readline()
+                if not line:
+                    return ""
+                self.line_buffer = list(line)
+            if self.line_buffer:
+                return self.line_buffer.pop(0)
+            return ""
+
         return self.stream.file_obj.read(1)
 
     def _push_back(self, ch: str) -> None:
@@ -136,6 +151,17 @@ class _TermReader:
                 and self.bracket_depth == 0
                 and self.brace_depth == 0
             ):
+                if self.is_tty:
+                    while self.line_buffer and self.line_buffer[0].isspace():
+                        self.line_buffer.pop(0)
+                    if not self.line_buffer and not self.pushback_buffer:
+                        return "".join(self.buffer)
+
+                # For TTY streams, check if we've consumed the input line
+                # If so, treat this as end of term without blocking for more input
+                if self.is_tty and not self.line_buffer and not self.pushback_buffer:
+                    return "".join(self.buffer)
+
                 # After a possible full term, skip trailing layout and determine next token
                 next_non_layout, saw_layout = IOBuiltins._consume_layout(
                     self._next_char, self._push_back, self.context

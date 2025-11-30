@@ -13,6 +13,23 @@ def prolog() -> PrologInterpreter:
     return PrologInterpreter()
 
 
+class SingleLineTTY(io.StringIO):
+    """TTY-like stream that should only be read once."""
+
+    def __init__(self, content: str):
+        super().__init__(content)
+        self.readline_calls = 0
+
+    def readline(self, *args, **kwargs):
+        self.readline_calls += 1
+        if self.readline_calls > 1:
+            raise AssertionError("readline called more than once")
+        return super().readline(*args, **kwargs)
+
+    def isatty(self) -> bool:
+        return True
+
+
 def test_read_terms_from_stream(prolog: PrologInterpreter):
     fixture_path = Path(__file__).parent / "read_terms.pl"
     open_result = prolog.query_once(f"open('{fixture_path}', read, StreamHandle)")
@@ -62,6 +79,20 @@ def test_read_uses_current_input_stream(prolog: PrologInterpreter):
     assert eof_result["Term"] == "end_of_file"
 
 
+def test_read_from_tty_line_does_not_block(prolog: PrologInterpreter):
+    # Initialize engine to populate the stream registry
+    prolog.query_once("true.")
+
+    tty_input = SingleLineTTY("yes.\n")
+    prolog.engine._streams["user_input"] = Stream(
+        handle=Atom("user_input"), file_obj=tty_input, mode="read"
+    )
+
+    result = prolog.query_once("read(Term)")
+    assert result is not None
+    assert result["Term"] == "yes"
+
+
 def test_read_reports_syntax_error_on_incomplete_term(
     prolog: PrologInterpreter, tmp_path
 ):
@@ -87,4 +118,3 @@ def test_read_raises_on_missing_stream(prolog: PrologInterpreter):
     assert result is not None
     error_term = result["Error"]
     assert error_term["error"][0]["existence_error"][0] == "stream"
-
