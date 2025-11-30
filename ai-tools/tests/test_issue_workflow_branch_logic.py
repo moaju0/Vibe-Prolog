@@ -5,8 +5,10 @@ These tests verify the branch selection behavior under different scenarios
 without actually creating or checking out branches.
 """
 
+from unittest.mock import patch
+
 import pytest
-from autocoder_utils.issue_workflow import IssueWorkflowConfig, determine_target_branch
+from autocoder_utils.issue_workflow import IssueWorkflowConfig, determine_target_branch, get_issue_linked_branches
 
 
 class TestDetermineTargetBranch:
@@ -395,3 +397,104 @@ class TestRealWorldScenarios:
         )
         assert should_create is False  # Should checkout Alice's branch
         assert branch == "fix/42-started-by-alice"
+
+
+class TestGetIssueLinkedBranches:
+    """Test suite for get_issue_linked_branches parsing logic."""
+
+    @patch("autocoder_utils.issue_workflow.run")
+    def test_parse_single_branch(self, mock_run):
+        """Should correctly parse output with a single linked branch."""
+        mock_run.return_value = """Showing linked branches for nlothian/Vibe-Prolog#190
+
+BRANCH                               URL
+190-implement-retractall1-predicate  https://github.com/nlothian/Vibe-Prolog/tree/190-implement-retractall1-predicate
+"""
+        result = get_issue_linked_branches("190")
+        assert result == ["190-implement-retractall1-predicate"]
+        mock_run.assert_called_once_with(["gh", "issue", "develop", "--list", "190"])
+
+    @patch("autocoder_utils.issue_workflow.run")
+    def test_parse_multiple_branches(self, mock_run):
+        """Should correctly parse output with multiple linked branches."""
+        mock_run.return_value = """Showing linked branches for owner/repo#42
+
+BRANCH                   URL
+fix/42-first-attempt     https://github.com/owner/repo/tree/fix/42-first-attempt
+fix/42-second-try        https://github.com/owner/repo/tree/fix/42-second-try
+feature/42-new-approach  https://github.com/owner/repo/tree/feature/42-new-approach
+"""
+        result = get_issue_linked_branches("42")
+        assert result == [
+            "fix/42-first-attempt",
+            "fix/42-second-try",
+            "feature/42-new-approach",
+        ]
+
+    @patch("autocoder_utils.issue_workflow.run")
+    def test_parse_empty_output(self, mock_run):
+        """Should return empty list when output is empty."""
+        mock_run.return_value = ""
+        result = get_issue_linked_branches("999")
+        assert result == []
+
+    @patch("autocoder_utils.issue_workflow.run")
+    def test_parse_only_headers_no_branches(self, mock_run):
+        """Should return empty list when only headers present (no branches)."""
+        mock_run.return_value = """Showing linked branches for owner/repo#123
+
+BRANCH                               URL
+"""
+        result = get_issue_linked_branches("123")
+        assert result == []
+
+    @patch("autocoder_utils.issue_workflow.run")
+    def test_parse_with_extra_whitespace(self, mock_run):
+        """Should handle varying amounts of whitespace correctly."""
+        mock_run.return_value = """Showing linked branches for owner/repo#42
+
+BRANCH                               URL
+my-branch                            https://github.com/owner/repo/tree/my-branch
+another-branch-with-long-name        https://github.com/owner/repo/tree/another-branch-with-long-name
+"""
+        result = get_issue_linked_branches("42")
+        assert result == [
+            "my-branch",
+            "another-branch-with-long-name",
+        ]
+
+    @patch("autocoder_utils.issue_workflow.run")
+    def test_parse_with_blank_lines(self, mock_run):
+        """Should skip blank lines in output."""
+        mock_run.return_value = """Showing linked branches for owner/repo#42
+
+
+BRANCH                               URL
+
+fix/42-branch                        https://github.com/owner/repo/tree/fix/42-branch
+
+"""
+        result = get_issue_linked_branches("42")
+        assert result == ["fix/42-branch"]
+
+    @patch("autocoder_utils.issue_workflow.run")
+    def test_handle_command_failure(self, mock_run):
+        """Should return empty list when gh command fails."""
+        mock_run.side_effect = Exception("gh command failed")
+        result = get_issue_linked_branches("123")
+        assert result == []
+
+    @patch("autocoder_utils.issue_workflow.run")
+    def test_extract_only_branch_name_not_url(self, mock_run):
+        """Should extract only branch name, not the URL (regression test)."""
+        mock_run.return_value = """Showing linked branches for owner/repo#190
+
+BRANCH                               URL
+190-implement-retractall1-predicate  https://github.com/owner/repo/tree/190-implement-retractall1-predicate
+"""
+        result = get_issue_linked_branches("190")
+        # Should NOT contain the URL or tab character
+        assert len(result) == 1
+        assert result[0] == "190-implement-retractall1-predicate"
+        assert "https://" not in result[0]
+        assert "\t" not in result[0]

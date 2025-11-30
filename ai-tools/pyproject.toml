@@ -7,9 +7,11 @@ requires-python = ">=3.12"
 dependencies = []
 
 [project.scripts]
+address-pr-comments-with-amp = "autocoder_utils.cli:address_pr_comments_with_amp"
 address-pr-comments-with-claude = "autocoder_utils.cli:address_pr_comments_with_claude"
 address-pr-comments-with-codex = "autocoder_utils.cli:address_pr_comments_with_codex"
 address-pr-comments-with-kilocode = "autocoder_utils.cli:address_pr_comments_with_kilocode"
+fix-issue-with-amp = "autocoder_utils.cli:fix_issue_with_amp"
 fix-issue-with-claude = "autocoder_utils.cli:fix_issue_with_claude"
 fix-issue-with-codex = "autocoder_utils.cli:fix_issue_with_codex"
 fix-issue-with-kilocode = "autocoder_utils.cli:fix_issue_with_kilocode"

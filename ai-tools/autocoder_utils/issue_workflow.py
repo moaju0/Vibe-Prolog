@@ -32,8 +32,18 @@ def get_issue_linked_branches(issue_number: str) -> list[str]:
         if not output:
             return []
 
-        # Parse output - typically one branch per line
-        branches = [line.strip() for line in output.splitlines() if line.strip()]
+        # Parse output - skip header lines and extract branch names (first column)
+        # Expected format:
+        #   Showing linked branches for owner/repo#123
+        #
+        #   BRANCH                               URL
+        #   190-implement-retractall1-predicate  https://github.com/...
+        branches = []
+        for line in output.splitlines():
+            line = line.strip()
+            if not line or line.startswith(("Showing", "BRANCH")):
+                continue
+            branches.append(line.split()[0])
         return branches
     except Exception:
         # If gh command fails or issue has no linked branches, return empty list
