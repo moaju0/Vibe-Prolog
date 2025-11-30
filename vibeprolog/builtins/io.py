@@ -186,6 +186,21 @@ class IOBuiltins:
         register_builtin(registry, "get_char", 2, IOBuiltins._builtin_get_char_from_stream)
         register_builtin(registry, "put_char", 1, IOBuiltins._builtin_put_char)
         register_builtin(registry, "put_char", 2, IOBuiltins._builtin_put_char_to_stream)
+        register_builtin(registry, "get_code", 1, IOBuiltins._builtin_get_code)
+        register_builtin(registry, "get_code", 2, IOBuiltins._builtin_get_code_from_stream)
+        register_builtin(registry, "put_code", 1, IOBuiltins._builtin_put_code)
+        register_builtin(registry, "put_code", 2, IOBuiltins._builtin_put_code_to_stream)
+        register_builtin(registry, "peek_char", 1, IOBuiltins._builtin_peek_char)
+        register_builtin(registry, "peek_char", 2, IOBuiltins._builtin_peek_char_from_stream)
+        register_builtin(registry, "peek_code", 1, IOBuiltins._builtin_peek_code)
+        register_builtin(registry, "peek_code", 2, IOBuiltins._builtin_peek_code_from_stream)
+        register_builtin(registry, "peek_byte", 1, IOBuiltins._builtin_peek_byte)
+        register_builtin(registry, "peek_byte", 2, IOBuiltins._builtin_peek_byte_from_stream)
+        register_builtin(registry, "get_byte", 1, IOBuiltins._builtin_get_byte)
+        register_builtin(registry, "get_byte", 2, IOBuiltins._builtin_get_byte_from_stream)
+        register_builtin(registry, "put_byte", 1, IOBuiltins._builtin_put_byte)
+        register_builtin(registry, "put_byte", 2, IOBuiltins._builtin_put_byte_to_stream)
+        register_builtin(registry, "nl", 1, IOBuiltins._builtin_newline_to_stream)
 
     @staticmethod
     def _builtin_write(
@@ -1103,6 +1118,646 @@ class IOBuiltins:
             # Handle I/O errors
             error_term = PrologError.permission_error("output", "stream", stream.handle, context)
             raise PrologThrow(error_term)
+
+    @staticmethod
+    def _builtin_get_code(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext | None
+    ) -> Substitution | None:
+        """get_code/1 - Read a character code from current input stream.
+
+        get_code(Code)
+        Reads a single character from the current input stream and unifies its character code with Code.
+        Returns -1 on EOF.
+        """
+        if engine is None:
+            return None
+
+        code_var = args[0]
+        stream = engine.get_stream(USER_INPUT_STREAM)
+        if stream is None:
+            error_term = PrologError.existence_error("stream", USER_INPUT_STREAM, "get_code/1")
+            raise PrologThrow(error_term)
+
+        if stream.mode not in ("read", "append"):
+            error_term = PrologError.permission_error("input", "stream", stream.handle, "get_code/1")
+            raise PrologThrow(error_term)
+
+        return IOBuiltins._read_code_from_stream(stream, code_var, subst, "get_code/1")
+
+    @staticmethod
+    def _builtin_get_code_from_stream(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext | None
+    ) -> Substitution | None:
+        """get_code/2 - Read a character code from specified stream.
+
+        get_code(Stream, Code)
+        Reads a single character from Stream and unifies its character code with Code.
+        Returns -1 on EOF.
+        """
+        if engine is None:
+            return None
+
+        stream_term, code_var = args
+
+        engine._check_instantiated(stream_term, subst, "get_code/2")
+        engine._check_type(stream_term, Atom, "stream_or_alias", subst, "get_code/2")
+
+        stream_term = deref(stream_term, subst)
+
+        stream = engine.get_stream(stream_term)
+        if stream is None:
+            error_term = PrologError.existence_error("stream", stream_term, "get_code/2")
+            raise PrologThrow(error_term)
+
+        if stream.mode not in ("read", "append"):
+            error_term = PrologError.permission_error("input", "stream", stream_term, "get_code/2")
+            raise PrologThrow(error_term)
+
+        return IOBuiltins._read_code_from_stream(stream, code_var, subst, "get_code/2")
+
+    @staticmethod
+    def _read_code_from_stream(
+        stream: Stream, code_var: Any, subst: Substitution, context: str
+    ) -> Substitution | None:
+        """Helper to read a character code from a stream."""
+        try:
+            # Check pushback buffer first
+            if stream.pushback_buffer:
+                ch = stream.pushback_buffer.pop()
+            else:
+                ch = stream.file_obj.read(1)
+
+            if ch == "":
+                # EOF - return -1
+                return unify(code_var, Number(-1), subst)
+            else:
+                # Return character code as number
+                return unify(code_var, Number(ord(ch)), subst)
+        except (OSError, IOError) as e:
+            # Handle I/O errors
+            error_term = PrologError.permission_error("input", "stream", stream.handle, context)
+            raise PrologThrow(error_term)
+
+    @staticmethod
+    def _builtin_put_code(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext | None
+    ) -> Substitution | None:
+        """put_code/1 - Write a character code to current output stream.
+
+        put_code(Code)
+        Writes the character corresponding to Code to the current output stream.
+        Code must be an integer in the valid character code range.
+        """
+        if engine is None:
+            return None
+
+        code_term = args[0]
+
+        engine._check_instantiated(code_term, subst, "put_code/1")
+
+        code_term = deref(code_term, subst)
+
+        # Validate that it's an integer
+        if not isinstance(code_term, Number):
+            error_term = PrologError.type_error("integer", code_term, "put_code/1")
+            raise PrologThrow(error_term)
+
+        if not isinstance(code_term.value, int):
+            error_term = PrologError.type_error("integer", code_term, "put_code/1")
+            raise PrologThrow(error_term)
+
+        code = code_term.value
+
+        # Validate character code range (ISO allows full Unicode range)
+        if code < 0:
+            error_term = PrologError.domain_error("character_code", code_term, "put_code/1")
+            raise PrologThrow(error_term)
+
+        try:
+            char = chr(code)
+        except ValueError:
+            error_term = PrologError.domain_error("character_code", code_term, "put_code/1")
+            raise PrologThrow(error_term)
+
+        stream = engine.get_stream(USER_OUTPUT_STREAM)
+        if stream is None:
+            error_term = PrologError.existence_error("stream", USER_OUTPUT_STREAM, "put_code/1")
+            raise PrologThrow(error_term)
+
+        if stream.mode not in ("write", "append"):
+            error_term = PrologError.permission_error("output", "stream", stream.handle, "put_code/1")
+            raise PrologThrow(error_term)
+
+        return IOBuiltins._write_char_to_stream(stream, char, "put_code/1")
+
+    @staticmethod
+    def _builtin_put_code_to_stream(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext | None
+    ) -> Substitution | None:
+        """put_code/2 - Write a character code to specified stream.
+
+        put_code(Stream, Code)
+        Writes the character corresponding to Code to Stream.
+        Code must be an integer in the valid character code range.
+        """
+        if engine is None:
+            return None
+
+        stream_term, code_term = args
+
+        engine._check_instantiated(stream_term, subst, "put_code/2")
+        engine._check_instantiated(code_term, subst, "put_code/2")
+        engine._check_type(stream_term, Atom, "stream_or_alias", subst, "put_code/2")
+
+        stream_term = deref(stream_term, subst)
+        code_term = deref(code_term, subst)
+
+        # Validate that it's an integer
+        if not isinstance(code_term, Number):
+            error_term = PrologError.type_error("integer", code_term, "put_code/2")
+            raise PrologThrow(error_term)
+
+        if not isinstance(code_term.value, int):
+            error_term = PrologError.type_error("integer", code_term, "put_code/2")
+            raise PrologThrow(error_term)
+
+        code = code_term.value
+
+        # Validate character code range (ISO allows full Unicode range)
+        if code < 0:
+            error_term = PrologError.domain_error("character_code", code_term, "put_code/2")
+            raise PrologThrow(error_term)
+
+        try:
+            char = chr(code)
+        except ValueError:
+            error_term = PrologError.domain_error("character_code", code_term, "put_code/2")
+            raise PrologThrow(error_term)
+
+        stream = engine.get_stream(stream_term)
+        if stream is None:
+            error_term = PrologError.existence_error("stream", stream_term, "put_code/2")
+            raise PrologThrow(error_term)
+
+        if stream.mode not in ("write", "append"):
+            error_term = PrologError.permission_error("output", "stream", stream_term, "put_code/2")
+            raise PrologThrow(error_term)
+
+        return IOBuiltins._write_char_to_stream(stream, char, "put_code/2")
+
+    @staticmethod
+    def _builtin_peek_char(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext | None
+    ) -> Substitution | None:
+        """peek_char/1 - Peek at next character from current input stream without consuming it.
+
+        peek_char(Char)
+        Reads the next character from the current input stream without consuming it,
+        and unifies it with Char. Returns 'end_of_file' on EOF.
+        """
+        if engine is None:
+            return None
+
+        char_var = args[0]
+        stream = engine.get_stream(USER_INPUT_STREAM)
+        if stream is None:
+            error_term = PrologError.existence_error("stream", USER_INPUT_STREAM, "peek_char/1")
+            raise PrologThrow(error_term)
+
+        if stream.mode not in ("read", "append"):
+            error_term = PrologError.permission_error("input", "stream", stream.handle, "peek_char/1")
+            raise PrologThrow(error_term)
+
+        return IOBuiltins._peek_char_from_stream(stream, char_var, subst, "peek_char/1")
+
+    @staticmethod
+    def _builtin_peek_char_from_stream(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext | None
+    ) -> Substitution | None:
+        """peek_char/2 - Peek at next character from specified stream without consuming it.
+
+        peek_char(Stream, Char)
+        Reads the next character from Stream without consuming it and unifies it with Char.
+        Returns 'end_of_file' on EOF.
+        """
+        if engine is None:
+            return None
+
+        stream_term, char_var = args
+
+        engine._check_instantiated(stream_term, subst, "peek_char/2")
+        engine._check_type(stream_term, Atom, "stream_or_alias", subst, "peek_char/2")
+
+        stream_term = deref(stream_term, subst)
+
+        stream = engine.get_stream(stream_term)
+        if stream is None:
+            error_term = PrologError.existence_error("stream", stream_term, "peek_char/2")
+            raise PrologThrow(error_term)
+
+        if stream.mode not in ("read", "append"):
+            error_term = PrologError.permission_error("input", "stream", stream_term, "peek_char/2")
+            raise PrologThrow(error_term)
+
+        return IOBuiltins._peek_char_from_stream(stream, char_var, subst, "peek_char/2")
+
+    @staticmethod
+    def _peek_char_from_stream(
+        stream: Stream, char_var: Any, subst: Substitution, context: str
+    ) -> Substitution | None:
+        """Helper to peek at next character from a stream without consuming it."""
+        try:
+            # Check pushback buffer first
+            if stream.pushback_buffer:
+                ch = stream.pushback_buffer[-1]  # Peek at top of stack
+            else:
+                # Read character and push it back
+                ch = stream.file_obj.read(1)
+                if ch:
+                    stream.pushback_buffer.append(ch)
+
+            if ch == "":
+                # EOF
+                return unify(char_var, Atom("end_of_file"), subst)
+            else:
+                # Return single character as atom
+                return unify(char_var, Atom(ch), subst)
+        except (OSError, IOError) as e:
+            # Handle I/O errors
+            error_term = PrologError.permission_error("input", "stream", stream.handle, context)
+            raise PrologThrow(error_term)
+
+    @staticmethod
+    def _builtin_peek_code(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext | None
+    ) -> Substitution | None:
+        """peek_code/1 - Peek at next character code from current input stream without consuming it.
+
+        peek_code(Code)
+        Reads the next character from the current input stream without consuming it,
+        and unifies its character code with Code. Returns -1 on EOF.
+        """
+        if engine is None:
+            return None
+
+        code_var = args[0]
+        stream = engine.get_stream(USER_INPUT_STREAM)
+        if stream is None:
+            error_term = PrologError.existence_error("stream", USER_INPUT_STREAM, "peek_code/1")
+            raise PrologThrow(error_term)
+
+        if stream.mode not in ("read", "append"):
+            error_term = PrologError.permission_error("input", "stream", stream.handle, "peek_code/1")
+            raise PrologThrow(error_term)
+
+        return IOBuiltins._peek_code_from_stream(stream, code_var, subst, "peek_code/1")
+
+    @staticmethod
+    def _builtin_peek_code_from_stream(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext | None
+    ) -> Substitution | None:
+        """peek_code/2 - Peek at next character code from specified stream without consuming it.
+
+        peek_code(Stream, Code)
+        Reads the next character from Stream without consuming it and unifies its code with Code.
+        Returns -1 on EOF.
+        """
+        if engine is None:
+            return None
+
+        stream_term, code_var = args
+
+        engine._check_instantiated(stream_term, subst, "peek_code/2")
+        engine._check_type(stream_term, Atom, "stream_or_alias", subst, "peek_code/2")
+
+        stream_term = deref(stream_term, subst)
+
+        stream = engine.get_stream(stream_term)
+        if stream is None:
+            error_term = PrologError.existence_error("stream", stream_term, "peek_code/2")
+            raise PrologThrow(error_term)
+
+        if stream.mode not in ("read", "append"):
+            error_term = PrologError.permission_error("input", "stream", stream_term, "peek_code/2")
+            raise PrologThrow(error_term)
+
+        return IOBuiltins._peek_code_from_stream(stream, code_var, subst, "peek_code/2")
+
+    @staticmethod
+    def _peek_code_from_stream(
+        stream: Stream, code_var: Any, subst: Substitution, context: str
+    ) -> Substitution | None:
+        """Helper to peek at next character code from a stream without consuming it."""
+        try:
+            # Check pushback buffer first
+            if stream.pushback_buffer:
+                ch = stream.pushback_buffer[-1]  # Peek at top of stack
+            else:
+                # Read character and push it back
+                ch = stream.file_obj.read(1)
+                if ch:
+                    stream.pushback_buffer.append(ch)
+
+            if ch == "":
+                # EOF - return -1
+                return unify(code_var, Number(-1), subst)
+            else:
+                # Return character code as number
+                return unify(code_var, Number(ord(ch)), subst)
+        except (OSError, IOError) as e:
+            # Handle I/O errors
+            error_term = PrologError.permission_error("input", "stream", stream.handle, context)
+            raise PrologThrow(error_term)
+
+    @staticmethod
+    def _builtin_peek_byte(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext | None
+    ) -> Substitution | None:
+        """peek_byte/1 - Peek at next byte from current input stream without consuming it.
+
+        peek_byte(Byte)
+        Reads the next byte (0-255) from the current input stream without consuming it,
+        and unifies it with Byte. Returns -1 on EOF.
+        """
+        if engine is None:
+            return None
+
+        byte_var = args[0]
+        stream = engine.get_stream(USER_INPUT_STREAM)
+        if stream is None:
+            error_term = PrologError.existence_error("stream", USER_INPUT_STREAM, "peek_byte/1")
+            raise PrologThrow(error_term)
+
+        if stream.mode not in ("read", "append"):
+            error_term = PrologError.permission_error("input", "stream", stream.handle, "peek_byte/1")
+            raise PrologThrow(error_term)
+
+        return IOBuiltins._peek_byte_from_stream(stream, byte_var, subst, "peek_byte/1")
+
+    @staticmethod
+    def _builtin_peek_byte_from_stream(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext | None
+    ) -> Substitution | None:
+        """peek_byte/2 - Peek at next byte from specified stream without consuming it.
+
+        peek_byte(Stream, Byte)
+        Reads the next byte from Stream without consuming it and unifies it with Byte.
+        Returns -1 on EOF.
+        """
+        if engine is None:
+            return None
+
+        stream_term, byte_var = args
+
+        engine._check_instantiated(stream_term, subst, "peek_byte/2")
+        engine._check_type(stream_term, Atom, "stream_or_alias", subst, "peek_byte/2")
+
+        stream_term = deref(stream_term, subst)
+
+        stream = engine.get_stream(stream_term)
+        if stream is None:
+            error_term = PrologError.existence_error("stream", stream_term, "peek_byte/2")
+            raise PrologThrow(error_term)
+
+        if stream.mode not in ("read", "append"):
+            error_term = PrologError.permission_error("input", "stream", stream_term, "peek_byte/2")
+            raise PrologThrow(error_term)
+
+        return IOBuiltins._peek_byte_from_stream(stream, byte_var, subst, "peek_byte/2")
+
+    @staticmethod
+    def _peek_byte_from_stream(
+        stream: Stream, byte_var: Any, subst: Substitution, context: str
+    ) -> Substitution | None:
+        """Helper to peek at next byte from a stream without consuming it."""
+        try:
+            # Check pushback buffer first
+            if stream.pushback_buffer:
+                ch = stream.pushback_buffer[-1]  # Peek at top of stack
+            else:
+                # Read character and push it back
+                ch = stream.file_obj.read(1)
+                if ch:
+                    stream.pushback_buffer.append(ch)
+
+            if ch == "":
+                # EOF - return -1
+                return unify(byte_var, Number(-1), subst)
+            else:
+                # Return byte value (0-255)
+                return unify(byte_var, Number(ord(ch)), subst)
+        except (OSError, IOError) as e:
+            # Handle I/O errors
+            error_term = PrologError.permission_error("input", "stream", stream.handle, context)
+            raise PrologThrow(error_term)
+
+    @staticmethod
+    def _builtin_get_byte(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext | None
+    ) -> Substitution | None:
+        """get_byte/1 - Read a byte from current input stream.
+
+        get_byte(Byte)
+        Reads a single byte (0-255) from the current input stream and unifies it with Byte.
+        Returns -1 on EOF.
+        """
+        if engine is None:
+            return None
+
+        byte_var = args[0]
+        stream = engine.get_stream(USER_INPUT_STREAM)
+        if stream is None:
+            error_term = PrologError.existence_error("stream", USER_INPUT_STREAM, "get_byte/1")
+            raise PrologThrow(error_term)
+
+        if stream.mode not in ("read", "append"):
+            error_term = PrologError.permission_error("input", "stream", stream.handle, "get_byte/1")
+            raise PrologThrow(error_term)
+
+        return IOBuiltins._read_byte_from_stream(stream, byte_var, subst, "get_byte/1")
+
+    @staticmethod
+    def _builtin_get_byte_from_stream(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext | None
+    ) -> Substitution | None:
+        """get_byte/2 - Read a byte from specified stream.
+
+        get_byte(Stream, Byte)
+        Reads a single byte (0-255) from Stream and unifies it with Byte.
+        Returns -1 on EOF.
+        """
+        if engine is None:
+            return None
+
+        stream_term, byte_var = args
+
+        engine._check_instantiated(stream_term, subst, "get_byte/2")
+        engine._check_type(stream_term, Atom, "stream_or_alias", subst, "get_byte/2")
+
+        stream_term = deref(stream_term, subst)
+
+        stream = engine.get_stream(stream_term)
+        if stream is None:
+            error_term = PrologError.existence_error("stream", stream_term, "get_byte/2")
+            raise PrologThrow(error_term)
+
+        if stream.mode not in ("read", "append"):
+            error_term = PrologError.permission_error("input", "stream", stream_term, "get_byte/2")
+            raise PrologThrow(error_term)
+
+        return IOBuiltins._read_byte_from_stream(stream, byte_var, subst, "get_byte/2")
+
+    @staticmethod
+    def _read_byte_from_stream(
+        stream: Stream, byte_var: Any, subst: Substitution, context: str
+    ) -> Substitution | None:
+        """Helper to read a single byte from a stream."""
+        try:
+            # Check pushback buffer first
+            if stream.pushback_buffer:
+                ch = stream.pushback_buffer.pop()
+            else:
+                ch = stream.file_obj.read(1)
+
+            if ch == "":
+                # EOF - return -1
+                return unify(byte_var, Number(-1), subst)
+            else:
+                # Return byte value (0-255)
+                return unify(byte_var, Number(ord(ch)), subst)
+        except (OSError, IOError) as e:
+            # Handle I/O errors
+            error_term = PrologError.permission_error("input", "stream", stream.handle, context)
+            raise PrologThrow(error_term)
+
+    @staticmethod
+    def _builtin_put_byte(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext | None
+    ) -> Substitution | None:
+        """put_byte/1 - Write a byte to current output stream.
+
+        put_byte(Byte)
+        Writes a single byte (0-255) to the current output stream.
+        Byte must be an integer in range 0-255.
+        """
+        if engine is None:
+            return None
+
+        byte_term = args[0]
+
+        engine._check_instantiated(byte_term, subst, "put_byte/1")
+
+        byte_term = deref(byte_term, subst)
+
+        # Validate that it's an integer
+        if not isinstance(byte_term, Number):
+            error_term = PrologError.type_error("byte", byte_term, "put_byte/1")
+            raise PrologThrow(error_term)
+
+        if not isinstance(byte_term.value, int):
+            error_term = PrologError.type_error("byte", byte_term, "put_byte/1")
+            raise PrologThrow(error_term)
+
+        byte_value = byte_term.value
+
+        # Validate byte range (0-255)
+        if byte_value < 0 or byte_value > 255:
+            error_term = PrologError.domain_error("byte", byte_term, "put_byte/1")
+            raise PrologThrow(error_term)
+
+        char = chr(byte_value)
+
+        stream = engine.get_stream(USER_OUTPUT_STREAM)
+        if stream is None:
+            error_term = PrologError.existence_error("stream", USER_OUTPUT_STREAM, "put_byte/1")
+            raise PrologThrow(error_term)
+
+        if stream.mode not in ("write", "append"):
+            error_term = PrologError.permission_error("output", "stream", stream.handle, "put_byte/1")
+            raise PrologThrow(error_term)
+
+        return IOBuiltins._write_char_to_stream(stream, char, "put_byte/1")
+
+    @staticmethod
+    def _builtin_put_byte_to_stream(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext | None
+    ) -> Substitution | None:
+        """put_byte/2 - Write a byte to specified stream.
+
+        put_byte(Stream, Byte)
+        Writes a single byte (0-255) to Stream.
+        Byte must be an integer in range 0-255.
+        """
+        if engine is None:
+            return None
+
+        stream_term, byte_term = args
+
+        engine._check_instantiated(stream_term, subst, "put_byte/2")
+        engine._check_instantiated(byte_term, subst, "put_byte/2")
+        engine._check_type(stream_term, Atom, "stream_or_alias", subst, "put_byte/2")
+
+        stream_term = deref(stream_term, subst)
+        byte_term = deref(byte_term, subst)
+
+        # Validate that it's an integer
+        if not isinstance(byte_term, Number):
+            error_term = PrologError.type_error("byte", byte_term, "put_byte/2")
+            raise PrologThrow(error_term)
+
+        if not isinstance(byte_term.value, int):
+            error_term = PrologError.type_error("byte", byte_term, "put_byte/2")
+            raise PrologThrow(error_term)
+
+        byte_value = byte_term.value
+
+        # Validate byte range (0-255)
+        if byte_value < 0 or byte_value > 255:
+            error_term = PrologError.domain_error("byte", byte_term, "put_byte/2")
+            raise PrologThrow(error_term)
+
+        char = chr(byte_value)
+
+        stream = engine.get_stream(stream_term)
+        if stream is None:
+            error_term = PrologError.existence_error("stream", stream_term, "put_byte/2")
+            raise PrologThrow(error_term)
+
+        if stream.mode not in ("write", "append"):
+            error_term = PrologError.permission_error("output", "stream", stream_term, "put_byte/2")
+            raise PrologThrow(error_term)
+
+        return IOBuiltins._write_char_to_stream(stream, char, "put_byte/2")
+
+    @staticmethod
+    def _builtin_newline_to_stream(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext | None
+    ) -> Substitution | None:
+        """nl/1 - Write newline to specified stream.
+
+        nl(Stream)
+        Writes a newline character to Stream.
+        """
+        if engine is None:
+            return None
+
+        stream_term = args[0]
+
+        engine._check_instantiated(stream_term, subst, "nl/1")
+        engine._check_type(stream_term, Atom, "stream_or_alias", subst, "nl/1")
+
+        stream_term = deref(stream_term, subst)
+
+        stream = engine.get_stream(stream_term)
+        if stream is None:
+            error_term = PrologError.existence_error("stream", stream_term, "nl/1")
+            raise PrologThrow(error_term)
+
+        if stream.mode not in ("write", "append"):
+            error_term = PrologError.permission_error("output", "stream", stream_term, "nl/1")
+            raise PrologThrow(error_term)
+
+        return IOBuiltins._write_char_to_stream(stream, "\n", "nl/1")
 
 
 __all__ = ["IOBuiltins"]
