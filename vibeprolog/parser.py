@@ -622,6 +622,82 @@ class PrologParser:
         )
         # operator_table is reserved for future dynamic operator parsing; currently unused
         self.operator_table = operator_table
+        # Character conversion table: maps single chars to single chars
+        # Initially identity (no conversions active)
+        self._char_conversions: dict[str, str] = {}
+
+    def set_char_conversion(self, from_char: str, to_char: str) -> None:
+        """Set a character conversion.
+        
+        If from_char == to_char, removes the conversion (identity mapping).
+        Otherwise, adds/updates the conversion.
+        """
+        if from_char == to_char:
+            # Identity conversion: remove from table
+            self._char_conversions.pop(from_char, None)
+        else:
+            self._char_conversions[from_char] = to_char
+
+    def get_char_conversions(self) -> dict[str, str]:
+        """Return copy of current character conversion table."""
+        return dict(self._char_conversions)
+
+    def _apply_char_conversions(self, text: str) -> str:
+        """Apply character conversions to text, excluding quoted strings.
+        
+        Per ISO Prolog, character conversions apply to source text but NOT
+        to the contents of quoted atoms or strings.
+        """
+        if not self._char_conversions:
+            return text
+        
+        result = []
+        i = 0
+        in_single_quote = False
+        in_double_quote = False
+        escape_next = False
+        
+        while i < len(text):
+            char = text[i]
+            
+            if escape_next:
+                result.append(char)
+                escape_next = False
+                i += 1
+                continue
+            
+            if char == '\\' and (in_single_quote or in_double_quote):
+                result.append(char)
+                escape_next = True
+                i += 1
+                continue
+            
+            if char == "'" and not in_double_quote:
+                # Check for doubled quote escape inside single-quoted strings
+                if in_single_quote and i + 1 < len(text) and text[i + 1] == "'":
+                    result.append(char)
+                    result.append(text[i + 1])
+                    i += 2
+                    continue
+                in_single_quote = not in_single_quote
+                result.append(char)
+                i += 1
+                continue
+            
+            if char == '"' and not in_single_quote:
+                in_double_quote = not in_double_quote
+                result.append(char)
+                i += 1
+                continue
+            
+            # Apply conversion only outside quoted strings
+            if not in_single_quote and not in_double_quote:
+                char = self._char_conversions.get(char, char)
+            
+            result.append(char)
+            i += 1
+        
+        return ''.join(result)
 
     def _strip_block_comments(self, text: str) -> tuple[str, list[tuple[int, str]]]:
         """Strip block comments from text, handling nesting and quoted strings.
@@ -771,6 +847,8 @@ class PrologParser:
     def parse(self, text: str, context: str = "parse/1") -> list[Clause | Directive]:
         """Parse Prolog source code and return list of clauses."""
         try:
+            # Apply character conversions before parsing
+            text = self._apply_char_conversions(text)
             text, pldoc_comments = self._collect_pldoc_comments(text)
             tree = self.parser.parse(text)
             transformer = PrologTransformer()

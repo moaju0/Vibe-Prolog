@@ -242,6 +242,22 @@ class PrologInterpreter:
             self.operator_table.define(prec_term, spec_term, name_term, "op/3")
             return
 
+        # Handle char_conversion/2 directive
+        if isinstance(goal, Compound) and goal.functor == "char_conversion" and len(goal.args) == 2:
+            from_term, to_term = goal.args
+            # Validate both arguments are single-character atoms
+            if isinstance(from_term, Variable) or isinstance(to_term, Variable):
+                error_term = PrologError.instantiation_error("char_conversion/2")
+                raise PrologThrow(error_term)
+            
+            # Extract characters
+            from_char = self._extract_character(from_term, "char_conversion/2")
+            to_char = self._extract_character(to_term, "char_conversion/2")
+            
+            # Update the parser's conversion table
+            self.parser.set_char_conversion(from_char, to_char)
+            return
+
         # Handle supported directives
         if isinstance(goal, Compound) and goal.functor == "initialization" and len(goal.args) == 1:
             init_goal = goal.args[0]
@@ -399,6 +415,19 @@ class PrologInterpreter:
         name, arity = key
         return Compound("/", (Atom(name), Number(arity)))
 
+    def _extract_character(self, term: Any, context: str) -> str:
+        """Extract a single character from a term for char_conversion.
+        
+        The term must be a single-character atom.
+        Raises type_error(character, term) if invalid.
+        """
+        if isinstance(term, Atom):
+            if len(term.name) == 1:
+                return term.name
+        # Not a single-character atom
+        error_term = PrologError.type_error("character", term, context)
+        raise PrologThrow(error_term)
+
     def _add_clause(
         self,
         clause: Clause,
@@ -480,17 +509,28 @@ class PrologInterpreter:
         Args:
             prolog_code: String containing Prolog code to process
         """
-        try:
-            items = self.parser.parse(prolog_code, "consult/1")
-        except (ValueError, LarkError) as exc:
-            error_term = PrologError.syntax_error(str(exc), "consult/1")
-            raise PrologThrow(error_term)
         # Reset module context to `user` at start of a consult
         self.current_module = "user"
         # Ensure a default user module exists
         self.modules.setdefault("user", Module("user", None))
 
-        self._process_items(items, source_name)
+        # Parse and process incrementally to support char_conversion taking effect
+        # between clauses/directives. We split by period-terminated statements.
+        all_items = []
+        for chunk in self._split_clauses(prolog_code):
+            chunk = chunk.strip()
+            if not chunk:
+                continue
+            try:
+                items = self.parser.parse(chunk, "consult/1")
+            except (ValueError, LarkError) as exc:
+                error_term = PrologError.syntax_error(str(exc), "consult/1")
+                raise PrologThrow(error_term)
+            # Process each item immediately so char_conversion directives
+            # take effect before subsequent parsing
+            self._process_items(items, source_name)
+            all_items.extend(items)
+
         self.engine = PrologEngine(
             self.clauses,
             self.argv,
@@ -503,6 +543,118 @@ class PrologInterpreter:
         # Expose interpreter to engine for module-aware resolution
         self.engine.interpreter = self
         self._execute_initialization_goals()
+
+    def _split_clauses(self, prolog_code: str) -> list[str]:
+        """Split Prolog code into individual clause/directive strings.
+        
+        Handles quoted strings and comments to avoid splitting inside them.
+        Each returned string ends with a period.
+        """
+        chunks = []
+        current = []
+        i = 0
+        in_single_quote = False
+        in_double_quote = False
+        in_line_comment = False
+        in_block_comment = 0
+        escape_next = False
+        
+        while i < len(prolog_code):
+            char = prolog_code[i]
+            
+            # Handle line comments
+            if in_line_comment:
+                current.append(char)
+                if char == '\n':
+                    in_line_comment = False
+                i += 1
+                continue
+            
+            # Handle block comments
+            if in_block_comment > 0:
+                current.append(char)
+                if prolog_code[i:i+2] == '/*':
+                    in_block_comment += 1
+                    current.append(prolog_code[i+1])
+                    i += 2
+                    continue
+                if prolog_code[i:i+2] == '*/':
+                    in_block_comment -= 1
+                    current.append(prolog_code[i+1])
+                    i += 2
+                    continue
+                i += 1
+                continue
+            
+            # Handle escape sequences
+            if escape_next:
+                current.append(char)
+                escape_next = False
+                i += 1
+                continue
+            
+            if char == '\\' and (in_single_quote or in_double_quote):
+                current.append(char)
+                escape_next = True
+                i += 1
+                continue
+            
+            # Handle entering/exiting quotes
+            if char == "'" and not in_double_quote:
+                # Check for doubled quote
+                if in_single_quote and i + 1 < len(prolog_code) and prolog_code[i + 1] == "'":
+                    current.append(char)
+                    current.append(prolog_code[i + 1])
+                    i += 2
+                    continue
+                in_single_quote = not in_single_quote
+                current.append(char)
+                i += 1
+                continue
+            
+            if char == '"' and not in_single_quote:
+                in_double_quote = not in_double_quote
+                current.append(char)
+                i += 1
+                continue
+            
+            # Check for comment starts
+            if not in_single_quote and not in_double_quote:
+                if char == '%':
+                    in_line_comment = True
+                    current.append(char)
+                    i += 1
+                    continue
+                if prolog_code[i:i+2] == '/*':
+                    in_block_comment = 1
+                    current.append(char)
+                    current.append(prolog_code[i+1])
+                    i += 2
+                    continue
+            
+            # Handle period (end of clause)
+            if char == '.' and not in_single_quote and not in_double_quote:
+                current.append(char)
+                # Check for float (period followed by digit)
+                if i + 1 < len(prolog_code) and prolog_code[i + 1].isdigit():
+                    i += 1
+                    continue
+                # End of clause
+                chunks.append(''.join(current))
+                current = []
+                i += 1
+                continue
+            
+            current.append(char)
+            i += 1
+        
+        # Add any remaining content (should not happen in well-formed code)
+        if current:
+            remainder = ''.join(current).strip()
+            if remainder:
+                chunks.append(remainder)
+        
+        return chunks
 
     def consult(self, filepath: str | Path):
         """Load Prolog clauses from a file."""
