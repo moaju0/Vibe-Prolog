@@ -181,12 +181,12 @@ Status legend:
 | `sumlist/2`             | ✅      | Common extension                              |
 | `max_list/2`            | ✅      | Common extension                              |
 | `min_list/2`            | ✅      | Common extension                              |
-| `is_set/1`              | ❌      | Common extension - Test if list has no duplicates |
-| `list_to_set/2`         | ❌      | Common extension - Remove duplicates          |
-| `list_to_ord_set/2`     | ❌      | Common extension - Convert to ordered set     |
-| `ord_subtract/3`        | ❌      | Common extension - Ordered set difference     |
-| `numlist/3`             | ❌      | Common extension - Generate list of integers  |
-| `permutation/2`         | ❌      | Common extension - Generate permutations      |
+| `is_set/1`              | ✅      | Common extension - Test if list has no duplicates |
+| `list_to_set/2`         | ✅      | Common extension - Remove duplicates          |
+| `list_to_ord_set/2`     | ✅      | Common extension - Convert to ordered set     |
+| `ord_subtract/3`        | ✅      | Common extension - Ordered set difference     |
+| `numlist/3`             | ✅      | Common extension - Generate list of integers  |
+| `permutation/2`         | ✅      | Common extension - Generate permutations      |
 | `maplist/3-5`           | ❌      | Higher-order (only `/2` implemented)          |
 | `include/3`             | ❌      | Higher-order - Filter list                    |
 | `exclude/3`             | ❌      | Higher-order - Filter list (negated)          |

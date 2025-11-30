@@ -49,6 +49,12 @@ class ListOperationsBuiltins:
         register_builtin(registry, "sum_list", 2, ListOperationsBuiltins._builtin_sumlist)  # Alias
         register_builtin(registry, "max_list", 2, ListOperationsBuiltins._builtin_max_list)
         register_builtin(registry, "min_list", 2, ListOperationsBuiltins._builtin_min_list)
+        register_builtin(registry, "is_set", 1, ListOperationsBuiltins._builtin_is_set)
+        register_builtin(registry, "list_to_set", 2, ListOperationsBuiltins._builtin_list_to_set)
+        register_builtin(registry, "list_to_ord_set", 2, ListOperationsBuiltins._builtin_list_to_ord_set)
+        register_builtin(registry, "ord_subtract", 3, ListOperationsBuiltins._builtin_ord_subtract)
+        register_builtin(registry, "numlist", 3, ListOperationsBuiltins._builtin_numlist)
+        register_builtin(registry, "permutation", 2, ListOperationsBuiltins._builtin_permutation)
 
     @staticmethod
     def _builtin_member(
@@ -603,6 +609,210 @@ class ListOperationsBuiltins:
         new_subst = unify(min_result, Number(min_val), subst)
         if new_subst is not None:
             yield new_subst
+
+    @staticmethod
+    def _builtin_is_set(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext
+    ) -> Iterator[Substitution]:
+        """is_set/1 - Test if list has no duplicates."""
+        lst, = args
+        lst = deref(lst, subst)
+
+        if isinstance(lst, Variable):
+            raise PrologThrow(PrologError.instantiation_error("is_set/1"))
+        if not isinstance(lst, List):
+            raise PrologThrow(PrologError.type_error("list", lst, "is_set/1"))
+
+        py_list = list_to_python(lst, subst)
+
+        # Check for duplicates using term equality
+        seen = []
+        for item in py_list:
+            is_duplicate = False
+            for seen_item in seen:
+                if terms_equal(item, seen_item):
+                    is_duplicate = True
+                    break
+            if is_duplicate:
+                return  # Has duplicates, fail
+            seen.append(item)
+
+        # No duplicates found, succeed
+        yield subst
+
+    @staticmethod
+    def _builtin_list_to_set(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext
+    ) -> Iterator[Substitution]:
+        """list_to_set/2 - Remove duplicates from list."""
+        lst, result = args
+        lst = deref(lst, subst)
+
+        if isinstance(lst, Variable):
+            raise PrologThrow(PrologError.instantiation_error("list_to_set/2"))
+        if not isinstance(lst, List):
+            raise PrologThrow(PrologError.type_error("list", lst, "list_to_set/2"))
+
+        py_list = list_to_python(lst, subst)
+
+        # Remove duplicates, preserving first occurrence
+        unique = []
+        seen = []
+        for item in py_list:
+            is_duplicate = False
+            for seen_item in seen:
+                if terms_equal(item, seen_item):
+                    is_duplicate = True
+                    break
+            if not is_duplicate:
+                unique.append(item)
+                seen.append(item)
+
+        result_list = python_to_list(unique)
+        new_subst = unify(result, result_list, subst)
+        if new_subst is not None:
+            yield new_subst
+
+    @staticmethod
+    def _builtin_list_to_ord_set(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext
+    ) -> Iterator[Substitution]:
+        """list_to_ord_set/2 - Convert to sorted set."""
+        lst, result = args
+        lst = deref(lst, subst)
+
+        if isinstance(lst, Variable):
+            raise PrologThrow(PrologError.instantiation_error("list_to_ord_set/2"))
+        if not isinstance(lst, List):
+            raise PrologThrow(PrologError.type_error("list", lst, "list_to_ord_set/2"))
+
+        py_list = list_to_python(lst, subst)
+
+        # Remove duplicates and sort
+        unique = []
+        seen = []
+        for item in py_list:
+            is_duplicate = False
+            for seen_item in seen:
+                if terms_equal(item, seen_item):
+                    is_duplicate = True
+                    break
+            if not is_duplicate:
+                unique.append(item)
+                seen.append(item)
+
+        try:
+            sorted_unique = sorted(unique, key=term_sort_key)
+        except TypeError:
+            sorted_unique = unique
+
+        result_list = python_to_list(sorted_unique)
+        new_subst = unify(result, result_list, subst)
+        if new_subst is not None:
+            yield new_subst
+
+    @staticmethod
+    def _builtin_ord_subtract(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext
+    ) -> Iterator[Substitution]:
+        """ord_subtract/3 - Ordered set difference."""
+        set1, set2, result = args
+        set1 = deref(set1, subst)
+        set2 = deref(set2, subst)
+
+        if isinstance(set1, Variable):
+            raise PrologThrow(PrologError.instantiation_error("ord_subtract/3"))
+        if not isinstance(set1, List):
+            raise PrologThrow(PrologError.type_error("list", set1, "ord_subtract/3"))
+        if isinstance(set2, Variable):
+            raise PrologThrow(PrologError.instantiation_error("ord_subtract/3"))
+        if not isinstance(set2, List):
+            raise PrologThrow(PrologError.type_error("list", set2, "ord_subtract/3"))
+
+        py_set1 = list_to_python(set1, subst)
+        py_set2 = list_to_python(set2, subst)
+
+        # Assume both are sorted, perform ordered set difference
+        result_list = []
+        i, j = 0, 0
+        while i < len(py_set1) and j < len(py_set2):
+            key1 = term_sort_key(py_set1[i])
+            key2 = term_sort_key(py_set2[j])
+            if key1 < key2:
+                result_list.append(py_set1[i])
+                i += 1
+            elif key1 > key2:
+                j += 1
+            else:
+                # Equal, skip from set1
+                i += 1
+                j += 1
+
+        # Add remaining elements from set1
+        while i < len(py_set1):
+            result_list.append(py_set1[i])
+            i += 1
+
+        result_prolog = python_to_list(result_list)
+        new_subst = unify(result, result_prolog, subst)
+        if new_subst is not None:
+            yield new_subst
+
+    @staticmethod
+    def _builtin_numlist(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext
+    ) -> Iterator[Substitution]:
+        """numlist/3 - Generate integer range."""
+        low, high, result = args
+        low = deref(low, subst)
+        high = deref(high, subst)
+
+        if isinstance(low, Variable):
+            raise PrologThrow(PrologError.instantiation_error("numlist/3"))
+        if not isinstance(low, Number) or not isinstance(low.value, int):
+            raise PrologThrow(PrologError.type_error("integer", low, "numlist/3"))
+        if isinstance(high, Variable):
+            raise PrologThrow(PrologError.instantiation_error("numlist/3"))
+        if not isinstance(high, Number) or not isinstance(high.value, int):
+            raise PrologThrow(PrologError.type_error("integer", high, "numlist/3"))
+
+        low_val = low.value
+        high_val = high.value
+
+        if low_val > high_val:
+            # Empty range
+            result_list = python_to_list([])
+        else:
+            # Generate range inclusive
+            nums = list(range(low_val, high_val + 1))
+            result_list = python_to_list([Number(n) for n in nums])
+
+        new_subst = unify(result, result_list, subst)
+        if new_subst is not None:
+            yield new_subst
+
+    @staticmethod
+    def _builtin_permutation(
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext
+    ) -> Iterator[Substitution]:
+        """permutation/2 - Generate list permutations."""
+        lst, result = args
+        lst = deref(lst, subst)
+
+        if isinstance(lst, Variable):
+            raise PrologThrow(PrologError.instantiation_error("permutation/2"))
+        if not isinstance(lst, List):
+            raise PrologThrow(PrologError.type_error("list", lst, "permutation/2"))
+
+        py_list = list_to_python(lst, subst)
+
+        # Generate all permutations
+        import itertools
+        for perm in itertools.permutations(py_list):
+            perm_list = python_to_list(list(perm))
+            new_subst = unify(result, perm_list, subst)
+            if new_subst is not None:
+                yield new_subst
 
 
 __all__ = ["ListOperationsBuiltins"]

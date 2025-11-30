@@ -498,3 +498,275 @@ class TestMinList:
         """Test min_list with non-number element."""
         with pytest.raises(Exception):  # Should raise type_error
             prolog.query_once("min_list([1, atom, 3], X).")
+
+
+class TestIsSet:
+    """Tests for is_set/1 predicate."""
+
+    def test_is_set_empty_list(self, prolog):
+        """Test is_set on empty list."""
+        assert prolog.has_solution("is_set([]).")
+
+    def test_is_set_single_element(self, prolog):
+        """Test is_set on single element."""
+        assert prolog.has_solution("is_set([a]).")
+
+    def test_is_set_no_duplicates(self, prolog):
+        """Test is_set with no duplicates."""
+        assert prolog.has_solution("is_set([1,2,3]).")
+
+    def test_is_set_with_duplicates(self, prolog):
+        """Test is_set with duplicates."""
+        assert not prolog.has_solution("is_set([1,2,1]).")
+
+    def test_is_set_nested_terms(self, prolog):
+        """Test is_set with nested terms."""
+        assert prolog.has_solution("is_set([f(a), f(b), g(c)]).")
+        assert not prolog.has_solution("is_set([f(a), f(a)]).")
+
+    def test_is_set_type_error(self, prolog):
+        """Test is_set with non-list."""
+        with pytest.raises(Exception):  # Should raise type_error
+            prolog.query_once("is_set(atom).")
+
+    def test_is_set_instantiation_error(self, prolog):
+        """Test is_set with unbound variable."""
+        with pytest.raises(Exception):  # Should raise instantiation_error
+            prolog.query_once("is_set(X).")
+
+
+class TestListToSet:
+    """Tests for list_to_set/2 predicate."""
+
+    def test_list_to_set_empty(self, prolog):
+        """Test list_to_set on empty list."""
+        result = prolog.query_once("list_to_set([], X).")
+        assert result is not None
+        assert result['X'] == []
+
+    def test_list_to_set_no_duplicates(self, prolog):
+        """Test list_to_set with no duplicates."""
+        result = prolog.query_once("list_to_set([1,2,3], X).")
+        assert result is not None
+        assert set(result['X']) == {1, 2, 3}
+
+    def test_list_to_set_with_duplicates(self, prolog):
+        """Test list_to_set with duplicates."""
+        result = prolog.query_once("list_to_set([1,2,1,3,2], X).")
+        assert result is not None
+        assert set(result['X']) == {1, 2, 3}
+
+    def test_list_to_set_preserves_order(self, prolog):
+        """Test list_to_set preserves first occurrence order."""
+        result = prolog.query_once("list_to_set([3,1,2,1,3], X).")
+        assert result is not None
+        # Should preserve order of first occurrences
+        assert result['X'] == [3, 1, 2]
+
+    def test_list_to_set_type_error(self, prolog):
+        """Test list_to_set with non-list."""
+        with pytest.raises(Exception):  # Should raise type_error
+            prolog.query_once("list_to_set(atom, X).")
+
+    def test_list_to_set_instantiation_error(self, prolog):
+        """Test list_to_set with unbound input."""
+        with pytest.raises(Exception):  # Should raise instantiation_error
+            prolog.query_once("list_to_set(X, Y).")
+
+
+class TestListToOrdSet:
+    """Tests for list_to_ord_set/2 predicate."""
+
+    def test_list_to_ord_set_basic(self, prolog):
+        """Test basic list_to_ord_set functionality."""
+        result = prolog.query_once("list_to_ord_set([3,1,2,1], X).")
+        assert result is not None
+        assert result['X'] == [1, 2, 3]
+
+    def test_list_to_ord_set_no_duplicates(self, prolog):
+        """Test list_to_ord_set removes duplicates."""
+        result = prolog.query_once("list_to_ord_set([b,a,c,a], X).")
+        assert result is not None
+        assert result['X'] == ['a', 'b', 'c']
+
+    def test_list_to_ord_set_empty(self, prolog):
+        """Test list_to_ord_set on empty list."""
+        result = prolog.query_once("list_to_ord_set([], X).")
+        assert result is not None
+        assert result['X'] == []
+
+    def test_list_to_ord_set_single(self, prolog):
+        """Test list_to_ord_set on single element."""
+        result = prolog.query_once("list_to_ord_set([single], X).")
+        assert result is not None
+        assert result['X'] == ['single']
+
+    def test_list_to_ord_set_type_error(self, prolog):
+        """Test list_to_ord_set with non-list."""
+        with pytest.raises(Exception):  # Should raise type_error
+            prolog.query_once("list_to_ord_set(atom, X).")
+
+    def test_list_to_ord_set_instantiation_error(self, prolog):
+        """Test list_to_ord_set with unbound input."""
+        with pytest.raises(Exception):  # Should raise instantiation_error
+            prolog.query_once("list_to_ord_set(X, Y).")
+
+
+class TestOrdSubtract:
+    """Tests for ord_subtract/3 predicate."""
+
+    def test_ord_subtract_basic(self, prolog):
+        """Test basic ord_subtract functionality."""
+        result = prolog.query_once("ord_subtract([1,2,3,4], [2,4], X).")
+        assert result is not None
+        assert result['X'] == [1, 3]
+
+    def test_ord_subtract_no_overlap(self, prolog):
+        """Test ord_subtract with no overlap."""
+        result = prolog.query_once("ord_subtract([1,2,3], [4,5], X).")
+        assert result is not None
+        assert result['X'] == [1, 2, 3]
+
+    def test_ord_subtract_complete_overlap(self, prolog):
+        """Test ord_subtract with complete overlap."""
+        result = prolog.query_once("ord_subtract([1,2,3], [1,2,3], X).")
+        assert result is not None
+        assert result['X'] == []
+
+    def test_ord_subtract_empty_first(self, prolog):
+        """Test ord_subtract with empty first list."""
+        result = prolog.query_once("ord_subtract([], [1,2], X).")
+        assert result is not None
+        assert result['X'] == []
+
+    def test_ord_subtract_empty_second(self, prolog):
+        """Test ord_subtract with empty second list."""
+        result = prolog.query_once("ord_subtract([1,2,3], [], X).")
+        assert result is not None
+        assert result['X'] == [1, 2, 3]
+
+    def test_ord_subtract_type_error_first(self, prolog):
+        """Test ord_subtract with non-list first argument."""
+        with pytest.raises(Exception):  # Should raise type_error
+            prolog.query_once("ord_subtract(atom, [1,2], X).")
+
+    def test_ord_subtract_type_error_second(self, prolog):
+        """Test ord_subtract with non-list second argument."""
+        with pytest.raises(Exception):  # Should raise type_error
+            prolog.query_once("ord_subtract([1,2], atom, X).")
+
+    def test_ord_subtract_instantiation_error_first(self, prolog):
+        """Test ord_subtract with unbound first argument."""
+        with pytest.raises(Exception):  # Should raise instantiation_error
+            prolog.query_once("ord_subtract(X, [1,2], Y).")
+
+    def test_ord_subtract_instantiation_error_second(self, prolog):
+        """Test ord_subtract with unbound second argument."""
+        with pytest.raises(Exception):  # Should raise instantiation_error
+            prolog.query_once("ord_subtract([1,2], Y, Z).")
+
+
+class TestNumlist:
+    """Tests for numlist/3 predicate."""
+
+    def test_numlist_basic(self, prolog):
+        """Test basic numlist functionality."""
+        result = prolog.query_once("numlist(1, 5, X).")
+        assert result is not None
+        assert result['X'] == [1, 2, 3, 4, 5]
+
+    def test_numlist_single_element(self, prolog):
+        """Test numlist with Low = High."""
+        result = prolog.query_once("numlist(3, 3, X).")
+        assert result is not None
+        assert result['X'] == [3]
+
+    def test_numlist_empty_range(self, prolog):
+        """Test numlist with Low > High."""
+        result = prolog.query_once("numlist(5, 1, X).")
+        assert result is not None
+        assert result['X'] == []
+
+    def test_numlist_negative_range(self, prolog):
+        """Test numlist with negative numbers."""
+        result = prolog.query_once("numlist(-2, 2, X).")
+        assert result is not None
+        assert result['X'] == [-2, -1, 0, 1, 2]
+
+    def test_numlist_type_error_low(self, prolog):
+        """Test numlist with non-integer Low."""
+        with pytest.raises(Exception):  # Should raise type_error
+            prolog.query_once("numlist(atom, 5, X).")
+
+    def test_numlist_type_error_high(self, prolog):
+        """Test numlist with non-integer High."""
+        with pytest.raises(Exception):  # Should raise type_error
+            prolog.query_once("numlist(1, atom, X).")
+
+    def test_numlist_type_error_float(self, prolog):
+        """Test numlist with float instead of integer."""
+        with pytest.raises(Exception):  # Should raise type_error
+            prolog.query_once("numlist(1.5, 5, X).")
+
+    def test_numlist_instantiation_error_low(self, prolog):
+        """Test numlist with unbound Low."""
+        with pytest.raises(Exception):  # Should raise instantiation_error
+            prolog.query_once("numlist(X, 5, Y).")
+
+    def test_numlist_instantiation_error_high(self, prolog):
+        """Test numlist with unbound High."""
+        with pytest.raises(Exception):  # Should raise instantiation_error
+            prolog.query_once("numlist(1, Y, Z).")
+
+
+class TestPermutation:
+    """Tests for permutation/2 predicate."""
+
+    def test_permutation_basic(self, prolog):
+        """Test basic permutation functionality."""
+        results = prolog.query("permutation([1,2,3], X).")
+        assert len(results) == 6  # 3! = 6 permutations
+
+        # Check all permutations are present
+        permutations = [r['X'] for r in results]
+        expected = [
+            [1, 2, 3], [1, 3, 2], [2, 1, 3],
+            [2, 3, 1], [3, 1, 2], [3, 2, 1]
+        ]
+        for perm in expected:
+            assert perm in permutations
+
+    def test_permutation_empty_list(self, prolog):
+        """Test permutation on empty list."""
+        result = prolog.query_once("permutation([], X).")
+        assert result is not None
+        assert result['X'] == []
+
+    def test_permutation_single_element(self, prolog):
+        """Test permutation on single element."""
+        result = prolog.query_once("permutation([a], X).")
+        assert result is not None
+        assert result['X'] == ['a']
+
+    def test_permutation_two_elements(self, prolog):
+        """Test permutation on two elements."""
+        results = prolog.query("permutation([a,b], X).")
+        assert len(results) == 2
+        permutations = [r['X'] for r in results]
+        assert ['a', 'b'] in permutations
+        assert ['b', 'a'] in permutations
+
+    def test_permutation_check_mode(self, prolog):
+        """Test permutation in check mode (second arg bound)."""
+        assert prolog.has_solution("permutation([1,2,3], [2,3,1]).")
+        assert not prolog.has_solution("permutation([1,2,3], [1,2,4]).")
+
+    def test_permutation_type_error(self, prolog):
+        """Test permutation with non-list."""
+        with pytest.raises(Exception):  # Should raise type_error
+            prolog.query_once("permutation(atom, X).")
+
+    def test_permutation_instantiation_error(self, prolog):
+        """Test permutation with unbound first argument."""
+        with pytest.raises(Exception):  # Should raise instantiation_error
+            prolog.query_once("permutation(X, Y).")
