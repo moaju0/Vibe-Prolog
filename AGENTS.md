@@ -106,7 +106,11 @@ Handle Prolog errors like this:
 
 ```bash
 # Run all tests
-uv run pytest
+uv run pytest 
+
+# Run tests without the long-running performance tests
+# usually this is sufficient to check nothing new broke
+uv run pytest --ignore=tests/performance
 
 # Run specific test file
 uv run pytest tests/test_builtins.py
