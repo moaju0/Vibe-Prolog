@@ -1697,12 +1697,8 @@ class IOBuiltins:
         byte_term = deref(byte_term, subst)
 
         # Validate that it's an integer
-        if not isinstance(byte_term, Number):
-            error_term = PrologError.type_error("byte", byte_term, "put_byte/2")
-            raise PrologThrow(error_term)
-
-        if not isinstance(byte_term.value, int):
-            error_term = PrologError.type_error("byte", byte_term, "put_byte/2")
+        if not isinstance(byte_term, Number) or not isinstance(byte_term.value, int):
+            error_term = PrologError.type_error("integer", byte_term, "put_byte/2")
             raise PrologThrow(error_term)
 
         byte_value = byte_term.value
