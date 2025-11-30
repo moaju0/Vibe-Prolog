@@ -19,6 +19,7 @@ from vibeprolog.terms import Atom, Compound, Number, Variable
 from vibeprolog.unification import Substitution, deref, unify
 from vibeprolog.utils.list_utils import list_to_python, python_to_list
 from vibeprolog.utils.term_utils import term_to_string
+from vibeprolog.utils.variable_utils import collect_vars_in_order
 
 _DEFAULT_OPERATOR_TABLE = OperatorTable()
 
@@ -542,7 +543,7 @@ class IOBuiltins:
         operator_table = _engine.operator_table if _engine is not None else None
 
         output_str = IOBuiltins._term_to_chars_string(
-            term, subst, ignore_ops, numbervars, quoted, operator_table=operator_table
+            term, subst, ignore_ops, numbervars, quoted, None, operator_table
         )
 
         # Convert string to list of character atoms
@@ -551,6 +552,50 @@ class IOBuiltins:
 
         return unify(chars_var, chars_list, subst)
 
+    @staticmethod
+    def _builtin_parse_write_options(options_term, subst: Substitution) -> dict:
+        """Parse write_term/2 options into a dict, returning defaults if omitted.
+        Raises PrologThrow on errors to align with existing error handling."""
+        options_deref = deref(options_term, subst)
+        if not isinstance(options_deref, List):
+            error_term = PrologError.type_error("list", options_term, "write_term/2")
+            raise PrologThrow(error_term)
+
+
+        # Defaults
+        parsed = {
+            "quoted": False,
+            "ignore_ops": False,
+            "numbervars": False,
+            "max_depth": None,
+        }
+
+        for opt in options_deref.elements:
+            opt = deref(opt, subst)
+            if isinstance(opt, Compound):
+                if opt.functor == "quoted" and len(opt.args) == 1:
+                    val = deref(opt.args[0], subst)
+                    parsed["quoted"] = isinstance(val, Atom) and val.name == "true"
+                elif opt.functor == "ignore_ops" and len(opt.args) == 1:
+                    val = deref(opt.args[0], subst)
+                    parsed["ignore_ops"] = isinstance(val, Atom) and val.name == "true"
+                elif opt.functor == "numbervars" and len(opt.args) == 1:
+                    val = deref(opt.args[0], subst)
+                    parsed["numbervars"] = isinstance(val, Atom) and val.name == "true"
+                elif opt.functor == "max_depth" and len(opt.args) == 1:
+                    val = deref(opt.args[0], subst)
+                    if isinstance(val, Number) and isinstance(val.value, int) and val.value >= 0:
+                        parsed["max_depth"] = val.value
+                    else:
+                        error_term = PrologError.domain_error("write_option", opt, "write_term/2")
+                        raise PrologThrow(error_term)
+                else:
+                    error_term = PrologError.domain_error("write_option", opt, "write_term/2")
+                    raise PrologThrow(error_term)
+            else:
+                error_term = PrologError.domain_error("write_option", opt, "write_term/2")
+                raise PrologThrow(error_term)
+        return parsed
     @staticmethod
     def _builtin_write_term(
         args: BuiltinArgs, subst: Substitution, engine: EngineContext | None
@@ -563,42 +608,12 @@ class IOBuiltins:
         term = deref(term, subst)
         options_term = deref(options_term, subst)
 
-        # Parse options
-        if not isinstance(options_term, List):
-            error_term = PrologError.type_error("list", options_term, "write_term/2")
-            raise PrologThrow(error_term)
-
-        # Extract option values
-        quoted = False
-        ignore_ops = False
-        numbervars = False
-        max_depth = None
-
-        for opt in options_term.elements:
-            opt = deref(opt, subst)
-            if isinstance(opt, Compound):
-                if opt.functor == "quoted" and len(opt.args) == 1:
-                    val = deref(opt.args[0], subst)
-                    quoted = isinstance(val, Atom) and val.name == "true"
-                elif opt.functor == "ignore_ops" and len(opt.args) == 1:
-                    val = deref(opt.args[0], subst)
-                    ignore_ops = isinstance(val, Atom) and val.name == "true"
-                elif opt.functor == "numbervars" and len(opt.args) == 1:
-                    val = deref(opt.args[0], subst)
-                    numbervars = isinstance(val, Atom) and val.name == "true"
-                elif opt.functor == "max_depth" and len(opt.args) == 1:
-                    val = deref(opt.args[0], subst)
-                    if isinstance(val, Number) and isinstance(val.value, int) and val.value >= 0:
-                        max_depth = val.value
-                    else:
-                        error_term = PrologError.domain_error("write_option", opt, "write_term/2")
-                        raise PrologThrow(error_term)
-                else:
-                    error_term = PrologError.domain_error("write_option", opt, "write_term/2")
-                    raise PrologThrow(error_term)
-            else:
-                error_term = PrologError.domain_error("write_option", opt, "write_term/2")
-                raise PrologThrow(error_term)
+        # Use shared helper to parse options
+        parsed = IOBuiltins._builtin_parse_write_options(options_term, subst)
+        quoted = parsed["quoted"]
+        ignore_ops = parsed["ignore_ops"]
+        numbervars = parsed["numbervars"]
+        max_depth = parsed["max_depth"]
 
         # Write to current output
         operator_table = engine.operator_table if engine is not None else None
@@ -634,42 +649,12 @@ class IOBuiltins:
             error_term = PrologError.permission_error("output", "stream", stream_term, "write_term/3")
             raise PrologThrow(error_term)
 
-        # Parse options
-        if not isinstance(options_term, List):
-            error_term = PrologError.type_error("list", options_term, "write_term/3")
-            raise PrologThrow(error_term)
-
-        # Extract option values
-        quoted = False
-        ignore_ops = False
-        numbervars = False
-        max_depth = None
-
-        for opt in options_term.elements:
-            opt = deref(opt, subst)
-            if isinstance(opt, Compound):
-                if opt.functor == "quoted" and len(opt.args) == 1:
-                    val = deref(opt.args[0], subst)
-                    quoted = isinstance(val, Atom) and val.name == "true"
-                elif opt.functor == "ignore_ops" and len(opt.args) == 1:
-                    val = deref(opt.args[0], subst)
-                    ignore_ops = isinstance(val, Atom) and val.name == "true"
-                elif opt.functor == "numbervars" and len(opt.args) == 1:
-                    val = deref(opt.args[0], subst)
-                    numbervars = isinstance(val, Atom) and val.name == "true"
-                elif opt.functor == "max_depth" and len(opt.args) == 1:
-                    val = deref(opt.args[0], subst)
-                    if isinstance(val, Number) and isinstance(val.value, int) and val.value >= 0:
-                        max_depth = val.value
-                    else:
-                        error_term = PrologError.domain_error("write_option", opt, "write_term/3")
-                        raise PrologThrow(error_term)
-                else:
-                    error_term = PrologError.domain_error("write_option", opt, "write_term/3")
-                    raise PrologThrow(error_term)
-            else:
-                error_term = PrologError.domain_error("write_option", opt, "write_term/3")
-                raise PrologThrow(error_term)
+        # Use shared helper to parse options
+        parsed = IOBuiltins._builtin_parse_write_options(options_term, subst)
+        quoted = parsed["quoted"]
+        ignore_ops = parsed["ignore_ops"]
+        numbervars = parsed["numbervars"]
+        max_depth = parsed["max_depth"]
 
         # Write to stream
         operator_table = engine.operator_table if engine is not None else None
@@ -687,11 +672,17 @@ class IOBuiltins:
         ignore_ops: bool,
         numbervars: bool,
         quoted: bool,
-        parent_prec: int = 1200,
+        max_depth: int | None,
         operator_table=None,
+        current_depth: int = 0,
+        parent_prec: int = 1200,
     ) -> str:
-        """Convert a term to string with specified options."""
+        """Convert a term to string with full options support including max_depth."""
         term = deref(term, subst)
+
+        # Check max_depth
+        if max_depth is not None and current_depth >= max_depth:
+            return "..."
 
         # Handle $VAR(N) for numbervars
         if numbervars and isinstance(term, Compound) and term.functor == "$VAR" and len(term.args) == 1:
@@ -735,7 +726,7 @@ class IOBuiltins:
             # Handle list elements
             elements_str = [
                 IOBuiltins._term_to_chars_string(
-                    e, subst, ignore_ops, numbervars, quoted, 1200, operator_table
+                    e, subst, ignore_ops, numbervars, quoted, max_depth, operator_table, current_depth + 1, 1200
                 )
                 for e in term.elements
             ]
@@ -745,7 +736,7 @@ class IOBuiltins:
                 isinstance(term.tail, List) and not term.tail.elements and term.tail.tail is None
             ):
                 tail_str = IOBuiltins._term_to_chars_string(
-                    term.tail, subst, ignore_ops, numbervars, quoted, 1200, operator_table
+                    term.tail, subst, ignore_ops, numbervars, quoted, max_depth, operator_table, current_depth + 1, 1200
                 )
                 return f"[{','.join(elements_str)}|{tail_str}]"
 
@@ -754,7 +745,7 @@ class IOBuiltins:
         if isinstance(term, Compound):
             if not ignore_ops:
                 operator_rendered = IOBuiltins._format_operator_term(
-                    term, subst, ignore_ops, numbervars, quoted, parent_prec, operator_table
+                    term, subst, ignore_ops, numbervars, quoted, parent_prec, max_depth, operator_table, current_depth
                 )
                 if operator_rendered is not None:
                     return operator_rendered
@@ -765,7 +756,7 @@ class IOBuiltins:
                 return term.functor
             args_str = ','.join(
                 IOBuiltins._term_to_chars_string(
-                    arg, subst, ignore_ops, numbervars, quoted, 1200, operator_table
+                    arg, subst, ignore_ops, numbervars, quoted, max_depth, operator_table, current_depth + 1, 1200
                 )
                 for arg in term.args
             )
@@ -787,6 +778,7 @@ class IOBuiltins:
         max_depth: int | None,
         operator_table=None,
         current_depth: int = 0,
+        parent_prec: int = 1200,
     ) -> str:
         """Convert a term to string with full options support including max_depth."""
         term = deref(term, subst)
@@ -856,7 +848,7 @@ class IOBuiltins:
         if isinstance(term, Compound):
             if not ignore_ops:
                 operator_rendered = IOBuiltins._format_operator_term(
-                    term, subst, ignore_ops, numbervars, quoted, 1200, operator_table
+                    term, subst, ignore_ops, numbervars, quoted, parent_prec, max_depth, operator_table, current_depth
                 )
                 if operator_rendered is not None:
                     return operator_rendered
@@ -887,7 +879,9 @@ class IOBuiltins:
         numbervars: bool,
         quoted: bool,
         parent_prec: int,
-        operator_table,
+        max_depth: int | None,
+        operator_table=None,
+        current_depth: int = 0,
     ) -> str | None:
         op_info = IOBuiltins._lookup_operator(term.functor, len(term.args), operator_table)
         if op_info is None:
@@ -895,18 +889,18 @@ class IOBuiltins:
 
         if op_info.is_prefix:
             arg_limit = IOBuiltins._child_precedence_limit(op_info, "right")
-            arg_str = IOBuiltins._term_to_chars_string(
-                term.args[0], subst, ignore_ops, numbervars, quoted, arg_limit, operator_table
+            arg_str = IOBuiltins._term_to_chars_string_with_options(
+                term.args[0], subst, ignore_ops, numbervars, quoted, max_depth, operator_table, current_depth + 1, arg_limit
             )
             rendered = IOBuiltins._render_prefix(term.functor, arg_str)
         else:
             left_limit = IOBuiltins._child_precedence_limit(op_info, "left")
             right_limit = IOBuiltins._child_precedence_limit(op_info, "right")
-            left_str = IOBuiltins._term_to_chars_string(
-                term.args[0], subst, ignore_ops, numbervars, quoted, left_limit, operator_table
+            left_str = IOBuiltins._term_to_chars_string_with_options(
+                term.args[0], subst, ignore_ops, numbervars, quoted, max_depth, operator_table, current_depth + 1, left_limit
             )
-            right_str = IOBuiltins._term_to_chars_string(
-                term.args[1], subst, ignore_ops, numbervars, quoted, right_limit, operator_table
+            right_str = IOBuiltins._term_to_chars_string_with_options(
+                term.args[1], subst, ignore_ops, numbervars, quoted, max_depth, operator_table, current_depth + 1, right_limit
             )
             rendered = IOBuiltins._render_infix(term.functor, left_str, right_str)
 
@@ -1087,7 +1081,6 @@ class IOBuiltins:
         stream: Stream, term_arg: Any, options_arg: Any, subst: Substitution, context: str
     ) -> Substitution | None:
         """Read term with options support for read_term/2-3."""
-        from vibeprolog.utils.variable_utils import collect_vars_in_order
 
         # Parse options
         options_term = deref(options_arg, subst)
@@ -1756,6 +1749,24 @@ class IOBuiltins:
         return subst
 
     @staticmethod
+    def _is_at_eof(stream: Stream) -> bool:
+        """Private helper to determine if a stream is at EOF, accounting for peek/seek/dunno-what-backs."""
+        try:
+            if hasattr(stream.file_obj, 'peek'):
+                peeked = stream.file_obj.peek(1)
+                return len(peeked) == 0
+            elif hasattr(stream.file_obj, 'tell') and hasattr(stream.file_obj, 'read'):
+                pos = stream.file_obj.tell()
+                ch = stream.file_obj.read(1)
+                at_eof = len(ch) == 0
+                if not at_eof:
+                    stream.file_obj.seek(pos)
+                    stream.pushback_buffer.append(ch)
+                return at_eof
+        except (OSError, IOError):
+            return False
+        return False
+
     def _builtin_at_end_of_stream(
         _args: BuiltinArgs, subst: Substitution, engine: EngineContext | None
     ) -> Substitution | None:
@@ -1774,22 +1785,7 @@ class IOBuiltins:
             raise PrologThrow(error_term)
 
         try:
-            # Check if at EOF by trying to peek
-            if hasattr(stream.file_obj, 'peek'):
-                peeked = stream.file_obj.peek(1)
-                at_eof = len(peeked) == 0
-            else:
-                # For streams without peek, try reading a char and pushing back
-                pos = stream.file_obj.tell() if hasattr(stream.file_obj, 'tell') else None
-                ch = stream.file_obj.read(1)
-                at_eof = len(ch) == 0
-                if pos is not None and not at_eof:
-                    stream.file_obj.seek(pos)
-                elif not at_eof:
-                    # Push back the character
-                    if not stream.pushback_buffer:
-                        stream.pushback_buffer = []
-                    stream.pushback_buffer.append(ch)
+            at_eof = IOBuiltins._is_at_eof(stream)
             return subst if at_eof else None
         except (OSError, IOError):
             return None
@@ -1839,18 +1835,7 @@ class IOBuiltins:
 
             # end_of_stream property
             try:
-                if hasattr(stream.file_obj, 'peek'):
-                    peeked = stream.file_obj.peek(1)
-                    at_eof = len(peeked) == 0
-                else:
-                    pos = stream.file_obj.tell() if hasattr(stream.file_obj, 'tell') else None
-                    ch = stream.file_obj.read(1)
-                    at_eof = len(ch) == 0
-                    if pos is not None and not at_eof:
-                        stream.file_obj.seek(pos)
-                    elif not at_eof and stream.pushback_buffer:
-                        stream.pushback_buffer.append(ch)
-
+                at_eof = IOBuiltins._is_at_eof(stream)
                 if at_eof:
                     properties.append(Compound("end_of_stream", (Atom("at"),)))
                 else:
@@ -1942,22 +1927,7 @@ class IOBuiltins:
             raise PrologThrow(error_term)
 
         try:
-            # Check if at EOF by trying to peek
-            if hasattr(stream.file_obj, 'peek'):
-                peeked = stream.file_obj.peek(1)
-                at_eof = len(peeked) == 0
-            else:
-                # For streams without peek, try reading a char and pushing back
-                pos = stream.file_obj.tell() if hasattr(stream.file_obj, 'tell') else None
-                ch = stream.file_obj.read(1)
-                at_eof = len(ch) == 0
-                if pos is not None and not at_eof:
-                    stream.file_obj.seek(pos)
-                elif not at_eof:
-                    # Push back the character
-                    if not stream.pushback_buffer:
-                        stream.pushback_buffer = []
-                    stream.pushback_buffer.append(ch)
+            at_eof = IOBuiltins._is_at_eof(stream)
             return subst if at_eof else None
         except (OSError, IOError):
             return None
