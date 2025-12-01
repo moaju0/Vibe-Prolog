@@ -78,6 +78,10 @@ class PrologEngine:
         # Current input/output streams (can be changed by set_input/set_output)
         self._current_input_stream = USER_INPUT_STREAM
         self._current_output_stream = USER_OUTPUT_STREAM
+        # Per-engine I/O state (isolated per interpreter)
+        self.input_stack = []
+        self.output_stack = []
+        self.stream_properties = {}  # Stream handle -> properties dict
 
     # Compatibility wrappers retained for tests and external callers.
     def _list_to_python(
@@ -356,7 +360,6 @@ class PrologEngine:
             type_tests.TypeTestBuiltins,
             arithmetic.ArithmeticBuiltins,
             atom_processing.AtomProcessingBuiltins,
-            io.IOBuiltins,
             list_ops.ListOperationsBuiltins,
             term_manipulation.TermManipulationBuiltins,
             control.ControlBuiltins,
@@ -369,6 +372,10 @@ class PrologEngine:
             operators.OperatorBuiltins,
         ]:
             module.register(registry, self)
+
+        # IOBuiltins is instantiated per-engine
+        io_builtins = io.IOBuiltins(self)
+        io_builtins.register(registry)
 
         return registry
 
