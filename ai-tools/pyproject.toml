@@ -6,6 +6,11 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = []
 
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+]
+
 [project.scripts]
 address-pr-comments-with-amp = "autocoder_utils.cli:address_pr_comments_with_amp"
 address-pr-comments-with-claude = "autocoder_utils.cli:address_pr_comments_with_claude"

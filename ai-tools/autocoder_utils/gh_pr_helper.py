@@ -75,6 +75,63 @@ query FetchReviewComments($owner: String!, $repo: String!, $pr: Int!, $threadsAf
 """
 
 
+GRAPHQL_CI_FAILURES_QUERY = """
+query FetchCIFailures($owner: String!, $repo: String!, $pr: Int!) {
+  repository(owner: $owner, name: $repo) {
+    pullRequest(number: $pr) {
+      commits(last: 1) {
+        nodes {
+          commit {
+            oid
+            statusCheckRollup {
+              state
+              contexts(first: 100) {
+                nodes {
+                  __typename
+                  ... on CheckRun {
+                    name
+                    conclusion
+                    detailsUrl
+                    databaseId
+                    checkSuite {
+                      workflowRun {
+                        databaseId
+                        url
+                      }
+                    }
+                  }
+                  ... on StatusContext {
+                    context
+                    state
+                    targetUrl
+                    description
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+"""
+
+
+def _str_to_bool(value: str) -> bool:
+    """
+    Convert typical truthy/falsy strings to booleans for CLI parsing.
+    """
+    truthy = {"true", "1", "yes", "y", "on"}
+    falsy = {"false", "0", "no", "n", "off"}
+    value_lower = value.lower()
+    if value_lower in truthy:
+        return True
+    if value_lower in falsy:
+        return False
+    raise argparse.ArgumentTypeError(f"Invalid boolean value: '{value}'. Use true/false.")
+
+
 def parse_pr_path(pr_path: str) -> tuple[str, str, str]:
     """
     Parse a PR path like 'nlothian/Vibe-Prolog/pull/10' into (owner, repo, pr_number).
@@ -154,13 +211,10 @@ def _fetch_review_threads_page(
         "-F",
         f"pr={pr_number}",
     ]
-    
+
     if threads_after:
         cmd.extend(["-f", f"threadsAfter={threads_after}"])
-    else:
-        cmd.extend(["-f", "threadsAfter=null"])
-    
-    cmd.extend(["-f", "commentsAfter=null"])
+
     cmd.extend(["-f", f"query={GRAPHQL_REVIEW_COMMENTS_QUERY}"])
 
     try:
@@ -217,15 +271,11 @@ def _fetch_thread_comments_page(
         f"repo={repo}",
         "-F",
         f"pr={pr_number}",
-        "-f",
-        "threadsAfter=null",
     ]
-    
+
     if comments_after:
         cmd.extend(["-f", f"commentsAfter={comments_after}"])
-    else:
-        cmd.extend(["-f", "commentsAfter=null"])
-    
+
     cmd.extend(["-f", f"query={GRAPHQL_REVIEW_COMMENTS_QUERY}"])
 
     try:
@@ -350,12 +400,163 @@ def fetch_pr_comments(owner: str, repo: str, pr_number: str) -> tuple[list[dict]
     return review_comments, issue_comments
 
 
+def fetch_failed_ci_runs(owner: str, repo: str, pr_number: str) -> list[dict]:
+    """
+    Fetch information about failed CI runs for the latest commit on a PR.
+    """
+    cmd = [
+        "gh",
+        "api",
+        "graphql",
+        "-f",
+        f"owner={owner}",
+        "-f",
+        f"repo={repo}",
+        "-F",
+        f"pr={pr_number}",
+        "-f",
+        f"query={GRAPHQL_CI_FAILURES_QUERY}",
+    ]
+
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        payload = json.loads(result.stdout)
+    except subprocess.CalledProcessError as exc:
+        raise GitHubAPICallError(f"gh GraphQL API call failed: {exc.stderr}") from exc
+    except json.JSONDecodeError as exc:
+        raise GitHubJSONError(f"Failed to parse GraphQL response: {exc}") from exc
+
+    if "errors" in payload and payload["errors"]:
+        raise GitHubGraphQLError(f"GraphQL query returned errors: {payload['errors']}")
+
+    try:
+        commit_nodes = (
+            payload["data"]["repository"]["pullRequest"]["commits"].get("nodes") or []
+        )
+    except (KeyError, TypeError) as exc:
+        raise GitHubResponseError(
+            "Unexpected GraphQL response format when fetching CI failures"
+        ) from exc
+
+    failed_runs: list[dict] = []
+    for node in commit_nodes:
+        commit = node.get("commit") or {}
+        status_rollup = commit.get("statusCheckRollup") or {}
+        contexts = (status_rollup.get("contexts") or {}).get("nodes") or []
+
+        for context in contexts:
+            if context.get("__typename") != "CheckRun":
+                continue
+            if context.get("conclusion") != "FAILURE":
+                continue
+
+            workflow_run = ((context.get("checkSuite") or {}).get("workflowRun")) or {}
+            failed_runs.append(
+                {
+                    "name": context.get("name"),
+                    "details_url": context.get("detailsUrl"),
+                    "workflow_run_id": workflow_run.get("databaseId"),
+                    "workflow_url": workflow_run.get("url"),
+                }
+            )
+
+    return failed_runs
+
+
+def fetch_ci_run_log(run_id: int | str) -> str:
+    """
+    Retrieve the failed log output for a GitHub Actions run.
+    """
+    cmd = ["gh", "run", "view", str(run_id), "--log-failed"]
+
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        return result.stdout
+    except subprocess.CalledProcessError as exc:
+        raise GitHubAPICallError(f"gh run view failed: {exc.stderr}") from exc
+
+
+def _summarize_ci_log(log_output: str, include_full_log: bool) -> str:
+    """
+    Return either the full CI log or a snippet focused on the failure summary.
+    """
+    if include_full_log or not log_output:
+        return log_output
+
+    lines = log_output.strip().splitlines()
+    if not lines:
+        return ""
+
+    start_idx: int | None = None
+    for idx, line in enumerate(lines):
+        if "short test summary info" in line.lower():
+            start_idx = idx
+            break
+
+    if start_idx is None:
+        for idx, line in enumerate(lines):
+            if "failed" in line.lower():
+                start_idx = idx
+                break
+
+    if start_idx is None:
+        start_idx = max(len(lines) - 40, 0)
+
+    snippet = "\n".join(lines[start_idx:]).strip()
+    return snippet
+
+
+def collect_ci_failures(
+    owner: str, repo: str, pr_number: str, include_full_logs: bool = False
+) -> list[dict]:
+    """
+    Collect failed CI runs along with their logs for inclusion in markdown output.
+    """
+    failed_runs = fetch_failed_ci_runs(owner, repo, pr_number)
+    ci_failures: list[dict] = []
+    seen_runs: set[str] = set()
+
+    for run in failed_runs:
+        run_id = run.get("workflow_run_id")
+        details_url = run.get("details_url")
+        name = run.get("name") or "Failed check"
+
+        dedup_key = str(run_id) if run_id is not None else f"{name}:{details_url}"
+        if dedup_key in seen_runs:
+            continue
+        seen_runs.add(dedup_key)
+
+        raw_log_output: str
+        if run_id is not None:
+            try:
+                raw_log_output = fetch_ci_run_log(run_id)
+            except GitHubAPICallError as exc:
+                raw_log_output = f"Failed to fetch logs for run {run_id}: {exc}"
+        else:
+            raw_log_output = "No workflow run ID available to fetch logs."
+
+        log_output = _summarize_ci_log(raw_log_output, include_full_logs)
+
+        ci_failures.append(
+            {
+                "name": name,
+                "workflow_run_id": run_id,
+                "details_url": details_url,
+                "workflow_url": run.get("workflow_url"),
+                "log_output": log_output,
+            }
+        )
+
+    return ci_failures
+
+
 def format_comments_as_markdown(
     review_comments: list[dict],
     issue_comments: list[dict],
     owner: str,
     repo: str,
     pr_number: str,
+    ci_failures: list[dict] | None = None,
 ) -> str:
     """
     Format PR comments as markdown suitable for AI coding agents.
@@ -410,7 +611,27 @@ def format_comments_as_markdown(
                 output.append(body)
                 output.append("")
 
-    if not issue_comments and not review_comments:
+    if ci_failures:
+        output.append("## CI Failures\n")
+        for failure in ci_failures:
+            name = failure.get("name") or "Failed check"
+            run_id = failure.get("workflow_run_id")
+            run_label = f"{name} (Run ID {run_id})" if run_id is not None else name
+            output.append(f"### {run_label}")
+
+            details_url = failure.get("details_url")
+            if details_url:
+                output.append(f"[Details]({details_url})")
+
+            log_output = (failure.get("log_output") or "").rstrip()
+            if log_output:
+                output.append("```")
+                output.append(log_output)
+                output.append("```\n")
+            else:
+                output.append("_No logs available._\n")
+
+    if not issue_comments and not review_comments and not ci_failures:
         return "No comments found on this PR.\n"
 
     return "\n".join(output)
@@ -436,6 +657,12 @@ def gh_pr_helper(argv: Sequence[str] | None = None) -> None:
     parser.add_argument("--owner", help="Repository owner (alternative to pr_path)")
     parser.add_argument("--repo", help="Repository name (alternative to pr_path)")
     parser.add_argument("--pr", dest="pr_number", help="PR number (alternative to pr_path)")
+    parser.add_argument(
+        "--all-ci-failure-log",
+        type=_str_to_bool,
+        default=False,
+        help="Set to true to include the full CI failure logs. Defaults to false (only failure summary).",
+    )
 
     args = parser.parse_args(list(argv[1:]) if argv is not None else None)
 
@@ -452,8 +679,16 @@ def gh_pr_helper(argv: Sequence[str] | None = None) -> None:
             raise SystemExit(1)
 
         review_comments, issue_comments = fetch_pr_comments(owner, repo, pr_number)
+        ci_failures = collect_ci_failures(
+            owner, repo, pr_number, include_full_logs=args.all_ci_failure_log
+        )
         markdown_output = format_comments_as_markdown(
-            review_comments, issue_comments, owner, repo, pr_number
+            review_comments,
+            issue_comments,
+            owner,
+            repo,
+            pr_number,
+            ci_failures=ci_failures,
         )
         print(markdown_output)
 

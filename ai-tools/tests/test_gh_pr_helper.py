@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 import json
 import subprocess
 from unittest.mock import MagicMock, patch
@@ -9,6 +10,9 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from autocoder_utils.gh_pr_helper import (
+    _str_to_bool,
+    _summarize_ci_log,
+    collect_ci_failures,
     GitHubAPICallError,
     GitHubAPIError,
     GitHubGraphQLError,
@@ -17,6 +21,8 @@ from autocoder_utils.gh_pr_helper import (
     _fetch_review_threads_page,
     _fetch_thread_comments_page,
     fetch_api,
+    fetch_ci_run_log,
+    fetch_failed_ci_runs,
     fetch_pr_comments,
     fetch_review_comments_graphql,
     format_comments_as_markdown,
@@ -97,9 +103,6 @@ class TestFetchAPI:
 
         with pytest.raises(GitHubJSONError, match="Failed to parse JSON"):
             fetch_api("/repos/owner/repo/issues/1/comments")
-
-    def test_fail(self):
-        assert(True is False)
 
 
 class TestFetchReviewThreadsPage:
@@ -569,6 +572,31 @@ class TestFormatCommentsAsMarkdown:
         assert "@alice" in result
         assert "@reviewer1" in result
 
+    def test_format_includes_ci_failures(self):
+        """Test that CI failure logs are included when provided."""
+        ci_failures = [
+            {
+                "name": "CI Workflow",
+                "workflow_run_id": 12345,
+                "details_url": "https://example.com/run/12345",
+                "log_output": "Step failed",
+            }
+        ]
+
+        result = format_comments_as_markdown(
+            [],
+            [],
+            "owner",
+            "repo",
+            "10",
+            ci_failures=ci_failures,
+        )
+
+        assert "## CI Failures" in result
+        assert "CI Workflow (Run ID 12345)" in result
+        assert "Step failed" in result
+        assert "https://example.com/run/12345" in result
+
 
 class TestFetchPRComments:
     """Tests for fetch_pr_comments function."""
@@ -612,3 +640,214 @@ class TestFetchPRComments:
 
         with pytest.raises(GitHubAPIError):
             fetch_pr_comments("owner", "repo", "10")
+
+
+class TestBooleanParsing:
+    """Tests for CLI boolean parsing helper."""
+
+    def test_str_to_bool_true_values(self):
+        """Ensure various truthy strings are accepted."""
+        for value in ["true", "True", "YES", "1", "On"]:
+            assert _str_to_bool(value) is True
+
+    def test_str_to_bool_false_values(self):
+        """Ensure various falsy strings are accepted."""
+        for value in ["false", "False", "no", "0", "Off"]:
+            assert _str_to_bool(value) is False
+
+    def test_str_to_bool_invalid_value(self):
+        """Invalid strings should raise argparse errors."""
+        with pytest.raises(argparse.ArgumentTypeError):
+            _str_to_bool("maybe")
+
+
+class TestFetchFailedCIRuns:
+    """Tests for fetch_failed_ci_runs function."""
+
+    @patch("autocoder_utils.gh_pr_helper.subprocess.run")
+    def test_fetch_failed_ci_runs_success(self, mock_run):
+        """Test fetching failed CI runs filters to CheckRun failures."""
+        mock_payload = {
+            "data": {
+                "repository": {
+                    "pullRequest": {
+                        "commits": {
+                            "nodes": [
+                                {
+                                    "commit": {
+                                        "statusCheckRollup": {
+                                            "contexts": {
+                                                "nodes": [
+                                                    {
+                                                        "__typename": "CheckRun",
+                                                        "name": "Lint",
+                                                        "conclusion": "FAILURE",
+                                                        "detailsUrl": "https://example.com/lint",
+                                                        "checkSuite": {
+                                                            "workflowRun": {
+                                                                "databaseId": 111,
+                                                                "url": "https://github.com/run/111",
+                                                            }
+                                                        },
+                                                    },
+                                                    {
+                                                        "__typename": "CheckRun",
+                                                        "name": "Tests",
+                                                        "conclusion": "SUCCESS",
+                                                        "checkSuite": {
+                                                            "workflowRun": {
+                                                                "databaseId": 222,
+                                                                "url": "https://github.com/run/222",
+                                                            }
+                                                        },
+                                                    },
+                                                ]
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        }
+        mock_result = MagicMock()
+        mock_result.stdout = json.dumps(mock_payload)
+        mock_run.return_value = mock_result
+
+        runs = fetch_failed_ci_runs("owner", "repo", "10")
+
+        assert len(runs) == 1
+        assert runs[0]["name"] == "Lint"
+        assert runs[0]["workflow_run_id"] == 111
+        assert runs[0]["details_url"] == "https://example.com/lint"
+
+
+class TestFetchCIRunLog:
+    """Tests for fetch_ci_run_log function."""
+
+    @patch("autocoder_utils.gh_pr_helper.subprocess.run")
+    def test_fetch_ci_run_log_success(self, mock_run):
+        """Test successful retrieval of run logs."""
+        mock_result = MagicMock()
+        mock_result.stdout = "log output"
+        mock_run.return_value = mock_result
+
+        output = fetch_ci_run_log(123)
+
+        assert output == "log output"
+        mock_run.assert_called_once()
+        assert "--log-failed" in mock_run.call_args[0][0]
+
+    @patch("autocoder_utils.gh_pr_helper.subprocess.run")
+    def test_fetch_ci_run_log_failure(self, mock_run):
+        """Test that subprocess errors raise GitHubAPICallError."""
+        mock_run.side_effect = subprocess.CalledProcessError(1, "gh", stderr="boom")
+
+        with pytest.raises(GitHubAPICallError):
+            fetch_ci_run_log(123)
+
+
+class TestCollectCIFailures:
+    """Tests for collect_ci_failures helper."""
+
+    @patch("autocoder_utils.gh_pr_helper.fetch_ci_run_log")
+    @patch("autocoder_utils.gh_pr_helper.fetch_failed_ci_runs")
+    def test_collect_ci_failures_deduplicates_runs(self, mock_fetch_runs, mock_fetch_log):
+        """Test that duplicate run IDs are ignored and logs are attached."""
+        mock_fetch_runs.return_value = [
+            {
+                "name": "CI",
+                "workflow_run_id": 10,
+                "details_url": "https://example.com/ci",
+                "workflow_url": "https://github.com/run/10",
+            },
+            {
+                "name": "CI",
+                "workflow_run_id": 10,
+                "details_url": "https://example.com/ci",
+                "workflow_url": "https://github.com/run/10",
+            },
+        ]
+        mock_fetch_log.return_value = "log data"
+
+        failures = collect_ci_failures("owner", "repo", "10")
+
+        assert len(failures) == 1
+        assert failures[0]["log_output"] == "log data"
+        mock_fetch_log.assert_called_once_with(10)
+
+    @patch("autocoder_utils.gh_pr_helper.fetch_ci_run_log")
+    @patch("autocoder_utils.gh_pr_helper.fetch_failed_ci_runs")
+    def test_collect_ci_failures_handles_missing_run_id(
+        self, mock_fetch_runs, mock_fetch_log
+    ):
+        """Test that runs without IDs still produce entries."""
+        mock_fetch_runs.return_value = [
+            {
+                "name": "External Check",
+                "workflow_run_id": None,
+                "details_url": "https://example.com/external",
+                "workflow_url": None,
+            }
+        ]
+        failures = collect_ci_failures("owner", "repo", "10")
+
+        assert len(failures) == 1
+        assert "No workflow run ID available" in failures[0]["log_output"]
+        mock_fetch_log.assert_not_called()
+
+    @patch("autocoder_utils.gh_pr_helper.fetch_ci_run_log")
+    @patch("autocoder_utils.gh_pr_helper.fetch_failed_ci_runs")
+    def test_collect_ci_failures_log_summarization(
+        self, mock_fetch_runs, mock_fetch_log
+    ):
+        """Test that log summarization toggles between summary and full log."""
+        sample_log = "\n".join(
+            [
+                "setup step output",
+                "more details",
+                "optional-tests  UNKNOWN STEP    2025-12-01T00:09:38.3786545Z =========================== short test summary info ===========================",
+                "optional-tests  UNKNOWN STEP    2025-12-01T00:09:38.3787457Z FAILED tests/test_example.py::test_something - AssertionError",
+                "optional-tests  UNKNOWN STEP    2025-12-01T00:09:38.3789910Z = 1 failed, 10 passed =",
+            ]
+        )
+        mock_fetch_runs.return_value = [
+            {
+                "name": "optional-tests",
+                "workflow_run_id": 42,
+                "details_url": "https://example.com/runs/42",
+                "workflow_url": "https://github.com/run/42",
+            }
+        ]
+        mock_fetch_log.return_value = sample_log
+
+        summary_failures = collect_ci_failures(
+            "owner", "repo", "10", include_full_logs=False
+        )
+        assert summary_failures[0]["log_output"].startswith("optional-tests")
+        assert "setup step output" not in summary_failures[0]["log_output"]
+
+        mock_fetch_log.return_value = sample_log
+        full_failures = collect_ci_failures(
+            "owner", "repo", "10", include_full_logs=True
+        )
+        assert full_failures[0]["log_output"] == sample_log
+        assert mock_fetch_log.call_count == 2
+
+
+class TestSummarizeCILog:
+    """Direct tests for log summarization helper."""
+
+    def test_summarize_ci_log_uses_failed_marker(self):
+        """If summary marker missing, ensure we still capture failed lines."""
+        log_output = "info\nanother line\nFAILED test_sample::test_a\nTrailing"
+        snippet = _summarize_ci_log(log_output, include_full_log=False)
+        assert snippet.startswith("FAILED")
+        assert "info" not in snippet
+
+    def test_summarize_ci_log_full_toggle(self):
+        """When include_full_log is True, return entire log."""
+        log_output = "line1\nline2"
+        assert _summarize_ci_log(log_output, include_full_log=True) == log_output
