@@ -6,7 +6,7 @@ like `gh`, `llm`, `kilocode`, and `claude`, and can be run via `uv` or as an exe
 
 ## Layout
 
-- `autocoder_utils/`: Shared Python helpers used by the Kilocode/Claude flows.
+- `autocoder_utils/`: Shared Python helpers used by the Kilocode/Claude flows (see [Autocoder Utils](#autocoder-utils) below).
 - `change-tracker/`: Git changelog generator used by the scheduled workflow.
 - `gh-pr-helper/`: Standalone formatter that fetches and prints PR review comments.
 - `kilocode/`: Scripts that orchestrate Kilocode workflows along with git and GitHub.
@@ -123,6 +123,70 @@ Usage:
 
 ```bash
 uv tool run --from ./ai-tools address-pr-comments-with-kilocode 456
+```
+
+## Autocoder Utils
+
+This package provides shared utilities for AI-powered coding automation tools in the ai-tools directory.
+
+### Overview
+
+The `autocoder_utils` module contains common helper functions used by various AI coding automation scripts, including:
+
+- Command availability checking
+- Environment setup (API keys, LLM configuration)
+- Git operations (staging, checking for changes, repository metadata)
+- Subprocess execution with error handling
+
+### Functions
+
+#### Command and Environment
+
+- `check_commands_available(required)`: Verify that required CLI tools are installed
+- `ensure_env()`: Ensure required environment variables are set
+
+#### Git Operations
+
+- `stage_changes()`: Stage all changes with `git add -A`
+- `has_staged_changes()`: Check if there are staged changes
+- `get_repo_root()`: Get the root directory of the git repository
+- `get_owner_repo()`: Extract owner and repository name from git remote URL
+
+#### Utilities
+
+- `run(cmd, input_text=None, capture_output=True)`: Execute a command with proper error handling
+
+### Usage
+
+```python
+from autocoder_utils import check_commands_available, ensure_env, run
+
+# Check for required tools
+check_commands_available(["gh", "llm", "kilocode"])
+
+# Ensure environment is set up
+ensure_env()
+
+# Run a command
+output = run(["git", "status"])
+```
+
+### Dependencies
+
+This module has no external dependencies beyond Python's standard library.
+
+### Testing
+
+Tests for autocoder_utils are located in `tests/test_autocoder_utils.py` and can be run with:
+
+```bash
+uv run pytest tests/test_autocoder_utils.py
+```
+
+Additional tests for gh_pr_helper are located in `tests/test_gh_pr_helper.py`:
+
+```bash
+uv run pytest tests/test_gh_pr_helper.py
 ```
 
 ## Claude tool
