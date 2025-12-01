@@ -466,7 +466,7 @@ class IOBuiltins:
             # Convert single-character atom to code (SWI-Prolog compatibility)
             char_code = ord(code.name)
         else:
-            raise PrologThrow(PrologError.type_error("integer", code, "put/1"))
+            raise PrologThrow(PrologError.type_error("in_character", code, "put/1"))
 
         if char_code < 0 or char_code > 1114111:
             raise PrologThrow(PrologError.representation_error("character_code", "put/1"))
@@ -488,7 +488,7 @@ class IOBuiltins:
         elif isinstance(code, Atom) and len(code.name) == 1:
             char_code = ord(code.name)
         else:
-            raise PrologThrow(PrologError.type_error("integer", code, "put/2"))
+            raise PrologThrow(PrologError.type_error("in_character", code, "put/2"))
 
         if char_code < 0 or char_code > 1114111:
             raise PrologThrow(PrologError.representation_error("character_code", "put/2"))
