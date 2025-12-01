@@ -7,18 +7,56 @@ import sys
 from typing import Sequence
 
 
+class GitHubAPIError(Exception):
+    """Base exception for GitHub API errors."""
+
+    pass
+
+
+class GitHubAPICallError(GitHubAPIError):
+    """Raised when the gh CLI command fails."""
+
+    pass
+
+
+class GitHubJSONError(GitHubAPIError):
+    """Raised when JSON parsing fails."""
+
+    pass
+
+
+class GitHubGraphQLError(GitHubAPIError):
+    """Raised when GraphQL returns errors."""
+
+    pass
+
+
+class GitHubResponseError(GitHubAPIError):
+    """Raised when the API response format is unexpected."""
+
+    pass
+
+
 GRAPHQL_REVIEW_COMMENTS_QUERY = """
-query FetchReviewComments($owner: String!, $repo: String!, $pr: Int!) {
+query FetchReviewComments($owner: String!, $repo: String!, $pr: Int!, $threadsAfter: String, $commentsAfter: String) {
   repository(owner: $owner, name: $repo) {
     pullRequest(number: $pr) {
-      reviewThreads(first: 100) {
+      reviewThreads(first: 100, after: $threadsAfter) {
+        pageInfo {
+          hasNextPage
+          endCursor
+        }
         edges {
           node {
             isResolved
             path
             line
             startLine
-            comments(first: 100) {
+            comments(first: 100, after: $commentsAfter) {
+              pageInfo {
+                hasNextPage
+                endCursor
+              }
               nodes {
                 author {
                   login
@@ -55,6 +93,10 @@ def parse_pr_path(pr_path: str) -> tuple[str, str, str]:
 def fetch_api(api_path: str) -> list[dict]:
     """
     Fetch data from GitHub API using the gh CLI tool.
+
+    Raises:
+        GitHubAPICallError: If the gh CLI command fails.
+        GitHubJSONError: If JSON parsing fails.
     """
     cmd = [
         "gh",
@@ -75,16 +117,95 @@ def fetch_api(api_path: str) -> list[dict]:
         )
         return json.loads(result.stdout)
     except subprocess.CalledProcessError as exc:
-        print(f"Error calling gh API: {exc.stderr}", file=sys.stderr)
-        raise SystemExit(1)
+        raise GitHubAPICallError(f"gh API call failed: {exc.stderr}") from exc
     except json.JSONDecodeError as exc:
-        print(f"Error parsing JSON response: {exc}", file=sys.stderr)
-        raise SystemExit(1)
+        raise GitHubJSONError(f"Failed to parse JSON response: {exc}") from exc
 
 
-def fetch_review_comments_graphql(owner: str, repo: str, pr_number: str) -> list[dict]:
+def _fetch_review_threads_page(
+    owner: str, repo: str, pr_number: str, threads_after: str | None = None
+) -> tuple[list[dict], bool, str | None]:
     """
-    Fetch review comments via the GitHub GraphQL API, excluding resolved threads.
+    Fetch a single page of review threads from the GraphQL API.
+
+    Args:
+        owner: Repository owner
+        repo: Repository name
+        pr_number: Pull request number
+        threads_after: Cursor for pagination
+
+    Returns:
+        Tuple of (threads, has_next_page, next_cursor)
+
+    Raises:
+        GitHubAPICallError: If the gh CLI command fails.
+        GitHubJSONError: If JSON parsing fails.
+        GitHubGraphQLError: If GraphQL returns errors.
+        GitHubResponseError: If the response format is unexpected.
+    """
+    cmd = [
+        "gh",
+        "api",
+        "graphql",
+        "-f",
+        f"owner={owner}",
+        "-f",
+        f"repo={repo}",
+        "-F",
+        f"pr={pr_number}",
+    ]
+    
+    if threads_after:
+        cmd.extend(["-f", f"threadsAfter={threads_after}"])
+    else:
+        cmd.extend(["-f", "threadsAfter=null"])
+    
+    cmd.extend(["-f", "commentsAfter=null"])
+    cmd.extend(["-f", f"query={GRAPHQL_REVIEW_COMMENTS_QUERY}"])
+
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        payload = json.loads(result.stdout)
+    except subprocess.CalledProcessError as exc:
+        raise GitHubAPICallError(f"gh GraphQL API call failed: {exc.stderr}") from exc
+    except json.JSONDecodeError as exc:
+        raise GitHubJSONError(f"Failed to parse GraphQL response: {exc}") from exc
+
+    if "errors" in payload and payload["errors"]:
+        raise GitHubGraphQLError(f"GraphQL query returned errors: {payload['errors']}")
+
+    try:
+        review_threads_data = payload["data"]["repository"]["pullRequest"]["reviewThreads"]
+        threads = review_threads_data.get("edges") or []
+        page_info = review_threads_data.get("pageInfo") or {}
+    except (KeyError, TypeError) as exc:
+        raise GitHubResponseError(
+            "Unexpected GraphQL response format when fetching review threads"
+        ) from exc
+    
+    return threads, page_info.get("hasNextPage", False), page_info.get("endCursor")
+
+
+def _fetch_thread_comments_page(
+    owner: str, repo: str, pr_number: str, comments_after: str | None = None
+) -> tuple[list[dict], bool, str | None]:
+    """
+    Fetch a single page of comments for a specific thread.
+
+    Args:
+        owner: Repository owner
+        repo: Repository name
+        pr_number: Pull request number
+        comments_after: Cursor for pagination
+
+    Returns:
+        Tuple of (comments, has_next_page, next_cursor)
+
+    Raises:
+        GitHubAPICallError: If the gh CLI command fails.
+        GitHubJSONError: If JSON parsing fails.
+        GitHubGraphQLError: If GraphQL returns errors.
+        GitHubResponseError: If the response format is unexpected.
     """
     cmd = [
         "gh",
@@ -97,59 +218,121 @@ def fetch_review_comments_graphql(owner: str, repo: str, pr_number: str) -> list
         "-F",
         f"pr={pr_number}",
         "-f",
-        f"query={GRAPHQL_REVIEW_COMMENTS_QUERY}",
+        "threadsAfter=null",
     ]
+    
+    if comments_after:
+        cmd.extend(["-f", f"commentsAfter={comments_after}"])
+    else:
+        cmd.extend(["-f", "commentsAfter=null"])
+    
+    cmd.extend(["-f", f"query={GRAPHQL_REVIEW_COMMENTS_QUERY}"])
 
     try:
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            check=True,
-        )
+        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
         payload = json.loads(result.stdout)
     except subprocess.CalledProcessError as exc:
-        print(f"Error calling gh GraphQL API: {exc.stderr}", file=sys.stderr)
-        raise SystemExit(1)
+        raise GitHubAPICallError(f"gh GraphQL API call failed: {exc.stderr}") from exc
     except json.JSONDecodeError as exc:
-        print(f"Error parsing GraphQL JSON response: {exc}", file=sys.stderr)
-        raise SystemExit(1)
+        raise GitHubJSONError(f"Failed to parse GraphQL response: {exc}") from exc
 
     if "errors" in payload and payload["errors"]:
-        print(f"GraphQL errors: {payload['errors']}", file=sys.stderr)
-        raise SystemExit(1)
+        raise GitHubGraphQLError(f"GraphQL query returned errors: {payload['errors']}")
 
     try:
         threads = payload["data"]["repository"]["pullRequest"]["reviewThreads"]["edges"]
+        if threads:
+            comments_data = threads[0].get("node", {}).get("comments", {})
+            comment_nodes = comments_data.get("nodes") or []
+            page_info = comments_data.get("pageInfo") or {}
+        else:
+            comment_nodes = []
+            page_info = {}
     except (KeyError, TypeError) as exc:
-        print("Unexpected GraphQL response format when fetching review comments.", file=sys.stderr)
-        raise SystemExit(1) from exc
+        raise GitHubResponseError(
+            "Unexpected GraphQL response format when fetching thread comments"
+        ) from exc
+    
+    return comment_nodes, page_info.get("hasNextPage", False), page_info.get("endCursor")
 
+
+def fetch_review_comments_graphql(owner: str, repo: str, pr_number: str) -> list[dict]:
+    """
+    Fetch review comments via the GitHub GraphQL API, excluding resolved threads.
+    Implements pagination to handle more than 100 review threads or 100 comments per thread.
+    """
     review_comments: list[dict] = []
-    for edge in threads or []:
-        thread = edge.get("node") or {}
-        if thread.get("isResolved"):
-            continue
-
-        path = thread.get("path", "unknown")
-        line = thread.get("line")
-        start_line = thread.get("startLine")
-        comment_nodes = (thread.get("comments") or {}).get("nodes") or []
-
-        for comment in comment_nodes:
-            author_login = (comment.get("author") or {}).get("login", "unknown")
-            review_comments.append(
-                {
-                    "path": path,
-                    "line": line,
-                    "start_line": start_line,
-                    "original_line": line,
-                    "diff_hunk": comment.get("diffHunk"),
-                    "user": {"login": author_login},
-                    "body": comment.get("body", ""),
-                    "url": comment.get("url"),
-                }
-            )
+    threads_after: str | None = None
+    
+    # Paginate through review threads
+    while True:
+        threads, has_next_thread_page, next_thread_cursor = _fetch_review_threads_page(
+            owner, repo, pr_number, threads_after
+        )
+        
+        for edge in threads:
+            thread = edge.get("node") or {}
+            if thread.get("isResolved"):
+                continue
+            
+            path = thread.get("path", "unknown")
+            line = thread.get("line")
+            start_line = thread.get("startLine")
+            
+            # Collect all comments for this thread with pagination
+            comments_after: str | None = None
+            while True:
+                # Get first page of comments from the thread
+                comment_nodes = (thread.get("comments") or {}).get("nodes") or []
+                comments_page_info = (thread.get("comments") or {}).get("pageInfo") or {}
+                
+                for comment in comment_nodes:
+                    author_login = (comment.get("author") or {}).get("login", "unknown")
+                    review_comments.append(
+                        {
+                            "path": path,
+                            "line": line,
+                            "start_line": start_line,
+                            "original_line": line,
+                            "diff_hunk": comment.get("diffHunk"),
+                            "user": {"login": author_login},
+                            "body": comment.get("body", ""),
+                            "url": comment.get("url"),
+                        }
+                    )
+                
+                # Check if there are more comments in this thread
+                if not comments_page_info.get("hasNextPage"):
+                    break
+                
+                # Fetch next page of comments
+                comments_after = comments_page_info.get("endCursor")
+                comment_nodes, has_next_comment_page, next_comment_cursor = (
+                    _fetch_thread_comments_page(owner, repo, pr_number, comments_after)
+                )
+                
+                for comment in comment_nodes:
+                    author_login = (comment.get("author") or {}).get("login", "unknown")
+                    review_comments.append(
+                        {
+                            "path": path,
+                            "line": line,
+                            "start_line": start_line,
+                            "original_line": line,
+                            "diff_hunk": comment.get("diffHunk"),
+                            "user": {"login": author_login},
+                            "body": comment.get("body", ""),
+                            "url": comment.get("url"),
+                        }
+                    )
+                
+                if not has_next_comment_page:
+                    break
+        
+        if not has_next_thread_page:
+            break
+        
+        threads_after = next_thread_cursor
 
     return review_comments
 
@@ -234,6 +417,12 @@ def format_comments_as_markdown(
 
 
 def gh_pr_helper(argv: Sequence[str] | None = None) -> None:
+    """
+    Main entry point for fetching and formatting GitHub PR comments.
+
+    Parses command-line arguments, fetches PR comments, and prints formatted output.
+    Catches and handles all exceptions, printing error messages before exiting.
+    """
     parser = argparse.ArgumentParser(
         description="Fetch and format GitHub PR comments for AI coding agents.",
         epilog="Example: %(prog)s nlothian/Vibe-Prolog/pull/10",
@@ -250,21 +439,27 @@ def gh_pr_helper(argv: Sequence[str] | None = None) -> None:
 
     args = parser.parse_args(list(argv[1:]) if argv is not None else None)
 
-    if args.pr_path:
-        try:
+    try:
+        if args.pr_path:
             owner, repo, pr_number = parse_pr_path(args.pr_path)
-        except ValueError as exc:
-            print(f"Error: {exc}", file=sys.stderr)
+        elif args.owner and args.repo and args.pr_number:
+            owner = args.owner
+            repo = args.repo
+            pr_number = args.pr_number
+        else:
+            parser.print_help()
+            print("\nError: Provide either a PR path or --owner, --repo, and --pr", file=sys.stderr)
             raise SystemExit(1)
-    elif args.owner and args.repo and args.pr_number:
-        owner = args.owner
-        repo = args.repo
-        pr_number = args.pr_number
-    else:
-        parser.print_help()
-        print("\nError: Provide either a PR path or --owner, --repo, and --pr", file=sys.stderr)
-        raise SystemExit(1)
 
-    review_comments, issue_comments = fetch_pr_comments(owner, repo, pr_number)
-    markdown_output = format_comments_as_markdown(review_comments, issue_comments, owner, repo, pr_number)
-    print(markdown_output)
+        review_comments, issue_comments = fetch_pr_comments(owner, repo, pr_number)
+        markdown_output = format_comments_as_markdown(
+            review_comments, issue_comments, owner, repo, pr_number
+        )
+        print(markdown_output)
+
+    except ValueError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        raise SystemExit(1)
+    except GitHubAPIError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        raise SystemExit(1)
