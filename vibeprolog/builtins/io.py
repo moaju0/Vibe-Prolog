@@ -542,10 +542,10 @@ class IOBuiltins:
         register_builtin(registry, "told", 0, lambda args, subst, eng: self._builtin_told(args, subst, eng))
 
         # Character code I/O predicates
-        register_builtin(registry, "get", 1, lambda args, subst, eng: self._builtin_get(args, subst, eng))
-        register_builtin(registry, "get", 2, lambda args, subst, eng: self._builtin_get_stream(args, subst, eng))
-        register_builtin(registry, "put", 1, lambda args, subst, eng: self._builtin_put(args, subst, eng))
-        register_builtin(registry, "put", 2, lambda args, subst, eng: self._builtin_put_stream(args, subst, eng))
+        register_builtin(registry, "get", 1, IOBuiltins._builtin_get)
+        register_builtin(registry, "get", 2, IOBuiltins._builtin_get_stream)
+        register_builtin(registry, "put", 1, IOBuiltins._builtin_put)
+        register_builtin(registry, "put", 2, IOBuiltins._builtin_put_stream)
 
         # New ISO predicates
         register_builtin(registry, "read_term", 2, self._builtin_read_term)
