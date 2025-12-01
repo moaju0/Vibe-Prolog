@@ -182,6 +182,10 @@ class _TermReader:
 class IOBuiltins:
     """Built-ins for standard output and formatting."""
 
+    def __init__(self, engine):
+        # Per-engine I/O state is stored on the EngineContext to avoid cross-context sharing
+        self.engine = engine
+
     # =========================================================================
     # Stream Helper Methods
     # =========================================================================
@@ -292,78 +296,280 @@ class IOBuiltins:
             raise PrologThrow(error_term)
         return stream
 
+    def _register_stream(self, handle, filename, mode, stream_type='text'):
+        """Register a stream with its properties."""
+        self.engine.stream_properties[handle] = {
+            'file_name': filename,
+            'mode': mode,
+            'type': stream_type,
+            'input': mode in ['read', 'read_write'],
+            'output': mode in ['write', 'append', 'read_write'],
+        }
+
+    def _unregister_stream(self, handle):
+        """Remove stream from property tracking."""
+        if handle in self.engine.stream_properties:
+            del self.engine.stream_properties[handle]
+
+    def _builtin_see(self, args, subst, engine):
+        """see(+File) - Classic input redirection."""
+        file_term = args[0]
+        filename = deref(file_term, subst)
+
+        # Type check
+        if not isinstance(filename, Atom):
+            raise PrologThrow(PrologError.type_error("atom", filename, "see/1"))
+
+        try:
+            # Open file
+            handle = open(filename.name, 'r', encoding='utf-8')
+
+            # Save current input
+            current = getattr(engine, '_current_input_stream', USER_INPUT_STREAM)
+            self.engine.input_stack.append(current)
+
+            # Set new input
+            engine._current_input_stream = Atom(f"stream_{id(handle)}")
+            engine.add_stream(Stream(handle=engine._current_input_stream, file_obj=handle, mode='read', filename=filename.name))
+            self._register_stream(engine._current_input_stream, filename.name, 'read')
+
+            yield subst
+
+        except FileNotFoundError:
+            raise PrologThrow(PrologError.existence_error("source_sink", filename, "see/1"))
+        except PermissionError:
+            raise PrologThrow(PrologError.permission_error("open", "source_sink", filename, "see/1"))
+
+    def _builtin_seen(self, args, subst, engine):
+        """seen - Close classic input."""
+        if self.engine.input_stack:
+            # Close current input
+            current_stream = getattr(engine, '_current_input_stream', USER_INPUT_STREAM)
+            if current_stream != USER_INPUT_STREAM:
+                stream = engine.get_stream(current_stream)
+                if stream:
+                    stream.close()
+                    engine.remove_stream(current_stream)
+                    self._unregister_stream(current_stream)
+
+            # Restore previous
+            engine._current_input_stream = self.engine.input_stack.pop()
+
+        yield subst
+
+    def _builtin_tell(self, args, subst, engine):
+        """tell(+File) - Classic output redirection."""
+        file_term = args[0]
+        filename = deref(file_term, subst)
+
+        if not isinstance(filename, Atom):
+            raise PrologThrow(PrologError.type_error("atom", filename, "tell/1"))
+
+        try:
+            handle = open(filename.name, 'w', encoding='utf-8')
+
+            current = getattr(engine, '_current_output_stream', USER_OUTPUT_STREAM)
+            self.engine.output_stack.append(current)
+
+            engine._current_output_stream = Atom(f"stream_{id(handle)}")
+            engine.add_stream(Stream(handle=engine._current_output_stream, file_obj=handle, mode='write', filename=filename.name))
+            self._register_stream(engine._current_output_stream, filename.name, 'write')
+
+            yield subst
+
+        except FileNotFoundError:
+            raise PrologThrow(PrologError.existence_error("source_sink", filename, "tell/1"))
+        except PermissionError:
+            raise PrologThrow(PrologError.permission_error("open", "source_sink", filename, "tell/1"))
+
+    def _builtin_told(self, args, subst, engine):
+        """told - Close classic output."""
+        if self.engine.output_stack:
+            current_stream = getattr(engine, '_current_output_stream', USER_OUTPUT_STREAM)
+            if current_stream != USER_OUTPUT_STREAM:
+                stream = engine.get_stream(current_stream)
+                if stream:
+                    stream.close()
+                    engine.remove_stream(current_stream)
+                    self._unregister_stream(current_stream)
+
+            engine._current_output_stream = self.engine.output_stack.pop()
+
+        yield subst
+
     @staticmethod
-    def register(registry: BuiltinRegistry, _engine: EngineContext | None) -> None:
+    def _builtin_get(args, subst, engine):
+        """get(-Code) - Read character code, skipping whitespace."""
+        code_term = args[0]
+
+        stream = IOBuiltins._get_input_stream(engine, "get/1")
+
+        # Skip whitespace
+        while True:
+            ch = IOBuiltins._read_raw_char(stream, "get/1")
+            if ch == "":
+                code = -1
+                break
+            if not ch.isspace():
+                code = ord(ch)
+                break
+
+        # Unify
+        new_subst = unify(code_term, Number(code), subst)
+        if new_subst is not None:
+            yield new_subst
+
+    @staticmethod
+    def _builtin_get_stream(args, subst, engine):
+        """get(+Stream, -Code) - Read character code from stream."""
+        stream_term, code_term = args
+        stream = IOBuiltins._get_input_stream_from_term(engine, stream_term, subst, "get/2")
+
+        # Skip whitespace
+        while True:
+            ch = IOBuiltins._read_raw_char(stream, "get/2")
+            if ch == "":
+                code = -1
+                break
+            if not ch.isspace():
+                code = ord(ch)
+                break
+
+        # Unify
+        new_subst = unify(code_term, Number(code), subst)
+        if new_subst is not None:
+            yield new_subst
+
+    @staticmethod
+    def _read_raw_char(stream, context):
+        """Helper to read a single character from stream."""
+        try:
+            if stream.pushback_buffer:
+                return stream.pushback_buffer.pop()
+            else:
+                ch = stream.file_obj.read(1)
+                return ch
+        except (OSError, IOError) as e:
+            error_term = PrologError.permission_error("input", "stream", stream.handle, context)
+            raise PrologThrow(error_term)
+
+    @staticmethod
+    def _builtin_put(args, subst, engine):
+        """put(+Code) - Write character code."""
+        code_term = args[0]
+        code = deref(code_term, subst)
+
+        if not isinstance(code, Number) or not isinstance(code.value, int):
+            raise PrologThrow(PrologError.type_error("integer", code, "put/1"))
+
+        if code.value < 0 or code.value > 1114111:
+            raise PrologThrow(PrologError.representation_error("character_code", "put/1"))
+
+        stream = IOBuiltins._get_output_stream(engine, "put/1")
+        IOBuiltins._write_char_to_stream(stream, chr(code.value), "put/1")
+
+        yield subst
+
+    @staticmethod
+    def _builtin_put_stream(args, subst, engine):
+        """put(+Stream, +Code) - Write character code to stream."""
+        stream_term, code_term = args
+        code = deref(code_term, subst)
+
+        if not isinstance(code, Number) or not isinstance(code.value, int):
+            raise PrologThrow(PrologError.type_error("integer", code, "put/2"))
+
+        if code.value < 0 or code.value > 1114111:
+            raise PrologThrow(PrologError.representation_error("character_code", "put/2"))
+
+        stream = IOBuiltins._get_output_stream_from_term(engine, stream_term, subst, "put/2")
+        IOBuiltins._write_char_to_stream(stream, chr(code.value), "put/2")
+
+        yield subst
+
+    def register(self, registry: BuiltinRegistry) -> None:
         """Register I/O predicate handlers."""
         # Existing predicates
-        register_builtin(registry, "write", 1, IOBuiltins._builtin_write)
-        register_builtin(registry, "writeln", 1, IOBuiltins._builtin_writeln)
-        register_builtin(registry, "format", 3, IOBuiltins._builtin_format)
-        register_builtin(registry, "format", 2, IOBuiltins._builtin_format_stdout)
+        register_builtin(registry, "write", 1, self._builtin_write)
+        register_builtin(registry, "writeln", 1, self._builtin_writeln)
+        register_builtin(registry, "format", 3, self._builtin_format)
+        register_builtin(registry, "format", 2, self._builtin_format_stdout)
         register_builtin(
             registry,
             "format",
             1,
-            lambda args, subst, engine: IOBuiltins._builtin_format_stdout(
+            lambda args, subst, engine: self._builtin_format_stdout(
                 (args[0], List(())), subst, engine
             ),
         )
-        register_builtin(registry, "nl", 0, IOBuiltins._builtin_newline)
+        register_builtin(registry, "nl", 0, self._builtin_newline)
         register_builtin(
-            registry, "read_from_chars", 2, IOBuiltins._builtin_read_from_chars
+            registry, "read_from_chars", 2, self._builtin_read_from_chars
         )
         register_builtin(
-            registry, "write_term_to_chars", 3, IOBuiltins._builtin_write_term_to_chars
+            registry, "write_term_to_chars", 3, self._builtin_write_term_to_chars
         )
-        register_builtin(registry, "current_input", 1, IOBuiltins._builtin_current_input)
-        register_builtin(registry, "current_output", 1, IOBuiltins._builtin_current_output)
-        register_builtin(registry, "open", 3, IOBuiltins._builtin_open)
-        register_builtin(registry, "close", 1, IOBuiltins._builtin_close)
-        register_builtin(registry, "read", 1, IOBuiltins._builtin_read)
-        register_builtin(registry, "read", 2, IOBuiltins._builtin_read_from_stream)
-        register_builtin(registry, "get_char", 1, IOBuiltins._builtin_get_char)
-        register_builtin(registry, "get_char", 2, IOBuiltins._builtin_get_char_from_stream)
-        register_builtin(registry, "put_char", 1, IOBuiltins._builtin_put_char)
-        register_builtin(registry, "put_char", 2, IOBuiltins._builtin_put_char_to_stream)
-        register_builtin(registry, "get_code", 1, IOBuiltins._builtin_get_code)
-        register_builtin(registry, "get_code", 2, IOBuiltins._builtin_get_code_from_stream)
-        register_builtin(registry, "put_code", 1, IOBuiltins._builtin_put_code)
-        register_builtin(registry, "put_code", 2, IOBuiltins._builtin_put_code_to_stream)
-        register_builtin(registry, "peek_char", 1, IOBuiltins._builtin_peek_char)
-        register_builtin(registry, "peek_char", 2, IOBuiltins._builtin_peek_char_from_stream)
-        register_builtin(registry, "peek_code", 1, IOBuiltins._builtin_peek_code)
-        register_builtin(registry, "peek_code", 2, IOBuiltins._builtin_peek_code_from_stream)
-        register_builtin(registry, "peek_byte", 1, IOBuiltins._builtin_peek_byte)
-        register_builtin(registry, "peek_byte", 2, IOBuiltins._builtin_peek_byte_from_stream)
-        register_builtin(registry, "get_byte", 1, IOBuiltins._builtin_get_byte)
-        register_builtin(registry, "get_byte", 2, IOBuiltins._builtin_get_byte_from_stream)
-        register_builtin(registry, "put_byte", 1, IOBuiltins._builtin_put_byte)
-        register_builtin(registry, "put_byte", 2, IOBuiltins._builtin_put_byte_to_stream)
-        register_builtin(registry, "nl", 1, IOBuiltins._builtin_newline_to_stream)
+        register_builtin(registry, "current_input", 1, self._builtin_current_input)
+        register_builtin(registry, "current_output", 1, self._builtin_current_output)
+        register_builtin(registry, "open", 3, self._builtin_open)
+        register_builtin(registry, "close", 1, self._builtin_close)
+        register_builtin(registry, "read", 1, self._builtin_read)
+        register_builtin(registry, "read", 2, self._builtin_read_from_stream)
+        register_builtin(registry, "get_char", 1, self._builtin_get_char)
+        register_builtin(registry, "get_char", 2, self._builtin_get_char_from_stream)
+        register_builtin(registry, "put_char", 1, self._builtin_put_char)
+        register_builtin(registry, "put_char", 2, self._builtin_put_char_to_stream)
+        register_builtin(registry, "get_code", 1, self._builtin_get_code)
+        register_builtin(registry, "get_code", 2, self._builtin_get_code_from_stream)
+        register_builtin(registry, "put_code", 1, self._builtin_put_code)
+        register_builtin(registry, "put_code", 2, self._builtin_put_code_to_stream)
+        register_builtin(registry, "peek_char", 1, self._builtin_peek_char)
+        register_builtin(registry, "peek_char", 2, self._builtin_peek_char_from_stream)
+        register_builtin(registry, "peek_code", 1, self._builtin_peek_code)
+        register_builtin(registry, "peek_code", 2, self._builtin_peek_code_from_stream)
+        register_builtin(registry, "peek_byte", 1, self._builtin_peek_byte)
+        register_builtin(registry, "peek_byte", 2, self._builtin_peek_byte_from_stream)
+        register_builtin(registry, "get_byte", 1, self._builtin_get_byte)
+        register_builtin(registry, "get_byte", 2, self._builtin_get_byte_from_stream)
+        register_builtin(registry, "put_byte", 1, self._builtin_put_byte)
+        register_builtin(registry, "put_byte", 2, self._builtin_put_byte_to_stream)
+        register_builtin(registry, "nl", 1, self._builtin_newline_to_stream)
+
+        # Classic I/O predicates
+        register_builtin(registry, "see", 1, lambda args, subst, eng: self._builtin_see(args, subst, eng))
+        register_builtin(registry, "seen", 0, lambda args, subst, eng: self._builtin_seen(args, subst, eng))
+        register_builtin(registry, "tell", 1, lambda args, subst, eng: self._builtin_tell(args, subst, eng))
+        register_builtin(registry, "told", 0, lambda args, subst, eng: self._builtin_told(args, subst, eng))
+
+        # Character code I/O predicates
+        register_builtin(registry, "get", 1, IOBuiltins._builtin_get)
+        register_builtin(registry, "get", 2, IOBuiltins._builtin_get_stream)
+        register_builtin(registry, "put", 1, IOBuiltins._builtin_put)
+        register_builtin(registry, "put", 2, IOBuiltins._builtin_put_stream)
 
         # New ISO predicates
-        register_builtin(registry, "read_term", 2, IOBuiltins._builtin_read_term)
-        register_builtin(registry, "read_term", 3, IOBuiltins._builtin_read_term_from_stream)
-        register_builtin(registry, "write_term", 2, IOBuiltins._builtin_write_term)
-        register_builtin(registry, "write_term", 3, IOBuiltins._builtin_write_term_to_stream)
-        register_builtin(registry, "writeq", 1, IOBuiltins._builtin_writeq)
-        register_builtin(registry, "writeq", 2, IOBuiltins._builtin_writeq_to_stream)
-        register_builtin(registry, "write_canonical", 1, IOBuiltins._builtin_write_canonical)
-        register_builtin(registry, "write_canonical", 2, IOBuiltins._builtin_write_canonical_to_stream)
-        register_builtin(registry, "print", 1, IOBuiltins._builtin_print)
-        register_builtin(registry, "print", 2, IOBuiltins._builtin_print_to_stream)
-        register_builtin(registry, "write", 2, IOBuiltins._builtin_write_to_stream)
-        register_builtin(registry, "writeln", 2, IOBuiltins._builtin_writeln_to_stream)
-        register_builtin(registry, "set_input", 1, IOBuiltins._builtin_set_input)
-        register_builtin(registry, "set_output", 1, IOBuiltins._builtin_set_output)
-        register_builtin(registry, "flush_output", 0, IOBuiltins._builtin_flush_output)
-        register_builtin(registry, "flush_output", 1, IOBuiltins._builtin_flush_output_stream)
-        register_builtin(registry, "at_end_of_stream", 0, IOBuiltins._builtin_at_end_of_stream)
-        register_builtin(registry, "at_end_of_stream", 1, IOBuiltins._builtin_at_end_of_stream_stream)
-        register_builtin(registry, "stream_property", 2, IOBuiltins._builtin_stream_property)
-        register_builtin(registry, "set_stream_position", 2, IOBuiltins._builtin_set_stream_position)
-        register_builtin(registry, "open", 4, IOBuiltins._builtin_open_with_options)
-        register_builtin(registry, "close", 2, IOBuiltins._builtin_close_with_options)
+        register_builtin(registry, "read_term", 2, self._builtin_read_term)
+        register_builtin(registry, "read_term", 3, self._builtin_read_term_from_stream)
+        register_builtin(registry, "write_term", 2, self._builtin_write_term)
+        register_builtin(registry, "write_term", 3, self._builtin_write_term_to_stream)
+        register_builtin(registry, "writeq", 1, self._builtin_writeq)
+        register_builtin(registry, "writeq", 2, self._builtin_writeq_to_stream)
+        register_builtin(registry, "write_canonical", 1, self._builtin_write_canonical)
+        register_builtin(registry, "write_canonical", 2, self._builtin_write_canonical_to_stream)
+        register_builtin(registry, "print", 1, self._builtin_print)
+        register_builtin(registry, "print", 2, self._builtin_print_to_stream)
+        register_builtin(registry, "write", 2, self._builtin_write_to_stream)
+        register_builtin(registry, "writeln", 2, self._builtin_writeln_to_stream)
+        register_builtin(registry, "set_input", 1, self._builtin_set_input)
+        register_builtin(registry, "set_output", 1, self._builtin_set_output)
+        register_builtin(registry, "flush_output", 0, self._builtin_flush_output)
+        register_builtin(registry, "flush_output", 1, self._builtin_flush_output_stream)
+        register_builtin(registry, "at_end_of_stream", 0, self._builtin_at_end_of_stream)
+        register_builtin(registry, "at_end_of_stream", 1, self._builtin_at_end_of_stream_stream)
+        register_builtin(registry, "stream_property", 2, self._builtin_stream_property)
+        register_builtin(registry, "set_stream_position", 2, self._builtin_set_stream_position)
+        register_builtin(registry, "open", 4, self._builtin_open_with_options)
+        register_builtin(registry, "close", 2, self._builtin_close_with_options)
 
     @staticmethod
     def _builtin_write(
@@ -1863,6 +2069,7 @@ class IOBuiltins:
             return False
         return False
 
+    @staticmethod
     def _builtin_at_end_of_stream(
         _args: BuiltinArgs, subst: Substitution, engine: EngineContext | None
     ) -> Substitution | None:

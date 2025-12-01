@@ -239,6 +239,8 @@ Status legend:
 | `put_char/1-2`  | ✅      |                                  |
 | `get_code/1-2`  | ✅      | **ISO-required**                 |
 | `put_code/1-2`  | ✅      | **ISO-required**                 |
+| `get/1-2`       | ✅      | **ISO-required** - Skip whitespace |
+| `put/1-2`       | ✅      | **ISO-required** - Write character code |
 | `peek_char/1-2` | ✅      | **ISO-required** - Look ahead    |
 | `peek_code/1-2` | ✅      | **ISO-required** - Look ahead    |
 | `peek_byte/1-2` | ✅      | **ISO-required**                 |
@@ -279,6 +281,15 @@ Status legend:
 | `at_end_of_stream/0-1`   | ✅      | **ISO-required** - EOF test  |
 | `stream_property/2`      | ✅      | **ISO-required**             |
 | `set_stream_position/2`  | ✅      | **ISO-required** - Seek      |
+
+## Classic I/O Predicates (Edinburgh Style)
+
+| Predicate | Status | Notes                                      |
+| --------- | ------ | ------------------------------------------ |
+| `see/1`   | ✅      | Classic input redirection                  |
+| `seen/0`  | ✅      | Close classic input                        |
+| `tell/1`  | ✅      | Classic output redirection                 |
+| `told/0`  | ✅      | Close classic output                       |
 
 ---
 
