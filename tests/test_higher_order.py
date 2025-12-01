@@ -2,6 +2,7 @@
 
 import pytest
 from vibeprolog import PrologInterpreter
+from vibeprolog.exceptions import PrologThrow
 
 
 @pytest.fixture
@@ -38,7 +39,7 @@ class TestMaplist3:
 
     def test_maplist_3_type_error_non_callable(self, prolog):
         """Test maplist/3 with non-callable predicate."""
-        with pytest.raises(Exception):  # Should raise type_error
+        with pytest.raises(PrologThrow):  # Should raise type_error
             prolog.query_once("maplist(5, [a], [b]).")
 
 
@@ -59,6 +60,13 @@ class TestMaplist4:
 
 class TestMaplist5:
     """Tests for maplist/5 predicate."""
+
+    def test_maplist_5_basic(self, prolog):
+        """Test basic maplist/5 functionality with a simple predicate sum4/4."""
+        prolog.consult_string("sum4(A, B, C, D) :- D is A + B + C.")
+        result = prolog.query_once("maplist(sum4, [1,2], [10,20], [100,200], X).")
+        assert result is not None
+        assert result['X'] == [111, 222]
 
     def test_maplist_5_different_lengths(self, prolog):
         """Test maplist/5 fails with different list lengths."""
@@ -95,12 +103,12 @@ class TestInclude:
 
     def test_include_type_error_non_list(self, prolog):
         """Test include/3 with non-list."""
-        with pytest.raises(Exception):  # Should raise type_error
+        with pytest.raises(PrologThrow):  # Should raise type_error
             prolog.query_once("include(atom, not_a_list, X).")
 
     def test_include_type_error_non_callable(self, prolog):
         """Test include/3 with non-callable predicate."""
-        with pytest.raises(Exception):  # Should raise type_error
+        with pytest.raises(PrologThrow):  # Should raise type_error
             prolog.query_once("include(5, [1,2], X).")
 
 
@@ -187,7 +195,7 @@ class TestFoldl4:
 
     def test_foldl_4_type_error_non_list(self, prolog):
         """Test foldl/4 with non-list."""
-        with pytest.raises(Exception):  # Should raise type_error
+        with pytest.raises(PrologThrow):  # Should raise type_error
             prolog.query_once("foldl(plus, atom, 0, X).")
 
 

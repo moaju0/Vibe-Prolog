@@ -34,6 +34,16 @@ class HigherOrderBuiltins:
         register_builtin(registry, "foldl", 6, HigherOrderBuiltins._builtin_foldl_6)
 
     @staticmethod
+    def _create_goal(pred, *args, context: str):
+        # Helper to create a goal from pred/args
+        if isinstance(pred, Atom):
+            return Compound(pred.name, args)
+        elif isinstance(pred, Compound):
+            return Compound(pred.functor, pred.args + args)
+        else:
+            raise PrologThrow(PrologError.type_error("callable", pred, context))
+
+    @staticmethod
     def _builtin_maplist(
         args: BuiltinArgs, subst: Substitution, engine: EngineContext
     ) -> Iterator[Substitution]:
@@ -73,13 +83,14 @@ class HigherOrderBuiltins:
     @staticmethod
     def _maplist_n(args: BuiltinArgs, subst: Substitution, engine: EngineContext, arity: int) -> Iterator[Substitution]:
         """Generic helper for maplist/3-5 predicates."""
-        pred, *lists = args
+        pred, *input_lists, output = args
         context = f"maplist/{arity}"
         pred = deref(pred, subst)
+        output = deref(output, subst)
 
-        # Validate and convert lists
+        # Validate and convert input lists
         py_lists = []
-        for l in lists:
+        for l in input_lists:
             l_deref = deref(l, subst)
             if not isinstance(l_deref, List):
                 raise PrologThrow(PrologError.type_error("list", l_deref, context))
@@ -95,25 +106,24 @@ class HigherOrderBuiltins:
         if not all(len(pl) == first_len for pl in py_lists[1:]):
             return
 
-        def apply_pred(index: int, current_subst: Substitution) -> Iterator[Substitution]:
-            if index >= first_len:
-                yield current_subst
+        from vibeprolog.terms import Variable
+        results = []
+        current_subst = subst
+        for i in range(first_len):
+            elems = tuple(pl[i] for pl in py_lists)
+            result_var = Variable(f"_maplist_{i}")
+            goal = HigherOrderBuiltins._create_goal(pred, *elems, result_var, context=context)
+            try:
+                solution = next(engine._solve_goals([goal], current_subst))
+            except StopIteration:
                 return
+            results.append(deref(result_var, solution))
+            current_subst = solution
 
-            elems = tuple(pl[index] for pl in py_lists)
-            
-            # Create goal
-            if isinstance(pred, Atom):
-                goal = Compound(pred.name, elems)
-            elif isinstance(pred, Compound):
-                goal = Compound(pred.functor, pred.args + elems)
-            else:
-                raise PrologThrow(PrologError.type_error("callable", pred, context))
-
-            for solution in engine._solve_goals([goal], current_subst):
-                yield from apply_pred(index + 1, solution)
-
-        yield from apply_pred(0, subst)
+        result_list = python_to_list(results)
+        new_subst = unify(output, result_list, current_subst)
+        if new_subst is not None:
+            yield new_subst
 
     @staticmethod
     def _builtin_maplist_3(
