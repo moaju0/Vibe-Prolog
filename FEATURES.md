@@ -187,11 +187,11 @@ Status legend:
 | `ord_subtract/3`        | ✅      | Common extension - Ordered set difference     |
 | `numlist/3`             | ✅      | Common extension - Generate list of integers  |
 | `permutation/2`         | ✅      | Common extension - Generate permutations      |
-| `maplist/3-5`           | ❌      | Higher-order (only `/2` implemented)          |
-| `include/3`             | ❌      | Higher-order - Filter list                    |
-| `exclude/3`             | ❌      | Higher-order - Filter list (negated)          |
-| `partition/4`           | ❌      | Higher-order - Split list by condition        |
-| `foldl/4-6`             | ❌      | Higher-order - Fold left                      |
+| `maplist/3-5`           | ✅      | Higher-order                                  |
+| `include/3`             | ✅      | Higher-order - Filter list                    |
+| `exclude/3`             | ✅      | Higher-order - Filter list (negated)          |
+| `partition/4`           | ✅      | Higher-order - Split list by condition        |
+| `foldl/4-6`             | ✅      | Higher-order - Fold left                      |
 
 ---
 
@@ -369,7 +369,6 @@ These predicates are specific to SWI-Prolog and not part of the ISO standard.
 1. `op/3` must affect parsing (§6.3)
 2. `char_conversion/2` missing (§6.4, §7.4)
 3. **Database operations incomplete** - `retractall/1` missing (ISO-required)
-4. **Higher-order list predicates missing** - `maplist/3-5`, `include/3`, `exclude/3`, `partition/4`, `foldl/4-6`
 
 ## Common Extensions Worth Implementing
 
