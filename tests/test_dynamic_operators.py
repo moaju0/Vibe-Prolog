@@ -939,7 +939,7 @@ class TestCustomOperatorParsing:
         # '+++' (400) has higher precedence than '***' (500), so it binds tighter.
         # The expression should parse as (a +++ b) *** c.
         assert result is not None
-        expected = {'*': [{'*': [{'+++': ['a', 'b']}, '*']}, 'c']}
+        expected = {'***': [{'+++': ['a', 'b']}, 'c']}
         assert result['X'] == expected
 
 
