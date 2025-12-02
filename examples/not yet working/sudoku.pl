@@ -2,7 +2,7 @@
 % Aswin F. van Woudenberg
 
 
-:- use_module(library('clpb')).
+:- use_module(library('clpz')).
 
 sudoku([
 		AA, AB, AC, AD, AE, AF, AG, AH, AI,

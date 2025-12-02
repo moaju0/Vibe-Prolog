@@ -27,6 +27,8 @@ Be sure to include the following in each issue
 - update FEATURES.md
 
 Don't include estimates or line numbers
+
+Make sure you escape properly when raising the issue. Take extra care with this because it has tripped you up before. 
 ```
 
 ### Grooming issues
