@@ -240,7 +240,7 @@ Status legend:
 | `get_code/1-2`  | ✅      | **ISO-required**                 |
 | `put_code/1-2`  | ✅      | **ISO-required**                 |
 | `get/1-2`       | ✅      | **ISO-required** - Skip whitespace |
-| `put/1-2`       | ✅      | **ISO-required** - Write character code |
+| `put/1-2`       | ✅📘    | **ISO-required** - Write character code or single-character atom (SWI-Prolog compatible) |
 | `peek_char/1-2` | ✅      | **ISO-required** - Look ahead    |
 | `peek_code/1-2` | ✅      | **ISO-required** - Look ahead    |
 | `peek_byte/1-2` | ✅      | **ISO-required**                 |

@@ -455,36 +455,36 @@ class IOBuiltins:
 
     @staticmethod
     def _builtin_put(args, subst, engine):
-        """put(+Code) - Write character code."""
+        """put(+Code) - Write character code or character."""
         code_term = args[0]
         code = deref(code_term, subst)
-
-        if not isinstance(code, Number) or not isinstance(code.value, int):
-            raise PrologThrow(PrologError.type_error("integer", code, "put/1"))
-
-        if code.value < 0 or code.value > 1114111:
-            raise PrologThrow(PrologError.representation_error("character_code", "put/1"))
-
+        char_code = IOBuiltins._get_char_code_from_term(code, "put/1")
         stream = IOBuiltins._get_output_stream(engine, "put/1")
-        IOBuiltins._write_char_to_stream(stream, chr(code.value), "put/1")
-
+        IOBuiltins._write_char_to_stream(stream, chr(char_code), "put/1")
         yield subst
 
     @staticmethod
+    def _get_char_code_from_term(code_term, context: str) -> int:
+        """Helper to get a character code from an integer or single-char atom."""
+        if isinstance(code_term, Number) and isinstance(code_term.value, int):
+            char_code = code_term.value
+        elif isinstance(code_term, Atom) and len(code_term.name) == 1:
+            char_code = ord(code_term.name)
+        else:
+            raise PrologThrow(PrologError.type_error("in_character", code_term, context))
+
+        if char_code < 0 or char_code > 1114111:
+            raise PrologThrow(PrologError.representation_error("character_code", context))
+        return char_code
+
+    @staticmethod
     def _builtin_put_stream(args, subst, engine):
-        """put(+Stream, +Code) - Write character code to stream."""
+        """put(+Stream, +Code) - Write character code or character to stream."""
         stream_term, code_term = args
         code = deref(code_term, subst)
-
-        if not isinstance(code, Number) or not isinstance(code.value, int):
-            raise PrologThrow(PrologError.type_error("integer", code, "put/2"))
-
-        if code.value < 0 or code.value > 1114111:
-            raise PrologThrow(PrologError.representation_error("character_code", "put/2"))
-
+        char_code = IOBuiltins._get_char_code_from_term(code, "put/2")
         stream = IOBuiltins._get_output_stream_from_term(engine, stream_term, subst, "put/2")
-        IOBuiltins._write_char_to_stream(stream, chr(code.value), "put/2")
-
+        IOBuiltins._write_char_to_stream(stream, chr(char_code), "put/2")
         yield subst
 
     def register(self, registry: BuiltinRegistry) -> None:
