@@ -209,17 +209,21 @@ def main():
     iso_ops = {op for _, _, op in ISO_OPERATORS}
 
     # Categorize operators
-    used_and_supported = used_operators & supported_ops
-    used_but_unsupported = used_operators - supported_ops
+    declared_op_names = {op for _, _, op in declared_operators}
 
-    # Further categorize unsupported
-    unsupported_iso = used_but_unsupported & iso_ops
-    unsupported_non_iso = used_but_unsupported - iso_ops
+    # Operators that will be available (either in defaults or declared in this file)
+    available_ops = supported_ops | declared_op_names
+
+    used_and_available = used_operators & available_ops
+    used_but_missing = used_operators - available_ops
+
+    # Further categorize missing operators (not in defaults AND not declared in file)
+    missing_iso = used_but_missing & iso_ops
+    missing_non_iso = used_but_missing - iso_ops
 
     # Categorize declared operators
-    declared_op_names = {op for _, _, op in declared_operators}
-    declared_supported = declared_op_names & supported_ops
-    declared_unsupported = declared_op_names - supported_ops
+    declared_in_defaults = declared_op_names & supported_ops
+    declared_extensions = declared_op_names - supported_ops
 
     # Output markdown report
     print("# Operator Analysis Report")
@@ -227,51 +231,57 @@ def main():
     print(f"**File:** `{filepath}`")
     print()
     print(f"**Operators found in code:** {len(used_operators)}")
-    print(f"**Operators declared:** {len(declared_operators)}")
+    print(f"**Operators declared in file:** {len(declared_operators)}")
     print()
 
     if declared_operators:
-        print("## Declared Operators")
+        print("## Operators Declared in File")
         print()
-        print("Operators explicitly declared in `:- op(...)` directives or module exports:")
+        print("These operators are explicitly declared via `:- op(...)` directives or module exports")
+        print("and will be loaded automatically when this file is consulted:")
         print()
         for prec, assoc, op in sorted(declared_operators):
-            status = "✅ Supported" if op in supported_ops else "❌ Not supported"
-            print(f"- `{op}` ({prec}, {assoc}) - {status}")
+            in_defaults = "in defaults" if op in supported_ops else "extension"
+            print(f"- `{op}` ({prec}, {assoc}) - {in_defaults}")
         print()
 
-    print("## Supported Operators Used")
+    print("## Operators Available (Defaults + Declared)")
     print()
-    if used_and_supported:
-        print("These operators are used in the file and supported by Vibe-Prolog:")
+    if used_and_available:
+        print("These operators are used and will be available (either in defaults or declared in file):")
         print()
-        for op in sorted(used_and_supported):
-            print(f"- `{op}`")
+        for op in sorted(used_and_available):
+            source = "default" if op in supported_ops else "declared in file"
+            print(f"- `{op}` ({source})")
     else:
         print("*None found*")
     print()
 
-    print("## Unsupported ISO Operators Used")
+    print("## Missing ISO Operators")
     print()
-    if unsupported_iso:
-        print("These **ISO-required** operators are used but not currently supported:")
+    if missing_iso:
+        print("These **ISO-required** operators are used but NOT declared in file and NOT in defaults:")
         print()
-        for op in sorted(unsupported_iso):
+        for op in sorted(missing_iso):
             # Find the ISO spec for this operator
             specs = [f"({prec}, {assoc})" for prec, assoc, o in ISO_OPERATORS if o == op]
             spec_str = ", ".join(specs)
             print(f"- `{op}` - ISO spec: {spec_str}")
+        print()
+        print("**These should be added to `vibeprolog/operator_defaults.py`**")
     else:
         print("*None found* ✅")
     print()
 
-    print("## Unsupported Non-ISO Operators Used")
+    print("## Missing Non-ISO Operators")
     print()
-    if unsupported_non_iso:
-        print("These non-ISO operators are used but not currently supported:")
+    if missing_non_iso:
+        print("These non-ISO operators are used but NOT declared in file and NOT in defaults:")
         print()
-        for op in sorted(unsupported_non_iso):
+        for op in sorted(missing_non_iso):
             print(f"- `{op}`")
+        print()
+        print("**Note:** These may be typos or need to be declared with `:- op(...)` directives.")
     else:
         print("*None found*")
     print()
@@ -279,16 +289,16 @@ def main():
     # Summary
     print("## Summary")
     print()
-    print(f"- ✅ Supported operators used: {len(used_and_supported)}")
-    print(f"- ❌ Unsupported ISO operators used: {len(unsupported_iso)}")
-    print(f"- ⚠️ Unsupported non-ISO operators used: {len(unsupported_non_iso)}")
+    print(f"- ✅ Operators available (defaults + declared): {len(used_and_available)}")
+    print(f"- ❌ Missing ISO operators: {len(missing_iso)}")
+    print(f"- ⚠️ Missing non-ISO operators: {len(missing_non_iso)}")
     print()
 
-    if unsupported_iso:
+    if missing_iso:
         print("**Action Required:** Add missing ISO operators to `vibeprolog/operator_defaults.py`")
 
-    # Exit with error code if unsupported ISO operators found
-    if unsupported_iso:
+    # Exit with error code if missing ISO operators found
+    if missing_iso:
         sys.exit(1)
 
 
