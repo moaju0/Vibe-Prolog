@@ -709,7 +709,7 @@ class TestOperatorTableParsing:
         """Float precedence raises type_error."""
         table = OperatorTable()
         with pytest.raises(PrologThrow):
-            table._parse_precedence(Atom('5.5'), 'test')
+            table._parse_precedence(Number(5.5), 'test')
 
     def test_parse_precedence_out_of_range_error(self):
         """Out-of-range precedence raises domain_error."""
