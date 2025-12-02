@@ -76,12 +76,49 @@ class TestBasicArithmetic:
         assert result is not None
         assert result['X'] == 2
 
+    def test_remainder(self):
+        prolog = PrologInterpreter()
+
+        result = prolog.query_once("X is 10 rem 3")
+        assert result is not None
+        assert result['X'] == 1
+
+        result = prolog.query_once("X is 17 rem 5")
+        assert result is not None
+        assert result['X'] == 2
+
+        # Test negative operands
+        result = prolog.query_once("X is (-10) rem 3")
+        assert result is not None
+        assert result['X'] == -1
+
+        result = prolog.query_once("X is 10 rem (-3)")
+        assert result is not None
+        assert result['X'] == 1
+
+        result = prolog.query_once("X is (-10) rem (-3)")
+        assert result is not None
+        assert result['X'] == -1
+
     @pytest.mark.parametrize("expr, expected", [
         ("X is 7 div 2", 3),
         ("X is 20 div 6", 3),
         ("X is -7 div 2", -4),
     ])
     def test_div_operator(self, expr, expected):
+        prolog = PrologInterpreter()
+        result = prolog.query_once(expr)
+        assert result is not None
+        assert result['X'] == expected
+
+    @pytest.mark.parametrize("expr, expected", [
+        ("X is 7 rem 2", 1),
+        ("X is 20 rem 6", 2),
+        ("X is -7 rem 2", -1),
+        ("X is 7 rem -2", 1),
+        ("X is -7 rem -2", -1),
+    ])
+    def test_rem_operator(self, expr, expected):
         prolog = PrologInterpreter()
         result = prolog.query_once(expr)
         assert result is not None
@@ -98,6 +135,11 @@ class TestBasicArithmetic:
         assert result1 is not None
         assert result2 is not None
         assert result1['X'] == result2['Y']
+
+    def test_rem_current_op(self):
+        prolog = PrologInterpreter()
+        # Verify rem is defined with correct precedence and associativity
+        assert prolog.has_solution("current_op(400, yfx, rem)")
 
 
 class TestArithmeticPrecedence:
@@ -129,6 +171,17 @@ class TestArithmeticPrecedence:
         ("X is 7 div 2 * 3", 9),
     ])
     def test_div_precedence(self, query, expected):
+        prolog = PrologInterpreter()
+        result = prolog.query_once(query)
+        assert result is not None
+        assert result['X'] == expected
+
+    @pytest.mark.parametrize("query, expected", [
+        ("X is 10 + 7 rem 2", 11),
+        ("X is 7 rem 2 * 3", 3),
+        ("X is 17 rem 5 rem 2", 0),  # (17 rem 5) rem 2 = 2 rem 2 = 0
+    ])
+    def test_rem_precedence(self, query, expected):
         prolog = PrologInterpreter()
         result = prolog.query_once(query)
         assert result is not None
