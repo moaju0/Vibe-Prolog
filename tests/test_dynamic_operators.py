@@ -736,7 +736,7 @@ class TestOperatorTableParsing:
         """Non-atom specifier raises type_error."""
         table = OperatorTable()
         with pytest.raises(PrologThrow):
-            table._parse_specifier(Atom('500'), 'test')
+            table._parse_specifier(Number(500), 'test')
 
     def test_parse_specifier_invalid_error(self):
         """Invalid specifier raises domain_error."""
