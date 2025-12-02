@@ -170,6 +170,74 @@ This is standard ISO prolog implementation. The parser should parse standard pro
    ```
 
 
+## Developer Tools
+
+The `tools/` directory contains utilities for analyzing Prolog code and identifying missing functionality.
+
+### Check Operators (`tools/check_operators.py`)
+
+Analyzes which operators are used in a Prolog file and compares them against what Vibe-Prolog supports.
+
+**Usage:**
+```bash
+uv run python tools/check_operators.py <prolog_file>
+```
+
+**Example:**
+```bash
+uv run python tools/check_operators.py library/clpb.pl
+```
+
+**What it does:**
+- Finds all operators used in the code
+- Identifies operators declared in `:- op(...)` directives or module exports
+- Categorizes operators as:
+  - Supported (defined in `operator_defaults.py`)
+  - Unsupported ISO operators (required by standard)
+  - Unsupported non-ISO operators (extensions)
+- Outputs a markdown report
+
+**When to use:**
+- Before implementing support for a new library
+- To prioritize which operators to implement
+- To understand operator dependencies
+- To verify ISO compliance
+
+**Exit codes:**
+- 0: All ISO operators are supported
+- 1: Some ISO operators are missing
+
+### Find Built-ins (`tools/find_builtins.py`)
+
+Scans a directory of Prolog files to identify which predicates are called but not defined, indicating they're likely built-in predicates.
+
+**Usage:**
+```bash
+uv run python tools/find_builtins.py <directory>
+```
+
+**Example:**
+```bash
+uv run python tools/find_builtins.py examples/
+```
+
+**What it does:**
+- Parses all `.pl` files in the directory
+- Identifies predicates that are called but not defined
+- Categorizes predicates as:
+  - Actual built-ins (registered in Vibe-Prolog)
+  - Dynamic predicates (declared `:- dynamic` but asserted at runtime)
+  - Undefined predicates (not built-in, not dynamic, not defined - might be missing)
+- Shows which files use each predicate
+
+**When to use:**
+- To discover what built-ins are needed for a set of examples
+- To identify missing implementations
+- To prioritize built-in development
+- To verify completeness of built-in coverage
+
+**Note:** This tool identifies predicates, not operators. Operators are syntactic and checked by `check_operators.py`.
+
 ## Resources
 
 - [SWI-Prolog Documentation](https://www.swi-prolog.org/pldoc/man?section=builtin) - Reference for built-in predicates
