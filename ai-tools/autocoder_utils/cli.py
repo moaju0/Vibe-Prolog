@@ -75,6 +75,7 @@ def _run_issue_workflow(
         tool_cmd=tool_cmd,
         branch_prefix=branch_prefix,
         default_commit_message=f"Update from {tool_name.lower()}",
+        tool_name=tool_name.lower(),
         timeout_seconds=args.timeout,
         input_instruction=input_instruction,
         session_dir=session_dir,
@@ -91,7 +92,7 @@ def fix_issue_with_kilocode(argv: Sequence[str] | None = None) -> None:
         argv,
         tool_cmd=["kilocode", "--auto"],
         branch_prefix="fix-kilocode",
-        tool_name="kilocode",
+        tool_name="Kilocode",
         default_timeout=1200,
     )
 
@@ -168,8 +169,13 @@ def address_pr_comments_with_kilocode(argv: Sequence[str] | None = None) -> None
         default=1200,
         help="Seconds before Kilocode processing times out (default: %(default)s). Use 'off' to disable.",
     )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Enable debug mode with step-by-step execution and detailed output",
+    )
     args = parser.parse_args(arg_list)
-    _address_pr_comments_with_kilocode(pr_number=args.pr_number, timeout_seconds=args.timeout)
+    _address_pr_comments_with_kilocode(pr_number=args.pr_number, timeout_seconds=args.timeout, debug=args.debug)
 
 
 def address_pr_comments_with_claude(argv: Sequence[str] | None = None) -> None:
@@ -190,8 +196,13 @@ def address_pr_comments_with_claude(argv: Sequence[str] | None = None) -> None:
         default=180,
         help="Seconds before Claude processing times out (default: %(default)s). Use 'off' to disable.",
     )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Enable debug mode with step-by-step execution and detailed output",
+    )
     args = parser.parse_args(arg_list)
-    _address_pr_comments_with_claude(pr_number=args.pr_number, timeout_seconds=args.timeout)
+    _address_pr_comments_with_claude(pr_number=args.pr_number, timeout_seconds=args.timeout, debug=args.debug)
 
 
 def address_pr_comments_with_codex(argv: Sequence[str] | None = None) -> None:
@@ -212,8 +223,13 @@ def address_pr_comments_with_codex(argv: Sequence[str] | None = None) -> None:
         default=180,
         help="Seconds before Codex processing times out (default: %(default)s). Use 'off' to disable.",
     )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Enable debug mode with step-by-step execution and detailed output",
+    )
     args = parser.parse_args(arg_list)
-    _address_pr_comments_with_codex(pr_number=args.pr_number, timeout_seconds=args.timeout)
+    _address_pr_comments_with_codex(pr_number=args.pr_number, timeout_seconds=args.timeout, debug=args.debug)
 
 
 def address_pr_comments_with_amp(argv: Sequence[str] | None = None) -> None:
@@ -234,8 +250,13 @@ def address_pr_comments_with_amp(argv: Sequence[str] | None = None) -> None:
         default=180,
         help="Seconds before Amp processing times out (default: %(default)s). Use 'off' to disable.",
     )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Enable debug mode with step-by-step execution and detailed output",
+    )
     args = parser.parse_args(arg_list)
-    _address_pr_comments_with_amp(pr_number=args.pr_number, timeout_seconds=args.timeout)
+    _address_pr_comments_with_amp(pr_number=args.pr_number, timeout_seconds=args.timeout, debug=args.debug)
 
 
 def generate_changelog(argv: Sequence[str] | None = None) -> None:

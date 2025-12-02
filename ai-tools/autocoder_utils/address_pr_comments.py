@@ -14,6 +14,7 @@ from .gh_pr_helper import fetch_pr_comments, format_comments_as_markdown
 
 
 from . import (
+    add_label_if_needed,
     check_commands_available,
     ensure_env,
     get_owner_repo,
@@ -22,6 +23,36 @@ from . import (
     run,
     stage_changes,
 )
+
+
+def debug_step(step_name: str, data: str | None = None, enabled: bool = False) -> None:
+    """Print debug information and wait for user confirmation if debug is enabled.
+
+    Args:
+        step_name: Name of the step being executed
+        data: Optional data to display (input/output)
+        enabled: Whether debug mode is enabled
+    """
+    if not enabled:
+        return
+
+    print("\n" + "=" * 80)
+    print(f"DEBUG: {step_name}")
+    print("=" * 80)
+
+    if data:
+        print(data)
+        print("-" * 80)
+
+    while True:
+        response = input("Continue? (Y/N): ").strip().upper()
+        if response == "Y":
+            break
+        elif response == "N":
+            print("Aborting...")
+            raise SystemExit(0)
+        else:
+            print("Please enter Y or N")
 
 
 @dataclass(frozen=True)
@@ -49,6 +80,9 @@ class PRCommentWorkflowConfig:
     input_instruction: str | None = None
     """Optional preamble prepended to the tool input."""
 
+    debug: bool = False
+    """Enable debug mode with step-by-step execution and detailed output."""
+
 
 def get_pr_info(owner: str, repo: str, pr_number: str) -> dict:
     """
@@ -63,7 +97,7 @@ def get_pr_info(owner: str, repo: str, pr_number: str) -> dict:
             "--repo",
             f"{owner}/{repo}",
             "--json",
-            "number,headRefName",
+            "number,headRefName,body",
         ]
     )
     try:
@@ -73,6 +107,25 @@ def get_pr_info(owner: str, repo: str, pr_number: str) -> dict:
     if not isinstance(data, dict):
         raise SystemExit(f"Unexpected JSON type from gh: {type(data)}")
     return data
+
+
+def extract_linked_issues(pr_body: str) -> list[str]:
+    """Extract issue numbers from PR body that are linked via closing keywords.
+
+    Looks for patterns like:
+    - Closes #123
+    - Fixes #456
+    - Resolves #789
+    """
+    if not pr_body:
+        return []
+
+    # GitHub keywords that link issues
+    keywords = r"(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)"
+    pattern = rf"{keywords}\s+#(\d+)"
+
+    matches = re.findall(pattern, pr_body, re.IGNORECASE)
+    return matches
 
 
 def checkout_pr_branch(branch_name: str) -> None:
@@ -112,15 +165,23 @@ def get_gh_pr_output(helper_path: Path, owner: str, repo: str, pr_number: str) -
     )
 
 
-def build_changes_to_make(pr_output: str, custom_prompt: str | None = None) -> str:
+def build_changes_to_make(pr_output: str, custom_prompt: str | None = None, debug: bool = False) -> str:
     """Build instructions for addressing PR comments using LLM preprocessing."""
     default_prompt = (
         "Read the PR comments below and generate precise instructions to address them. "
         "We only want to include things that we want to fix, so be sure to remove comments have been marked as resolved or are made redundant by subsequent updates. "
+        "If there are test failures be sure to include them in full. "
         "Include the diff blocks and line numbers. Format as Markdown."
     )
     prompt = custom_prompt if custom_prompt is not None else default_prompt
-    return run(["llm", "-s", prompt], input_text=pr_output)
+
+    debug_step("LLM Preprocessing - Input", f"Prompt: {prompt}\n\nPR Output:\n{pr_output}", debug)
+
+    result = run(["llm", "-s", prompt], input_text=pr_output)
+
+    debug_step("LLM Preprocessing - Output", result, debug)
+
+    return result
 
 
 def run_kilocode_with_changes(changes_to_make: str) -> None:
@@ -176,6 +237,12 @@ def run_tool_with_changes(changes_to_make: str, config: PRCommentWorkflowConfig)
     # Add JSON output flag if configured
     if config.use_json_output and "--output" not in cmd:
         cmd.extend(["--output", "json"])
+
+    debug_step(
+        f"Running {config.tool_name}",
+        f"Command: {' '.join(cmd)}\n\nInput:\n{changes_to_make}",
+        config.debug
+    )
 
     # If no timeout, run normally
     if config.timeout_seconds is None:
@@ -413,6 +480,8 @@ def resolve_pr_from_current_branch() -> tuple[str, str, str]:
 
 def run_pr_comment_workflow(pr_number_arg: str | None, config: PRCommentWorkflowConfig) -> None:
     """Common workflow for addressing PR comments with any tool."""
+    debug_step("Starting PR Comment Workflow", f"Tool: {config.tool_name}\nDebug: {config.debug}", config.debug)
+
     required_commands = ["gh", "llm"]
     if config.tool_cmd is not None:
         required_commands.append(config.tool_cmd[0])
@@ -428,43 +497,85 @@ def run_pr_comment_workflow(pr_number_arg: str | None, config: PRCommentWorkflow
         pr_number = pr_number_arg
         owner, repo = get_owner_repo()
 
+    debug_step("PR Identification", f"Owner: {owner}\nRepo: {repo}\nPR#: {pr_number}", config.debug)
+
     pr_info = get_pr_info(owner, repo, pr_number)
     branch_name = str(pr_info.get("headRefName", "")).strip()
     if not branch_name:
         raise SystemExit(f"Unable to determine headRefName for PR #{pr_number}")
 
+    debug_step("PR Info", f"Branch: {branch_name}\nPR Info:\n{json.dumps(pr_info, indent=2)}", config.debug)
+
+    # Label the PR with 'nac' if it doesn't already have it
+    add_label_if_needed("pr", pr_number)
+
+    # Extract and label any linked issues
+    pr_body = pr_info.get("body", "")
+    linked_issues = extract_linked_issues(pr_body)
+    for issue_number in linked_issues:
+        add_label_if_needed("issue", issue_number)
+
+    debug_step("Checking out branch", f"Branch: {branch_name}", config.debug)
+
     checkout_pr_branch(branch_name)
     run(["git", "pull"], capture_output=False)
 
+    debug_step("Fetching PR comments", f"Owner: {owner}\nRepo: {repo}\nPR#: {pr_number}", config.debug)
+
     review_comments, issue_comments = fetch_pr_comments(owner, repo, pr_number)
+
+    debug_step(
+        "Fetched PR comments",
+        f"Review comments: {len(review_comments)}\nIssue comments: {len(issue_comments)}\n\n"
+        f"Review Comments:\n{json.dumps(review_comments, indent=2)}\n\n"
+        f"Issue Comments:\n{json.dumps(issue_comments, indent=2)}",
+        config.debug
+    )
+
     pr_output = format_comments_as_markdown(
         review_comments, issue_comments, owner, repo, pr_number
     )
 
-    changes_to_make = build_changes_to_make(pr_output, config.preprocess_prompt)
+    debug_step("Formatted PR output", pr_output, config.debug)
+
+    changes_to_make = build_changes_to_make(pr_output, config.preprocess_prompt, config.debug)
     tool_input = changes_to_make
     if config.input_instruction:
         tool_input = f"{config.input_instruction}\n\n{changes_to_make}"
+        debug_step("Tool input with instruction", tool_input, config.debug)
+
     run_tool_with_changes(tool_input, config)
+
+    debug_step("Staging changes", "Running git add", config.debug)
+
     stage_changes()
+
+    debug_step("Creating commit", "Generating commit message from PR output", config.debug)
+
     create_commit_from_pr_output(pr_output)
+
+    debug_step("Pushing changes", "Running git push", config.debug)
+
     push_current_branch()
+
+    debug_step("Workflow Complete", "All steps completed successfully", config.debug)
 
 
 def address_pr_comments_with_kilocode(
-    pr_number: str | None = None, timeout_seconds: int | None = 1200
+    pr_number: str | None = None, timeout_seconds: int | None = 1200, debug: bool = False
 ) -> None:
     """Address PR comments using Kilocode."""
     config = PRCommentWorkflowConfig(
         tool_name="kilocode",
         tool_cmd=["kilocode", "--auto"],
         timeout_seconds=timeout_seconds,
+        debug=debug,
     )
     run_pr_comment_workflow(pr_number, config)
 
 
 def address_pr_comments_with_claude(
-    pr_number: str | None = None, timeout_seconds: int | None = 180
+    pr_number: str | None = None, timeout_seconds: int | None = 180, debug: bool = False
 ) -> None:
     """Address PR comments using Claude Code in headless mode."""
     # Determine session directory (prefer ./paige relative to cwd)
@@ -482,12 +593,13 @@ def address_pr_comments_with_claude(
         timeout_seconds=timeout_seconds,
         session_dir=session_dir,
         use_json_output=True,
+        debug=debug,
     )
     run_pr_comment_workflow(pr_number, config)
 
 
 def address_pr_comments_with_codex(
-    pr_number: str | None = None, timeout_seconds: int | None = 180
+    pr_number: str | None = None, timeout_seconds: int | None = 180, debug: bool = False
 ) -> None:
     """Address PR comments using the Codex CLI headless mode."""
     config = PRCommentWorkflowConfig(
@@ -506,12 +618,13 @@ def address_pr_comments_with_codex(
             "below by editing this repository, running tests as appropriate, and summarizing "
             "your updates before finishing."
         ),
+        debug=debug,
     )
     run_pr_comment_workflow(pr_number, config)
 
 
 def address_pr_comments_with_amp(
-    pr_number: str | None = None, timeout_seconds: int | None = 180
+    pr_number: str | None = None, timeout_seconds: int | None = 180, debug: bool = False
 ) -> None:
     """Address PR comments using the Amp CLI headless mode."""
     config = PRCommentWorkflowConfig(
@@ -526,5 +639,6 @@ def address_pr_comments_with_amp(
             "below by editing this repository, running tests as appropriate, and summarizing "
             "your updates before finishing."
         ),
+        debug=debug,
     )
     run_pr_comment_workflow(pr_number, config)

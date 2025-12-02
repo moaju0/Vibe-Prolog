@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any, Sequence
 
 from . import (
+    add_label_if_needed,
     check_commands_available,
     ensure_env,
     has_staged_changes,
@@ -108,6 +109,7 @@ class IssueWorkflowConfig:
     tool_cmd: Sequence[str]
     branch_prefix: str
     default_commit_message: str
+    tool_name: str = ""
     branch_suffix: str = "-"
     required_commands: Sequence[str] | None = None
     pr_model: str = "gpt-5-nano"
@@ -381,11 +383,12 @@ def build_pr_title_body(issue_number: str, model: str) -> dict[str, Any]:
     return data
 
 
-def create_pr(issue_number: str, model: str) -> None:
+def create_pr(issue_number: str, model: str) -> str:
+    """Create a PR and return its number."""
     pr_data = build_pr_title_body(issue_number, model)
     title = str(pr_data.get("title", "")).strip()
     body = str(pr_data.get("body", "")).strip()
-    run(
+    output = run(
         [
             "gh",
             "pr",
@@ -395,13 +398,25 @@ def create_pr(issue_number: str, model: str) -> None:
             "--body",
             body,
         ],
-        capture_output=False,
+        capture_output=True,
     )
+    # Extract PR number from output (usually last line contains URL like https://github.com/owner/repo/pull/123)
+    for line in output.strip().split("\n"):
+        if "/pull/" in line:
+            pr_number = line.strip().split("/")[-1]
+            return pr_number
+    # Fallback: couldn't parse PR number
+    return ""
 
 
 def run_issue_workflow(issue_number: str, config: IssueWorkflowConfig) -> None:
     check_commands_available(config.required_cmds())
     ensure_env()
+
+    # Label the issue with 'nac' and tool-specific label if they don't already exist
+    add_label_if_needed("issue", issue_number, "nac")
+    if config.tool_name:
+        add_label_if_needed("issue", issue_number, config.tool_name)
 
     issue_content = get_issue_content(issue_number)
     tool_input = issue_content
@@ -414,4 +429,10 @@ def run_issue_workflow(issue_number: str, config: IssueWorkflowConfig) -> None:
     stage_changes()
     create_commit_if_needed(config.default_commit_message)
     push_branch(branch_name)
-    create_pr(issue_number, config.pr_model)
+    pr_number = create_pr(issue_number, config.pr_model)
+
+    # Label the PR with 'nac' and tool-specific label if they don't already exist
+    if pr_number:
+        add_label_if_needed("pr", pr_number, "nac")
+        if config.tool_name:
+            add_label_if_needed("pr", pr_number, config.tool_name)
