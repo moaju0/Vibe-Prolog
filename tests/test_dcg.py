@@ -109,8 +109,8 @@ class TestDCGAlternatives:
         prolog = PrologInterpreter()
         prolog.consult_string("""
             greeting --> [hello] ; [hi].
-            name --> [world] ; [there].
-            sentence --> greeting, name.
+            target --> [world] ; [there].
+            sentence --> greeting, target.
         """)
         assert prolog.has_solution("phrase(sentence, [hello, world])")
         assert prolog.has_solution("phrase(sentence, [hi, there])")
