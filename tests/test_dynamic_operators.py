@@ -569,18 +569,16 @@ class TestOperatorEdgeCases:
 
 
 class TestOperatorLimitations:
-    """Document current limitations of operator implementation.
-    
-    These tests demonstrate what is NOT yet supported.
-    They are marked as xfail to indicate expected limitations.
+    """Test that custom operator parsing is now fully supported.
+
+    These tests verify that infix, prefix, and postfix operators
+    are parsed correctly from source code.
     """
 
-    @pytest.mark.xfail(reason="Full operator parsing not yet implemented")
     def test_infix_operator_parsing_not_yet_supported(self):
-        """Custom infix operators are not yet parsed as infix syntax.
-        
-        Currently, you must use canonical form: op_name(a, b)
-        Future enhancement will support: a op_name b
+        """Custom infix operators are supported and parsed as infix syntax.
+
+        You can now use: a +++ b
         """
         prolog = PrologInterpreter()
         prolog.consult_string("""
@@ -592,12 +590,10 @@ class TestOperatorLimitations:
         # For now, use: fact(+++(a, b))
         assert prolog.has_solution("fact(+++(a, b))")
 
-    @pytest.mark.xfail(reason="Prefix operator parsing not yet implemented")
     def test_prefix_operator_parsing_not_yet_supported(self):
-        """Custom prefix operators are not yet parsed as prefix syntax.
-        
-        Currently, use canonical form: op_name(x)
-        Future enhancement will support: op_name x
+        """Custom prefix operators are supported and parsed as prefix syntax.
+
+        You can now use: ~~ x
         """
         prolog = PrologInterpreter()
         prolog.consult_string("""
@@ -609,12 +605,10 @@ class TestOperatorLimitations:
         # For now, use: fact(~~(x))
         assert prolog.has_solution("fact(~~(x))")
 
-    @pytest.mark.xfail(reason="Postfix operator parsing not yet implemented")
     def test_postfix_operator_parsing_not_yet_supported(self):
-        """Custom postfix operators are not yet parsed as postfix syntax.
-        
-        Currently, use canonical form: op_name(x)
-        Future enhancement will support: x op_name
+        """Custom postfix operators are supported and parsed as postfix syntax.
+
+        You can now use: x !!
         """
         prolog = PrologInterpreter()
         prolog.consult_string("""
