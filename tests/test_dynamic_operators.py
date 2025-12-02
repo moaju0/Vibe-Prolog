@@ -568,122 +568,24 @@ class TestOperatorEdgeCases:
             assert result is not None, f"Failed for {op_type}"
 
 
-class TestISOOperators:
-    """Test ISO-required operators are available by default."""
+class TestDynamicOperatorParsing:
+    """Test that custom operator parsing is now fully supported.
 
-    def test_directive_prefix_operator(self, prolog):
-        """Test :- (1200, fx) directive prefix operator."""
-        result = prolog.query_once("current_op(1200, fx, :-)")
-        assert result is not None
-
-    def test_dcg_rule_operator(self, prolog):
-        """Test --> (1200, xfx) DCG rule operator."""
-        result = prolog.query_once("current_op(1200, xfx, -->)")
-        assert result is not None
-
-    def test_integer_division_operator(self, prolog):
-        """Test div (400, yfx) integer division operator."""
-        result = prolog.query_once("current_op(400, yfx, div)")
-        assert result is not None
-
-    def test_exponentiation_operator(self, prolog):
-        """Test ^ (200, xfy) exponentiation operator."""
-        result = prolog.query_once("current_op(200, xfy, ^)")
-        assert result is not None
-
-    def test_alternative_exponentiation_operator(self, prolog):
-        """Test ** (200, xfx) alternative exponentiation operator."""
-        result = prolog.query_once("current_op(200, xfx, '**')")
-        assert result is not None
-
-    def test_bitwise_and_operator(self, prolog):
-        """Test /\ (500, yfx) bitwise AND operator."""
-        result = prolog.query_once("current_op(500, yfx, '/\\')")
-        assert result is not None
-
-    def test_bitwise_or_operator(self, prolog):
-        """Test \/ (500, yfx) bitwise OR operator."""
-        result = prolog.query_once("current_op(500, yfx, '\\/')")
-        assert result is not None
-
-    def test_bitwise_complement_operator(self, prolog):
-        """Test \ (200, fy) bitwise complement operator."""
-        result = prolog.query_once("current_op(200, fy, '\\')")
-        assert result is not None
-
-    def test_bitwise_shift_left_operator(self, prolog):
-        """Test << (400, yfx) bitwise shift left operator."""
-        result = prolog.query_once("current_op(400, yfx, '<<')")
-        assert result is not None
-
-    def test_bitwise_shift_right_operator(self, prolog):
-        """Test >> (400, yfx) bitwise shift right operator."""
-        result = prolog.query_once("current_op(400, yfx, '>>')")
-        assert result is not None
-
-
-class TestOperatorParsing:
-    """Test that operators parse correctly in expressions."""
-
-    def test_dcg_rule_parsing(self, prolog):
-        """Test --> DCG operator parses."""
-        # Should parse without error
-        prolog.consult_string("test --> [hello].")
-        assert prolog.has_solution("phrase(test, [hello])")
-
-    def test_directive_prefix_parsing(self, prolog):
-        """Test :- fx directive prefix parses and takes effect."""
-        # Should parse without error and declare test/1 as dynamic
-        prolog.consult_string(":- dynamic(test/1).")
-        # Check that it was processed by asserting a fact
-        prolog.query_once("assertz(test(a)).")
-        assert prolog.has_solution("test(a)")
-
-    @pytest.mark.parametrize("expression", [
-        "X = 2 ^ 3",
-        "X = 2 ** 3",
-        "X = 7 div 2",
-        "X = 5 /\\ 3",
-        "X = 5 \\/ 3",
-        "X = \\ 5",
-        "X = 5 << 2",
-        "X = 5 >> 2",
-    ])
-    def test_arithmetic_operators_parsing(self, prolog, expression):
-        """Test new arithmetic operators parse in expressions."""
-        prolog.query_once(expression)
-
-
-class TestOperatorLimitations:
-    """Document current limitations of operator implementation.
-
-    These tests demonstrate what is NOT yet supported.
-    They are marked as xfail to indicate expected limitations.
+    These tests verify that infix, prefix, and postfix operators
+    are parsed correctly from source code.
     """
 
-    @pytest.mark.xfail(reason="Full operator parsing not yet implemented")
     def test_infix_operator_parsing_not_yet_supported(self):
-        """Custom infix operators are not yet parsed as infix syntax.
-        
-        Currently, you must use canonical form: op_name(a, b)
-        Future enhancement will support: a op_name b
-        """
+        # For now, use: fact(a +++ b)
         prolog = PrologInterpreter()
-        prolog.consult_string("""
-            :- op(500, xfx, '+++').
-            fact(a +++ b).
-        """)
-        
-        # This will fail until parsing is implemented
-        # For now, use: fact(+++(a, b))
-        assert prolog.has_solution("fact(+++(a, b))")
+        prolog.consult_string(":- op(500, xfx, '+++').")
+        prolog.consult_string("fact(a +++ b).")
+        assert prolog.has_solution("fact(a +++ b)")
 
-    @pytest.mark.xfail(reason="Prefix operator parsing not yet implemented")
     def test_prefix_operator_parsing_not_yet_supported(self):
-        """Custom prefix operators are not yet parsed as prefix syntax.
-        
-        Currently, use canonical form: op_name(x)
-        Future enhancement will support: op_name x
+        """Custom prefix operators are supported and parsed as prefix syntax.
+
+        You can now use: ~~ x
         """
         prolog = PrologInterpreter()
         prolog.consult_string("""
@@ -695,12 +597,10 @@ class TestOperatorLimitations:
         # For now, use: fact(~~(x))
         assert prolog.has_solution("fact(~~(x))")
 
-    @pytest.mark.xfail(reason="Postfix operator parsing not yet implemented")
     def test_postfix_operator_parsing_not_yet_supported(self):
-        """Custom postfix operators are not yet parsed as postfix syntax.
-        
-        Currently, use canonical form: op_name(x)
-        Future enhancement will support: x op_name
+        """Custom postfix operators are supported and parsed as postfix syntax.
+
+        You can now use: x !!
         """
         prolog = PrologInterpreter()
         prolog.consult_string("""

@@ -7,11 +7,13 @@ Analyzes a Prolog library file to find:
 - Which are supported by Vibe-Prolog
 - Which are missing but required
 
-Outputs a markdown report.
+Outputs a markdown report by default, or JSON with --json flag.
 """
 
 from __future__ import annotations
 
+import argparse
+import json
 import re
 import sys
 from pathlib import Path
@@ -177,15 +179,88 @@ def find_declared_operators(filepath: Path) -> Set[tuple[int, str, str]]:
     return declared
 
 
+def output_json(filepath: Path, data: dict) -> None:
+    """Output results in JSON format."""
+    json.dump(data, sys.stdout, indent=2)
+    print()  # Add newline at end
+
+
+def output_markdown(filepath: Path, data: dict) -> None:
+    """Output results in markdown format."""
+    print("# Operator Analysis Report")
+    print()
+    print(f"**File:** `{filepath}`")
+    print()
+    print(f"**Operators found in code:** {data['operators_found_count']}")
+    print(f"**Operators declared in file:** {data['operators_declared_count']}")
+    print()
+
+    if data['declared_operators']:
+        print("## Operators Declared in File")
+        print()
+        print("These operators are explicitly declared via `:- op(...)` directives or module exports")
+        print("and will be loaded automatically when this file is consulted:")
+        print()
+        for op_info in data['declared_operators']:
+            print(f"- `{op_info['operator']}` ({op_info['precedence']}, {op_info['associativity']}) - {op_info['status']}")
+        print()
+
+    print("## Operators Available (Defaults + Declared)")
+    print()
+    if data['available_operators']:
+        print("These operators are used and will be available (either in defaults or declared in file):")
+        print()
+        for op_info in data['available_operators']:
+            print(f"- `{op_info['operator']}` ({op_info['source']})")
+    else:
+        print("*None found*")
+    print()
+
+    print("## Missing ISO Operators")
+    print()
+    if data['missing_iso_operators']:
+        print("These **ISO-required** operators are used but NOT declared in file and NOT in defaults:")
+        print()
+        for op_info in data['missing_iso_operators']:
+            print(f"- `{op_info['operator']}` - ISO spec: {op_info['iso_spec']}")
+        print()
+        print("**These should be added to `vibeprolog/operator_defaults.py`**")
+    else:
+        print("*None found* ✅")
+    print()
+
+    print("## Missing Non-ISO Operators")
+    print()
+    if data['missing_non_iso_operators']:
+        print("These non-ISO operators are used but NOT declared in file and NOT in defaults:")
+        print()
+        for op in data['missing_non_iso_operators']:
+            print(f"- `{op}`")
+        print()
+        print("**Note:** These may be typos or need to be declared with `:- op(...)` directives.")
+    else:
+        print("*None found*")
+    print()
+
+    # Summary
+    print("## Summary")
+    print()
+    print(f"- ✅ Operators available (defaults + declared): {data['summary']['available_count']}")
+    print(f"- ❌ Missing ISO operators: {data['summary']['missing_iso_count']}")
+    print(f"- ⚠️ Missing non-ISO operators: {data['summary']['missing_non_iso_count']}")
+    print()
+
+
 def main():
     """Main entry point."""
-    if len(sys.argv) != 2:
-        print("Usage: python check_operators.py <prolog_file>")
-        print("\nExample:")
-        print("  python check_operators.py library/clpb.pl")
-        sys.exit(1)
+    parser = argparse.ArgumentParser(
+        description="Check which operators are used in a Prolog file and compare with what's supported."
+    )
+    parser.add_argument("file", type=Path, help="Prolog file to analyze")
+    parser.add_argument("--json", action="store_true", help="Output results in JSON format")
 
-    filepath = Path(sys.argv[1])
+    args = parser.parse_args()
+    filepath = args.file
 
     if not filepath.exists():
         print(f"Error: File {filepath} does not exist", file=sys.stderr)
@@ -195,8 +270,9 @@ def main():
         print(f"Error: {filepath} is not a file", file=sys.stderr)
         sys.exit(1)
 
-    print(f"# Operator Analysis: {filepath.name}\n", file=sys.stderr)
-    print(f"Analyzing {filepath}...\n", file=sys.stderr)
+    if not args.json:
+        print(f"# Operator Analysis: {filepath.name}\n", file=sys.stderr)
+        print(f"Analyzing {filepath}...\n", file=sys.stderr)
 
     # Find operators used in code
     used_operators = find_operators_in_code(filepath)
@@ -221,81 +297,47 @@ def main():
     missing_iso = used_but_missing & iso_ops
     missing_non_iso = used_but_missing - iso_ops
 
-    # Categorize declared operators
-    declared_in_defaults = declared_op_names & supported_ops
-    declared_extensions = declared_op_names - supported_ops
+    # Build data structure for output
+    data = {
+        "file": str(filepath),
+        "operators_found_count": len(used_operators),
+        "operators_declared_count": len(declared_operators),
+        "declared_operators": [
+            {
+                "operator": op,
+                "precedence": prec,
+                "associativity": assoc,
+                "status": "in defaults" if op in supported_ops else "extension"
+            }
+            for prec, assoc, op in sorted(declared_operators)
+        ],
+        "available_operators": [
+            {
+                "operator": op,
+                "source": "default" if op in supported_ops else "declared in file"
+            }
+            for op in sorted(used_and_available)
+        ],
+        "missing_iso_operators": [
+            {
+                "operator": op,
+                "iso_spec": ", ".join(f"({prec}, {assoc})" for prec, assoc, o in ISO_OPERATORS if o == op)
+            }
+            for op in sorted(missing_iso)
+        ],
+        "missing_non_iso_operators": sorted(list(missing_non_iso)),
+        "summary": {
+            "available_count": len(used_and_available),
+            "missing_iso_count": len(missing_iso),
+            "missing_non_iso_count": len(missing_non_iso)
+        }
+    }
 
-    # Output markdown report
-    print("# Operator Analysis Report")
-    print()
-    print(f"**File:** `{filepath}`")
-    print()
-    print(f"**Operators found in code:** {len(used_operators)}")
-    print(f"**Operators declared in file:** {len(declared_operators)}")
-    print()
-
-    if declared_operators:
-        print("## Operators Declared in File")
-        print()
-        print("These operators are explicitly declared via `:- op(...)` directives or module exports")
-        print("and will be loaded automatically when this file is consulted:")
-        print()
-        for prec, assoc, op in sorted(declared_operators):
-            in_defaults = "in defaults" if op in supported_ops else "extension"
-            print(f"- `{op}` ({prec}, {assoc}) - {in_defaults}")
-        print()
-
-    print("## Operators Available (Defaults + Declared)")
-    print()
-    if used_and_available:
-        print("These operators are used and will be available (either in defaults or declared in file):")
-        print()
-        for op in sorted(used_and_available):
-            source = "default" if op in supported_ops else "declared in file"
-            print(f"- `{op}` ({source})")
+    # Output in requested format
+    if args.json:
+        output_json(filepath, data)
     else:
-        print("*None found*")
-    print()
-
-    print("## Missing ISO Operators")
-    print()
-    if missing_iso:
-        print("These **ISO-required** operators are used but NOT declared in file and NOT in defaults:")
-        print()
-        for op in sorted(missing_iso):
-            # Find the ISO spec for this operator
-            specs = [f"({prec}, {assoc})" for prec, assoc, o in ISO_OPERATORS if o == op]
-            spec_str = ", ".join(specs)
-            print(f"- `{op}` - ISO spec: {spec_str}")
-        print()
-        print("**These should be added to `vibeprolog/operator_defaults.py`**")
-    else:
-        print("*None found* ✅")
-    print()
-
-    print("## Missing Non-ISO Operators")
-    print()
-    if missing_non_iso:
-        print("These non-ISO operators are used but NOT declared in file and NOT in defaults:")
-        print()
-        for op in sorted(missing_non_iso):
-            print(f"- `{op}`")
-        print()
-        print("**Note:** These may be typos or need to be declared with `:- op(...)` directives.")
-    else:
-        print("*None found*")
-    print()
-
-    # Summary
-    print("## Summary")
-    print()
-    print(f"- ✅ Operators available (defaults + declared): {len(used_and_available)}")
-    print(f"- ❌ Missing ISO operators: {len(missing_iso)}")
-    print(f"- ⚠️ Missing non-ISO operators: {len(missing_non_iso)}")
-    print()
-
-    if missing_iso:
-        print("**Action Required:** Add missing ISO operators to `vibeprolog/operator_defaults.py`")
+        output_markdown(filepath, data)
 
     # Exit with error code if missing ISO operators found
     if missing_iso:
