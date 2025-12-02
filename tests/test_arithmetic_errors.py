@@ -87,6 +87,13 @@ class TestEvaluationErrors:
             prolog.query_once("X is 10 mod 0")
         assert "evaluation_error" in str(exc_info.value)
 
+    def test_div_by_zero(self):
+        """Div by zero raises error."""
+        prolog = PrologInterpreter()
+        with pytest.raises(Exception) as exc_info:
+            prolog.query_once("X is 10 div 0")
+        assert "evaluation_error" in str(exc_info.value)
+
     def test_sqrt_negative(self):
         """Square root of negative raises error."""
         prolog = PrologInterpreter()

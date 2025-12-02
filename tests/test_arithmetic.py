@@ -76,6 +76,36 @@ class TestBasicArithmetic:
         assert result is not None
         assert result['X'] == 2
 
+    def test_div_operator(self):
+        prolog = PrologInterpreter()
+
+        result = prolog.query_once("X is 7 div 2")
+        assert result is not None
+        assert result['X'] == 3
+
+        result = prolog.query_once("X is 20 div 6")
+        assert result is not None
+        assert result['X'] == 3
+
+        # Test negative division (rounds towards negative infinity)
+        result = prolog.query_once("X is -7 div 2")
+        assert result is not None
+        assert result['X'] == -4
+
+        # Test that div and // give the same results
+        result1 = prolog.query_once("X is 7 div 2")
+        result2 = prolog.query_once("Y is 7 // 2")
+        assert result1 is not None
+        assert result2 is not None
+        assert result1['X'] == result2['Y']
+
+        # Test negative case
+        result1 = prolog.query_once("X is -7 div 2")
+        result2 = prolog.query_once("Y is -7 // 2")
+        assert result1 is not None
+        assert result2 is not None
+        assert result1['X'] == result2['Y']
+
 
 class TestArithmeticPrecedence:
     """Operator precedence in arithmetic"""
@@ -100,6 +130,18 @@ class TestArithmeticPrecedence:
         result = prolog.query_once("X is 10 - 3 - 2")
         assert result is not None
         assert result['X'] == 5  # (10 - 3) - 2, not 10 - (3 - 2)
+
+    def test_div_precedence(self):
+        prolog = PrologInterpreter()
+
+        # div should have same precedence as // and mod (400)
+        result = prolog.query_once("X is 10 + 7 div 2")
+        assert result is not None
+        assert result['X'] == 13  # 10 + (7 div 2) = 10 + 3
+
+        result = prolog.query_once("X is 7 div 2 * 3")
+        assert result is not None
+        assert result['X'] == 9  # (7 div 2) * 3 = 3 * 3
 
 
 class TestComplexExpressions:
