@@ -70,4 +70,6 @@ Are you a tool vendor who wants your tools used? Yes! I'd love to use them. I pr
 
 # Libraries and Examples
 
-The libraries in ./library and the examples in ./example are **NOT* AI generated!
+The libraries in ./library and the examples in ./example are **NOT* AI generated! 
+
+./library comes from https://github.com/mthom/scryer-prolog/tree/master/src/lib via a git subtree. The files their are licensed as per the headers in those files. 
