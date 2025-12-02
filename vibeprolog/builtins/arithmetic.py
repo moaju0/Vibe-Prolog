@@ -58,7 +58,7 @@ def _check_evaluable(term: Any, subst: Substitution, predicate: str) -> None:
         # List of valid arithmetic functors
         valid_functors = {
             ('+', 1), ('+', 2), ('-', 1), ('-', 2),
-            ('*', 2), ('/', 2), ('//', 2), ('mod', 2),
+            ('*', 2), ('/', 2), ('//', 2), ('mod', 2), ('div', 2),
             ('**', 2), ('abs', 1), ('sign', 1),
             ('min', 2), ('max', 2),
             ('sqrt', 1), ('exp', 1), ('log', 1),
@@ -470,6 +470,10 @@ class ArithmeticBuiltins:
                 if right == 0:
                     raise ZeroDivisionError()
                 return left % right
+            elif functor == 'div':
+                if right == 0:
+                    raise ZeroDivisionError()
+                return int(left // right)
             elif functor == '**':
                 # Check for undefined cases
                 if left == 0 and right < 0:
