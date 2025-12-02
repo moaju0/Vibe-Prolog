@@ -139,6 +139,7 @@ Status legend:
 | `char_code/2`    | ✅      | **ISO-required**                         |
 | `number_chars/2` | ✅      | **ISO-required**                         |
 | `number_codes/2` | ✅      | **ISO-required**                         |
+| `name/2`         | 📘      | Classic Prolog extension (pre-ISO)       |
 
 ---
 

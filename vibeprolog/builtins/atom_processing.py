@@ -37,6 +37,7 @@ class AtomProcessingBuiltins:
         register_builtin(registry, "sub_atom", 5, AtomProcessingBuiltins._builtin_sub_atom)
         register_builtin(registry, "number_chars", 2, AtomProcessingBuiltins._builtin_number_chars)
         register_builtin(registry, "number_codes", 2, AtomProcessingBuiltins._builtin_number_codes)
+        register_builtin(registry, "name", 2, AtomProcessingBuiltins._builtin_name)
 
     @staticmethod
     def _builtin_atom_chars(
@@ -501,6 +502,76 @@ class AtomProcessingBuiltins:
                 # Syntax error for invalid number format
                 error_term = PrologError.syntax_error(f"Invalid number format: {char_str}", "number_codes/2")
                 raise PrologThrow(error_term)
+
+    @staticmethod
+    def _builtin_name(
+        args: BuiltinArgs, subst: Substitution, _engine: EngineContext | None
+    ) -> Iterator[Substitution]:
+        """name(+Term, ?Codes) - Classic Prolog conversion between atoms/numbers and character codes."""
+        term_term, codes_term = args
+        term_term = deref(term_term, subst)
+        codes_term = deref(codes_term, subst)
+
+        # Check for instantiation error (both args unbound)
+        if isinstance(term_term, Variable) and isinstance(codes_term, Variable):
+            error_term = PrologError.instantiation_error("name/2")
+            raise PrologThrow(error_term)
+
+        # Check type errors
+        if not isinstance(term_term, Variable) and not isinstance(term_term, (Atom, Number)):
+            error_term = PrologError.type_error("atom_or_number", term_term, "name/2")
+            raise PrologThrow(error_term)
+        if not isinstance(codes_term, Variable) and not isinstance(codes_term, List):
+            error_term = PrologError.type_error("list", codes_term, "name/2")
+            raise PrologThrow(error_term)
+
+        # Mode 1: term to codes (atom or number)
+        if isinstance(term_term, (Atom, Number)):
+            if isinstance(term_term, Atom):
+                codes = [Number(ord(c)) for c in term_term.name]
+            else:  # Number
+                num_str = str(term_term.value)
+                codes = [Number(ord(c)) for c in num_str]
+            code_list = List(tuple(codes), None)
+            new_subst = unify(codes_term, code_list, subst)
+            if new_subst is not None:
+                yield new_subst
+
+        # Mode 2: codes to term (try number first, then atom)
+        elif isinstance(codes_term, List):
+            # Collect all elements from the list (handle nested representation)
+            elements = AtomProcessingBuiltins._flatten_prolog_list(codes_term)
+            if elements is None:
+                return  # Not a proper list
+
+            char_str = ""
+            for elem in elements:
+                elem = deref(elem, subst)
+                if not isinstance(elem, Number) or not isinstance(elem.value, int):
+                    error_term = PrologError.type_error("integer", elem, "name/2")
+                    raise PrologThrow(error_term)
+                try:
+                    char_str += chr(elem.value)
+                except ValueError:
+                    error_term = PrologError.type_error("character_code", elem, "name/2")
+                    raise PrologThrow(error_term)
+
+            # Try to parse as number first
+            try:
+                if '.' in char_str or 'e' in char_str.lower():
+                    result = float(char_str)
+                else:
+                    result = int(char_str)
+                result_number = Number(result)
+                new_subst = unify(term_term, result_number, subst)
+                if new_subst is not None:
+                    yield new_subst
+            except ValueError:
+                # If number parsing fails, create an atom
+                result_atom = Atom(char_str)
+                new_subst = unify(term_term, result_atom, subst)
+                if new_subst is not None:
+                    yield new_subst
 
 
 __all__ = ["AtomProcessingBuiltins"]

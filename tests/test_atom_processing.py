@@ -479,3 +479,139 @@ class TestNumberCodes:
             prolog.query_once("number_codes(X, [1114112]).")
         assert "type_error" in str(exc_info.value)
         assert "character_code" in str(exc_info.value)
+
+
+class TestName:
+    """Tests for name/2 predicate (classic Prolog compatibility)."""
+
+    def test_name_atom_to_codes_simple(self):
+        """Test converting single-character atom to codes."""
+        prolog = PrologInterpreter()
+        result = prolog.query_once("name(a, X).")
+        assert result['X'] == [97]
+
+    def test_name_atom_to_codes_multi(self):
+        """Test converting multi-character atom to codes."""
+        prolog = PrologInterpreter()
+        result = prolog.query_once("name(hello, X).")
+        assert result['X'] == [104, 101, 108, 108, 111]
+
+    def test_name_atom_to_codes_empty(self):
+        """Test converting empty atom to codes."""
+        prolog = PrologInterpreter()
+        result = prolog.query_once("name('', X).")
+        assert result['X'] == []
+
+    def test_name_atom_to_codes_special(self):
+        """Test converting atom with special characters to codes."""
+        prolog = PrologInterpreter()
+        result = prolog.query_once("name('ABC', X).")
+        assert result['X'] == [65, 66, 67]
+
+    def test_name_number_to_codes_integer(self):
+        """Test converting integer to codes."""
+        prolog = PrologInterpreter()
+        result = prolog.query_once("name(123, X).")
+        assert result['X'] == [49, 50, 51]
+
+    def test_name_number_to_codes_negative(self):
+        """Test converting negative integer to codes."""
+        prolog = PrologInterpreter()
+        result = prolog.query_once("name(-456, X).")
+        assert result['X'] == [45, 52, 53, 54]
+
+    def test_name_number_to_codes_float(self):
+        """Test converting float to codes."""
+        prolog = PrologInterpreter()
+        result = prolog.query_once("name(3.14, X).")
+        assert result['X'] == [51, 46, 49, 52]
+
+    def test_name_codes_to_number_integer(self):
+        """Test converting codes to integer."""
+        prolog = PrologInterpreter()
+        result = prolog.query_once("name(X, [49,50,51]).")
+        assert result['X'] == 123
+
+    def test_name_codes_to_number_negative(self):
+        """Test converting codes to negative integer."""
+        prolog = PrologInterpreter()
+        result = prolog.query_once("name(X, [45,49,50,51]).")
+        assert result['X'] == -123
+
+    def test_name_codes_to_number_float(self):
+        """Test converting codes to float."""
+        prolog = PrologInterpreter()
+        result = prolog.query_once("name(X, [51,46,49,52]).")
+        assert result['X'] == 3.14
+
+    def test_name_codes_to_atom_non_numeric(self):
+        """Test converting codes to atom when codes don't represent a number."""
+        prolog = PrologInterpreter()
+        result = prolog.query_once("name(X, [104,101,108,108,111]).")
+        assert result['X'] == 'hello'
+
+    def test_name_codes_to_atom_mixed(self):
+        """Test converting codes to atom with mixed characters."""
+        prolog = PrologInterpreter()
+        result = prolog.query_once("name(X, [65,66,67]).")
+        assert result['X'] == 'ABC'
+
+    def test_name_verification_true_atom(self):
+        """Test verification mode with matching atom."""
+        prolog = PrologInterpreter()
+        assert prolog.has_solution("name(hello, [104,101,108,108,111]).")
+
+    def test_name_verification_true_number(self):
+        """Test verification mode with matching number."""
+        prolog = PrologInterpreter()
+        assert prolog.has_solution("name(123, [49,50,51]).")
+
+    def test_name_verification_false(self):
+        """Test verification mode with non-matching conversion."""
+        prolog = PrologInterpreter()
+        assert not prolog.has_solution("name(hello, [49,50,51]).")
+
+    def test_name_tictactoe_use_case(self):
+        """Test the specific use case from tictactoe: name('5', [X])."""
+        prolog = PrologInterpreter()
+        result = prolog.query_once("name('5', [X]).")
+        assert result['X'] == 53
+
+    def test_name_instantiation_error(self):
+        """Test instantiation error when both arguments are unbound."""
+        prolog = PrologInterpreter()
+        with pytest.raises(PrologThrow) as exc_info:
+            prolog.query_once("name(X, Y).")
+        assert "instantiation_error" in str(exc_info.value)
+
+    def test_name_type_error_term(self):
+        """Test type error when first arg is neither atom, number, nor variable."""
+        prolog = PrologInterpreter()
+        with pytest.raises(PrologThrow) as exc_info:
+            prolog.query_once("name([1,2,3], X).")
+        assert "type_error" in str(exc_info.value)
+        assert "atom_or_number" in str(exc_info.value)
+
+    def test_name_type_error_codes(self):
+        """Test type error when second arg is neither list nor variable."""
+        prolog = PrologInterpreter()
+        with pytest.raises(PrologThrow) as exc_info:
+            prolog.query_once("name(hello, atom).")
+        assert "type_error" in str(exc_info.value)
+        assert "list" in str(exc_info.value)
+
+    def test_name_type_error_non_integer_codes(self):
+        """Test type error when codes list contains non-integers."""
+        prolog = PrologInterpreter()
+        with pytest.raises(PrologThrow) as exc_info:
+            prolog.query_once("name(X, [49,hello,51]).")
+        assert "type_error" in str(exc_info.value)
+        assert "integer" in str(exc_info.value)
+
+    def test_name_type_error_invalid_character_code(self):
+        """Test type error when codes list contains invalid character code."""
+        prolog = PrologInterpreter()
+        with pytest.raises(PrologThrow) as exc_info:
+            prolog.query_once("name(X, [1114112]).")
+        assert "type_error" in str(exc_info.value)
+        assert "character_code" in str(exc_info.value)
