@@ -571,63 +571,53 @@ class TestOperatorEdgeCases:
 class TestISOOperators:
     """Test ISO-required operators are available by default."""
 
-    def test_directive_prefix_operator(self):
+    def test_directive_prefix_operator(self, prolog):
         """Test :- (1200, fx) directive prefix operator."""
-        prolog = PrologInterpreter()
         result = prolog.query_once("current_op(1200, fx, :-)")
         assert result is not None
 
-    def test_dcg_rule_operator(self):
+    def test_dcg_rule_operator(self, prolog):
         """Test --> (1200, xfx) DCG rule operator."""
-        prolog = PrologInterpreter()
         result = prolog.query_once("current_op(1200, xfx, -->)")
         assert result is not None
 
-    def test_integer_division_operator(self):
+    def test_integer_division_operator(self, prolog):
         """Test div (400, yfx) integer division operator."""
-        prolog = PrologInterpreter()
         result = prolog.query_once("current_op(400, yfx, div)")
         assert result is not None
 
-    def test_exponentiation_operator(self):
+    def test_exponentiation_operator(self, prolog):
         """Test ^ (200, xfy) exponentiation operator."""
-        prolog = PrologInterpreter()
         result = prolog.query_once("current_op(200, xfy, ^)")
         assert result is not None
 
-    def test_alternative_exponentiation_operator(self):
+    def test_alternative_exponentiation_operator(self, prolog):
         """Test ** (200, xfx) alternative exponentiation operator."""
-        prolog = PrologInterpreter()
         result = prolog.query_once("current_op(200, xfx, '**')")
         assert result is not None
 
-    def test_bitwise_and_operator(self):
+    def test_bitwise_and_operator(self, prolog):
         """Test /\ (500, yfx) bitwise AND operator."""
-        prolog = PrologInterpreter()
         result = prolog.query_once("current_op(500, yfx, '/\\')")
         assert result is not None
 
-    def test_bitwise_or_operator(self):
+    def test_bitwise_or_operator(self, prolog):
         """Test \/ (500, yfx) bitwise OR operator."""
-        prolog = PrologInterpreter()
         result = prolog.query_once("current_op(500, yfx, '\\/')")
         assert result is not None
 
-    def test_bitwise_complement_operator(self):
+    def test_bitwise_complement_operator(self, prolog):
         """Test \ (200, fy) bitwise complement operator."""
-        prolog = PrologInterpreter()
         result = prolog.query_once("current_op(200, fy, '\\')")
         assert result is not None
 
-    def test_bitwise_shift_left_operator(self):
+    def test_bitwise_shift_left_operator(self, prolog):
         """Test << (400, yfx) bitwise shift left operator."""
-        prolog = PrologInterpreter()
         result = prolog.query_once("current_op(400, yfx, '<<')")
         assert result is not None
 
-    def test_bitwise_shift_right_operator(self):
+    def test_bitwise_shift_right_operator(self, prolog):
         """Test >> (400, yfx) bitwise shift right operator."""
-        prolog = PrologInterpreter()
         result = prolog.query_once("current_op(400, yfx, '>>')")
         assert result is not None
 
@@ -635,37 +625,33 @@ class TestISOOperators:
 class TestOperatorParsing:
     """Test that operators parse correctly in expressions."""
 
-    def test_dcg_rule_parsing(self):
+    def test_dcg_rule_parsing(self, prolog):
         """Test --> DCG operator parses."""
-        prolog = PrologInterpreter()
         # Should parse without error
         prolog.consult_string("test --> [hello].")
         assert prolog.has_solution("phrase(test, [hello])")
 
-    def test_directive_prefix_parsing(self):
-        """Test :- fx directive prefix parses."""
-        prolog = PrologInterpreter()
-        # Should parse without error
+    def test_directive_prefix_parsing(self, prolog):
+        """Test :- fx directive prefix parses and takes effect."""
+        # Should parse without error and declare test/1 as dynamic
         prolog.consult_string(":- dynamic(test/1).")
-        # Check that it was processed (dynamic directive)
-        # Since dynamic is implemented, this should work
+        # Check that it was processed by asserting a fact
+        prolog.query_once("assertz(test(a)).")
+        assert prolog.has_solution("test(a)")
 
-    def test_arithmetic_operators_parsing(self):
+    @pytest.mark.parametrize("expression", [
+        "X = 2 ^ 3",
+        "X = 2 ** 3",
+        "X = 7 div 2",
+        "X = 5 /\\ 3",
+        "X = 5 \\/ 3",
+        "X = \\ 5",
+        "X = 5 << 2",
+        "X = 5 >> 2",
+    ])
+    def test_arithmetic_operators_parsing(self, prolog, expression):
         """Test new arithmetic operators parse in expressions."""
-        prolog = PrologInterpreter()
-        # These should parse without error, even if evaluation fails
-        # For now, just check they don't raise syntax errors
-        try:
-            prolog.query_once("X = 2 ^ 3")
-            prolog.query_once("X = 2 ** 3")
-            prolog.query_once("X = 7 div 2")  # This should work
-            prolog.query_once("X = 5 /\\ 3")
-            prolog.query_once("X = 5 \\/ 3")
-            prolog.query_once("X = \\ 5")
-            prolog.query_once("X = 5 << 2")
-            prolog.query_once("X = 5 >> 2")
-        except Exception as e:
-            pytest.fail(f"Parsing failed: {e}")
+        prolog.query_once(expression)
 
 
 class TestOperatorLimitations:
