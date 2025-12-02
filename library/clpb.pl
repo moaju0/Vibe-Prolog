@@ -179,7 +179,7 @@ The implementation is based on reduced and ordered Binary Decision
 Diagrams (BDDs).
 
 Benchmarks and usage examples of this library are available from:
-[*https://www.metalevel.at/clpb/*](https://www.metalevel.at/clpb/)
+[https://www.metalevel.at/clpb/](https://www.metalevel.at/clpb/)
 
 ## Boolean expressions
 
