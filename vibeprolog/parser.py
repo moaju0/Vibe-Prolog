@@ -92,7 +92,7 @@ PROLOG_GRAMMAR = r"""
     clause: rule | dcg_rule | fact
     fact: term "."
     rule: term ":-" goals "."
-    dcg_rule: term "-->" goals "."
+    dcg_rule: term DCG_ARROW goals "."
     atom_or_compound: atom
         | atom "(" args ")"
 
@@ -112,10 +112,11 @@ PROLOG_GRAMMAR = r"""
         | "[" op_symbol_or_atom ("," op_symbol_or_atom)* "]" -> op_arg_list_items
 
     // operator symbol or atom for op/3 - avoid parsing as expressions
-    op_symbol_or_atom: OP_SYMBOL | ATOM | SPECIAL_ATOM | OPERATOR_ATOM
+    op_symbol_or_atom: OP_SYMBOL_DIRECTIVE | OP_SYMBOL | ATOM | SPECIAL_ATOM | OPERATOR_ATOM
 
     // Operator symbols - must match complete sequences before breaking into component operators
     // Priority set to ensure special atoms like -$ are recognized, but still below SPECIAL_ATOM_OPS
+    OP_SYMBOL_DIRECTIVE.25: /[+\-*\/<>=\\@#$&!~:?^.]+/
     OP_SYMBOL: /[+\-*\/<>=\\@#$&!~:?^.]+/
 
     predicate_indicators: term ("," term)*
@@ -144,7 +145,8 @@ __OPERATOR_GRAMMAR__
 
     curly_braces: "{" term "}"
 
-    OPERATOR_ATOM: ":-" | "-->"
+    DCG_ARROW.20: "-->"
+    OPERATOR_ATOM.15: ":-"
 
     list: "[" "]"                          -> empty_list
         | "[" list_items "]"               -> list_items_only
@@ -315,7 +317,8 @@ class PrologTransformer(Transformer):
 
     @v_args(meta=True)
     def dcg_rule(self, meta, items):
-        head, body = items
+        head = items[0]
+        body = items[-1]
         return Clause(head=head, body=body, dcg=True, meta=meta)
 
     def goals(self, items):
@@ -1064,6 +1067,8 @@ def generate_operator_rules(operators: list[tuple[int, str, str]]) -> str:
     lower_rule = "primary"
     precedence_levels = sorted(grouped.keys())
 
+    token_counter = 0
+
     for precedence in precedence_levels:
         rule_name = f"level_{precedence}"
         parts = [lower_rule]
@@ -1072,39 +1077,71 @@ def generate_operator_rules(operators: list[tuple[int, str, str]]) -> str:
         postfix_specs = grouped[precedence]["postfix"]
 
         if infix_specs.get("xfx"):
-            token = f"INFIX_XFX_{precedence}"
-            tokens.append(f"    {token}: {_format_operator_literals(infix_specs['xfx'])}")
-            parts.append(f"{lower_rule} {token} {lower_rule} -> infix_xfx")
+            for name in sorted(infix_specs["xfx"]):
+                token_counter += 1
+                token = f"INFIX_XFX_{precedence}_{token_counter}"
+                priority = len(name)
+                token_def = f"{token}.{priority}" if priority else token
+                tokens.append(f"    {token_def}: {_format_operator_literals([name])}")
+                parts.append(f"{lower_rule} {token} {lower_rule} -> infix_xfx")
         if infix_specs.get("yfx"):
-            token = f"INFIX_YFX_{precedence}"
-            tokens.append(f"    {token}: {_format_operator_literals(infix_specs['yfx'])}")
-            parts.append(f"{rule_name} {token} {lower_rule} -> infix_yfx")
+            for name in sorted(infix_specs["yfx"]):
+                token_counter += 1
+                token = f"INFIX_YFX_{precedence}_{token_counter}"
+                priority = len(name)
+                token_def = f"{token}.{priority}" if priority else token
+                tokens.append(f"    {token_def}: {_format_operator_literals([name])}")
+                parts.append(f"{rule_name} {token} {lower_rule} -> infix_yfx")
         if infix_specs.get("xfy"):
-            token = f"INFIX_XFY_{precedence}"
-            tokens.append(f"    {token}: {_format_operator_literals(infix_specs['xfy'])}")
-            parts.append(f"{lower_rule} {token} {rule_name} -> infix_xfy")
+            for name in sorted(infix_specs["xfy"]):
+                token_counter += 1
+                token = f"INFIX_XFY_{precedence}_{token_counter}"
+                priority = len(name)
+                token_def = f"{token}.{priority}" if priority else token
+                tokens.append(f"    {token_def}: {_format_operator_literals([name])}")
+                parts.append(f"{lower_rule} {token} {rule_name} -> infix_xfy")
         if infix_specs.get("yfy"):
-            token = f"INFIX_YFY_{precedence}"
-            tokens.append(f"    {token}: {_format_operator_literals(infix_specs['yfy'])}")
-            parts.append(f"{rule_name} {token} {rule_name} -> infix_yfy")
+            for name in sorted(infix_specs["yfy"]):
+                token_counter += 1
+                token = f"INFIX_YFY_{precedence}_{token_counter}"
+                priority = len(name)
+                token_def = f"{token}.{priority}" if priority else token
+                tokens.append(f"    {token_def}: {_format_operator_literals([name])}")
+                parts.append(f"{rule_name} {token} {rule_name} -> infix_yfy")
 
         if prefix_specs.get("fx"):
-            token = f"PREFIX_FX_{precedence}"
-            tokens.append(f"    {token}: {_format_operator_literals(prefix_specs['fx'])}")
-            parts.append(f"{token} {lower_rule} -> prefix_fx")
+            for name in sorted(prefix_specs["fx"]):
+                token_counter += 1
+                token = f"PREFIX_FX_{precedence}_{token_counter}"
+                priority = len(name)
+                token_def = f"{token}.{priority}" if priority else token
+                tokens.append(f"    {token_def}: {_format_operator_literals([name])}")
+                parts.append(f"{token} {lower_rule} -> prefix_fx")
         if prefix_specs.get("fy"):
-            token = f"PREFIX_FY_{precedence}"
-            tokens.append(f"    {token}: {_format_operator_literals(prefix_specs['fy'])}")
-            parts.append(f"{token} {rule_name} -> prefix_fy")
+            for name in sorted(prefix_specs["fy"]):
+                token_counter += 1
+                token = f"PREFIX_FY_{precedence}_{token_counter}"
+                priority = len(name)
+                token_def = f"{token}.{priority}" if priority else token
+                tokens.append(f"    {token_def}: {_format_operator_literals([name])}")
+                parts.append(f"{token} {rule_name} -> prefix_fy")
 
         if postfix_specs.get("xf"):
-            token = f"POSTFIX_XF_{precedence}"
-            tokens.append(f"    {token}: {_format_operator_literals(postfix_specs['xf'])}")
-            parts.append(f"{lower_rule} {token} -> postfix_xf")
+            for name in sorted(postfix_specs["xf"]):
+                token_counter += 1
+                token = f"POSTFIX_XF_{precedence}_{token_counter}"
+                priority = len(name)
+                token_def = f"{token}.{priority}" if priority else token
+                tokens.append(f"    {token_def}: {_format_operator_literals([name])}")
+                parts.append(f"{lower_rule} {token} -> postfix_xf")
         if postfix_specs.get("yf"):
-            token = f"POSTFIX_YF_{precedence}"
-            tokens.append(f"    {token}: {_format_operator_literals(postfix_specs['yf'])}")
-            parts.append(f"{rule_name} {token} -> postfix_yf")
+            for name in sorted(postfix_specs["yf"]):
+                token_counter += 1
+                token = f"POSTFIX_YF_{precedence}_{token_counter}"
+                priority = len(name)
+                token_def = f"{token}.{priority}" if priority else token
+                tokens.append(f"    {token_def}: {_format_operator_literals([name])}")
+                parts.append(f"{rule_name} {token} -> postfix_yf")
 
         rule_body = "\n        | ".join(parts)
         rules.append(f"?{rule_name}: {rule_body}")

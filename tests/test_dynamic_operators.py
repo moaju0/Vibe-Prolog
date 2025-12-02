@@ -7,7 +7,9 @@ use in write_term.
 import pytest
 from vibeprolog import PrologInterpreter
 from vibeprolog.exceptions import PrologThrow
-from vibeprolog.terms import Atom, Compound
+from vibeprolog.operators import OperatorTable
+from vibeprolog.parser import extract_op_directives, generate_operator_rules, _merge_operators, _parse_operator_name_list, List
+from vibeprolog.terms import Atom, Compound, Number, Variable
 
 
 class TestOperatorDefinition:
@@ -568,69 +570,379 @@ class TestOperatorEdgeCases:
             assert result is not None, f"Failed for {op_type}"
 
 
-class TestDynamicOperatorParsing:
-    """Test that custom operator parsing is now fully supported.
+class TestOperatorHelpers:
+    """Unit tests for operator parsing and grammar generation helpers."""
 
-    These tests verify that infix, prefix, and postfix operators
-    are parsed correctly from source code.
+    def test_extract_op_directives_single_directive(self):
+        """Extract single op/3 directive."""
+        source = ":- op(500, xfx, '+++')."
+        ops = extract_op_directives(source)
+        assert ops == [(500, 'xfx', '+++')]
+
+    def test_extract_op_directives_multiple_directives(self):
+        """Extract multiple op/3 directives."""
+        source = """
+        :- op(500, xfx, '+++').
+        :- op(400, yfx, '***').
+        """
+        ops = extract_op_directives(source)
+        assert ops == [(500, 'xfx', '+++'), (400, 'yfx', '***')]
+
+    def test_extract_op_directives_list_operators(self):
+        """Extract directive with list of operators."""
+        source = ":- op(450, yfx, [@@, @@@@, @@@@@])."
+        ops = extract_op_directives(source)
+        assert ops == [(450, 'yfx', '@@'), (450, 'yfx', '@@@@'), (450, 'yfx', '@@@@@')]
+
+    def test_extract_op_directives_all_specifiers(self):
+        """Extract directives with all eight operator specifiers."""
+        specs = ['xfx', 'xfy', 'yfx', 'yfy', 'fx', 'fy', 'xf', 'yf']
+        source = "\n".join(f":- op({i+400}, {spec}, op_{spec})." for i, spec in enumerate(specs))
+        ops = extract_op_directives(source)
+        expected = [(i+400, spec, f'op_{spec}') for i, spec in enumerate(specs)]
+        assert ops == expected
+
+    def test_extract_op_directives_malformed_ignored(self):
+        """Malformed directives are ignored."""
+        source = """
+        :- op(500, xfx, '+++').
+        :- op(invalid).
+        :- op(400, yfx, '***').
+        """
+        ops = extract_op_directives(source)
+        assert ops == [(500, 'xfx', '+++'), (400, 'yfx', '***')]
+
+    def test_parse_operator_name_list_single(self):
+        """Parse single operator name."""
+        assert _parse_operator_name_list("'+++'") == ['+++']
+
+    def test_parse_operator_name_list_bracketed_list(self):
+        """Parse bracketed list of operators."""
+        assert _parse_operator_name_list("[@@, @@@@, @@@@@]") == ['@@', '@@@@', '@@@@@']
+
+    def test_parse_operator_name_list_quoted_operators(self):
+        """Parse operators with quotes."""
+        assert _parse_operator_name_list("['++', '--', '==']") == ['++', '--', '==']
+
+    def test_generate_operator_rules_empty(self):
+        """Generate rules for empty operator list."""
+        rules = generate_operator_rules([])
+        assert "term: primary" in rules
+
+    def test_generate_operator_rules_infix_operators(self):
+        """Generate rules for infix operators."""
+        ops = [(500, 'xfx', '+++'), (400, 'yfx', '***')]
+        rules = generate_operator_rules(ops)
+        assert 'INFIX_XFX_500' in rules
+        assert 'INFIX_YFX_400' in rules
+
+    def test_generate_operator_rules_prefix_operators(self):
+        """Generate rules for prefix operators."""
+        ops = [(300, 'fy', '~~'), (200, 'fx', '!!')]
+        rules = generate_operator_rules(ops)
+        assert 'PREFIX_FY_300' in rules
+        assert 'PREFIX_FX_200' in rules
+
+    def test_generate_operator_rules_postfix_operators(self):
+        """Generate rules for postfix operators."""
+        ops = [(200, 'xf', '!!'), (100, 'yf', '??')]
+        rules = generate_operator_rules(ops)
+        assert 'POSTFIX_XF_200' in rules
+        assert 'POSTFIX_YF_100' in rules
+
+    def test_generate_operator_rules_precedence_ordering(self):
+        """Operators are grouped by precedence level."""
+        ops = [(600, 'xfx', 'high'), (400, 'xfx', 'low'), (500, 'xfx', 'mid')]
+        rules = generate_operator_rules(ops)
+        # Check that all precedence levels are present
+        assert 'INFIX_XFX_600' in rules
+        assert 'INFIX_XFX_500' in rules
+        assert 'INFIX_XFX_400' in rules
+
+    def test_merge_operators_no_directives(self):
+        """Merge with empty directives returns base ops."""
+        base = [(500, 'xfx', '+'), (400, 'yfx', '*')]
+        merged = _merge_operators(base, [])
+        # Function sorts by precedence, spec, name
+        assert merged == [(400, 'yfx', '*'), (500, 'xfx', '+')]
+
+    def test_merge_operators_with_directives(self):
+        """Merge base ops with directives."""
+        base = [(500, 'xfx', '+')]
+        directives = [(400, 'yfx', '***')]
+        merged = _merge_operators(base, directives)
+        # Function sorts by precedence, spec, name
+        assert merged == [(400, 'yfx', '***'), (500, 'xfx', '+')]
+
+    def test_merge_operators_overrides_base(self):
+        """Directives can override base operators."""
+        base = [(500, 'xfx', '+')]
+        directives = [(400, 'xfx', '+')]  # Same name, different precedence/spec
+        merged = _merge_operators(base, directives)
+        # Last definition wins
+        assert merged == [(400, 'xfx', '+')]
+
+
+class TestOperatorTableParsing:
+    """Unit tests for OperatorTable parsing methods."""
+
+    def test_parse_precedence_valid(self):
+        """Parse valid precedence values."""
+        table = OperatorTable()
+        assert table._parse_precedence(Number(500), 'test') == 500
+        assert table._parse_precedence(Number(0), 'test') == 0
+        assert table._parse_precedence(Number(1200), 'test') == 1200
+
+    def test_parse_precedence_variable_error(self):
+        """Unbound precedence raises instantiation_error."""
+        table = OperatorTable()
+        with pytest.raises(PrologThrow):
+            table._parse_precedence(Variable('X'), 'test')
+
+    def test_parse_precedence_non_integer_error(self):
+        """Non-integer precedence raises type_error."""
+        table = OperatorTable()
+        with pytest.raises(PrologThrow):
+            table._parse_precedence(Atom('abc'), 'test')
+
+    def test_parse_precedence_float_error(self):
+        """Float precedence raises type_error."""
+        table = OperatorTable()
+        with pytest.raises(PrologThrow):
+            table._parse_precedence(Number(5.5), 'test')
+
+    def test_parse_precedence_out_of_range_error(self):
+        """Out-of-range precedence raises domain_error."""
+        table = OperatorTable()
+        with pytest.raises(PrologThrow):
+            table._parse_precedence(Atom('1201'), 'test')
+        with pytest.raises(PrologThrow):
+            table._parse_precedence(Atom('-1'), 'test')
+
+    def test_parse_specifier_valid(self):
+        """Parse valid specifiers."""
+        table = OperatorTable()
+        specs = ['xfx', 'xfy', 'yfx', 'yfy', 'fx', 'fy', 'xf', 'yf']
+        for spec in specs:
+            assert table._parse_specifier(Atom(spec), 'test') == spec
+
+    def test_parse_specifier_variable_error(self):
+        """Unbound specifier raises instantiation_error."""
+        table = OperatorTable()
+        with pytest.raises(PrologThrow):
+            table._parse_specifier(Variable('T'), 'test')
+
+    def test_parse_specifier_non_atom_error(self):
+        """Non-atom specifier raises type_error."""
+        table = OperatorTable()
+        with pytest.raises(PrologThrow):
+            table._parse_specifier(Number(500), 'test')
+
+    def test_parse_specifier_invalid_error(self):
+        """Invalid specifier raises domain_error."""
+        table = OperatorTable()
+        with pytest.raises(PrologThrow):
+            table._parse_specifier(Atom('invalid'), 'test')
+
+    def test_parse_operator_names_single_atom(self):
+        """Parse single operator name."""
+        table = OperatorTable()
+        assert table._parse_operator_names(Atom('+++'), 'test') == ['+++']
+
+    def test_parse_operator_names_list(self):
+        """Parse list of operator names."""
+        table = OperatorTable()
+        # Create a list [@@, @@@@]
+        names_list = List(elements=(Atom('@@'), Atom('@@@@')))
+        assert table._parse_operator_names(names_list, 'test') == ['@@', '@@@@']
+
+    def test_parse_operator_names_variable_error(self):
+        """Unbound operator name raises instantiation_error."""
+        table = OperatorTable()
+        with pytest.raises(PrologThrow):
+            table._parse_operator_names(Variable('Op'), 'test')
+
+    def test_parse_operator_names_non_atom_in_list_error(self):
+        """Non-atom in operator list raises type_error."""
+        table = OperatorTable()
+        # Create a list [@@, 500] where 500 is a number, not atom
+        names_list = List(elements=(Atom('@@'), Number(500)))
+        with pytest.raises(PrologThrow):
+            table._parse_operator_names(names_list, 'test')
+
+
+class TestOperatorIntegration:
+    """Integration tests for custom operators in source code."""
+
+    def test_infix_operator_in_clause_head(self):
+        """Custom infix operator in clause head."""
+        prolog = PrologInterpreter()
+        prolog.consult_string("""
+            :- op(500, xfx, loves).
+            alice loves bob.
+            (X loves Y) :- person(X), person(Y), X \\= Y.
+            person(alice).
+            person(bob).
+        """)
+
+        assert prolog.has_solution("alice loves bob")
+        assert prolog.has_solution("bob loves alice")
+
+    def test_infix_operator_in_clause_body(self):
+        """Custom infix operator in clause body."""
+        prolog = PrologInterpreter()
+        prolog.consult_string("""
+            :- op(500, xfx, trusts).
+            compatible(X, Y) :- X trusts Y, Y trusts X.
+            alice trusts bob.
+            bob trusts alice.
+        """)
+
+        assert prolog.has_solution("compatible(alice, bob)")
+
+    def test_infix_operator_in_query(self):
+        """Custom infix operator in query."""
+        prolog = PrologInterpreter()
+        prolog.consult_string("""
+            :- op(500, xfx, likes).
+            alice likes chocolate.
+        """)
+
+        assert prolog.has_solution("alice likes chocolate")
+
+    def test_prefix_operator_in_clause(self):
+        """Custom prefix operator in clause."""
+        prolog = PrologInterpreter()
+        prolog.consult_string("""
+            :- op(300, fy, not_).
+            test(X) :- X = not_ false.
+        """)
+
+        result = prolog.query_once("test(Y)")
+        assert result is not None
+        assert result['Y'] == {'not_': ['false']}
+
+    def test_prefix_operator_in_query(self):
+        """Custom prefix operator in query."""
+        prolog = PrologInterpreter()
+        prolog.consult_string("""
+            :- op(300, fy, negate).
+            value(negate 5).
+        """)
+
+        assert prolog.has_solution("value(negate(5))")
+
+    def test_postfix_operator_in_clause(self):
+        """Custom postfix operator in clause."""
+        prolog = PrologInterpreter()
+        prolog.consult_string("""
+            :- op(200, xf, factorial).
+            compute(X, Y) :- factorial(X, Y).
+            factorial(5, 120).
+        """)
+
+        assert prolog.has_solution("compute(5, 120)")
+
+    def test_postfix_operator_in_query(self):
+        """Custom postfix operator in query."""
+        prolog = PrologInterpreter()
+        prolog.consult_string("""
+            :- op(200, xf, squared).
+            4 squared.
+        """)
+
+        assert prolog.has_solution("4 squared")
+
+    def test_mixed_operators_precedence(self):
+        """Mixed custom operators respect precedence."""
+        prolog = PrologInterpreter()
+        prolog.consult_string("""
+            :- op(600, xfx, '><').
+            :- op(400, yfx, '++').
+            :- op(200, xfy, '^^').
+
+            expr(a >< b ++ c ^^ d).
+        """)
+
+        # Should parse as a >< (b ++ (c ^^ d)) due to precedence
+        result = prolog.query_once("expr(X)")
+        assert result is not None
+        # Check the parsed structure based on precedence
+        expected = {'><': ['a', {'++': ['b', {'^^': ['c', 'd']}]}]}
+        assert result['X'] == expected
+
+    def test_operator_removal_via_zero_precedence(self):
+        """op(0, _, Op) removes operator and affects parsing."""
+        prolog = PrologInterpreter()
+        prolog.consult_string("""
+            :- op(500, xfx, custom).
+            test1(custom(a, b)).
+            :- op(0, xfx, custom).
+        """)
+
+        # After removal, custom syntax should not parse
+        with pytest.raises(PrologThrow):
+            prolog.consult_string("test2(a custom b).")
+
+
+class TestCustomOperatorParsing:
+    """Tests for parsing custom operator syntax in source code.
+
+    These tests verify that custom operators defined with op/3 are correctly
+    parsed in various contexts, respecting precedence and associativity.
     """
 
-    def test_infix_operator_parsing_not_yet_supported(self):
-        # For now, use: fact(a +++ b)
+    def test_infix_operator_parsing_supported(self):
+        """Custom infix operators are parsed as infix syntax."""
         prolog = PrologInterpreter()
-        prolog.consult_string(":- op(500, xfx, '+++').")
-        prolog.consult_string("fact(a +++ b).")
-        assert prolog.has_solution("fact(a +++ b)")
+        prolog.consult_string("""
+            :- op(500, xfx, '+++').
+            fact(a +++ b).
+        """)
 
-    def test_prefix_operator_parsing_not_yet_supported(self):
-        """Custom prefix operators are supported and parsed as prefix syntax.
+        assert prolog.has_solution("fact(_)")
+        result = prolog.query_once("fact(X)")
+        assert result is not None
 
-        You can now use: ~~ x
-        """
+    def test_prefix_operator_parsing_supported(self):
+        """Custom prefix operators are parsed as prefix syntax."""
         prolog = PrologInterpreter()
         prolog.consult_string("""
             :- op(300, fy, '~~').
             fact(~~ x).
         """)
-        
-        # This will fail until parsing is implemented
-        # For now, use: fact(~~(x))
-        assert prolog.has_solution("fact(~~(x))")
 
-    def test_postfix_operator_parsing_not_yet_supported(self):
-        """Custom postfix operators are supported and parsed as postfix syntax.
+        assert prolog.has_solution("fact(_)")
+        result = prolog.query_once("fact(X)")
+        assert result is not None
 
-        You can now use: x !!
-        """
+    def test_postfix_operator_parsing_supported(self):
+        """Custom postfix operators are parsed as postfix syntax."""
         prolog = PrologInterpreter()
         prolog.consult_string("""
             :- op(200, xf, '!!').
             fact(x !!).
         """)
-        
-        # This will fail until parsing is implemented
-        # For now, use: fact(!!(x))
-        assert prolog.has_solution("fact(!!(x))")
 
-    @pytest.mark.skip(reason="Custom operator syntax parsing not yet implemented")
+        assert prolog.has_solution("fact(_)")
+        result = prolog.query_once("fact(X)")
+        assert result is not None
+
     def test_operator_precedence_affects_grouping(self):
-        """Operator precedence affects how expressions are grouped.
-        
-        This requires full parser integration for custom operator syntax.
-        The op/3 directives work, but infix syntax like 'a +++ b' doesn't parse.
-        """
+        """Operator precedence affects how expressions are grouped."""
         prolog = PrologInterpreter()
         prolog.consult_string("""
             :- op(400, xfx, '+++').
             :- op(500, xfx, '***').
-            
-            test(X) :- X = (a +++ b *** c).
+
+            test(X) :- X = a +++ b *** c.
         """)
-        
         result = prolog.query_once("test(X)")
-        # a +++ (b *** c) because *** has higher precedence (400 > 500 in ISO, but reversed)
-        # This depends on proper parsing implementation
+        # '+++' (400) has higher precedence than '***' (500), so it binds tighter.
+        # The expression should parse as (a +++ b) *** c.
         assert result is not None
+        expected = {'***': [{'+++': ['a', 'b']}, 'c']}
+        assert result['X'] == expected
 
 
 if __name__ == '__main__':
