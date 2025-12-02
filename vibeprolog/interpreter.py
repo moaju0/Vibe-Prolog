@@ -1,6 +1,7 @@
 """Main Prolog interpreter interface."""
 
 import io
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -16,6 +17,7 @@ from vibeprolog.parser import (
     PredicateIndicator,
     PredicatePropertyDirective,
     PrologParser,
+    extract_op_directives,
 )
 from vibeprolog.operators import OperatorTable
 from vibeprolog.terms import Atom, Compound, Number, Variable
@@ -531,6 +533,12 @@ class PrologInterpreter:
         # Ensure a default user module exists
         self.modules.setdefault("user", Module("user", None))
 
+        try:
+            directive_ops = extract_op_directives(prolog_code)
+        except ValueError as exc:
+            error_term = PrologError.syntax_error(str(exc), "consult/1")
+            raise PrologThrow(error_term)
+
         # Parse and process incrementally to support char_conversion taking effect
         # between clauses/directives. We split by period-terminated statements.
         all_items = []
@@ -551,12 +559,12 @@ class PrologInterpreter:
             try:
                 # char_conversion directives should not be affected by char conversions
                 # since they need to be parsed as-is to set the conversions
-                import re
                 is_char_conversion = re.match(r"\s*:-\s*char_conversion\b", chunk)
                 items = self.parser.parse(
                     chunk,
                     "consult/1",
-                    apply_char_conversions=not is_char_conversion
+                    apply_char_conversions=not is_char_conversion,
+                    directive_ops=directive_ops,
                 )
             except (ValueError, LarkError) as exc:
                 error_term = PrologError.syntax_error(str(exc), "consult/1")

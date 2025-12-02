@@ -86,10 +86,48 @@ class TestOperatorDefinition:
             :- op(500, xfx, custom_op).
             :- op(0, xfx, custom_op).
         """)
-        
+
         # After removal, should have no solution
         result = prolog.query_once("current_op(_, _, custom_op)")
         assert result is None
+
+    def test_consult_uses_fresh_parser_with_new_operators(self):
+        """Consulted files rebuild the parser when new operators are introduced."""
+        prolog = PrologInterpreter()
+        prolog.consult_string(
+            """
+            :- op(500, xfx, loves).
+            alice loves bob.
+            """
+        )
+
+        assert prolog.has_solution("alice loves bob")
+
+        prolog.consult_string(
+            """
+            :- op(600, xfx, trusts).
+            alice trusts bob.
+            """
+        )
+
+        assert prolog.has_solution("alice trusts bob")
+
+    def test_operator_removal_updates_parser_between_consults(self):
+        """Removing operators forces queries to use the updated grammar."""
+        prolog = PrologInterpreter()
+        prolog.consult_string(
+            """
+            :- op(500, xfx, loves).
+            alice loves bob.
+            """
+        )
+
+        assert prolog.has_solution("alice loves bob")
+
+        prolog.consult_string(":- op(0, xfx, loves).")
+
+        with pytest.raises(PrologThrow):
+            prolog.query_once("alice loves bob")
 
 
 class TestOperatorPrec:

@@ -1207,11 +1207,14 @@ class PrologParser:
         operator_rules = generate_operator_rules(operators)
         return PROLOG_GRAMMAR.replace("__OPERATOR_GRAMMAR__", operator_rules)
 
-    def _ensure_parser(self, cleaned_text: str) -> None:
-        try:
-            directive_ops = extract_op_directives(cleaned_text)
-        except ValueError:
-            directive_ops = []
+    def _ensure_parser(
+        self, cleaned_text: str, directive_ops: list[tuple[int, str, str]] | None = None
+    ) -> None:
+        if directive_ops is None:
+            try:
+                directive_ops = extract_op_directives(cleaned_text)
+            except ValueError:
+                directive_ops = []
         operators = _merge_operators(self._base_operator_definitions(), directive_ops)
         key = tuple(operators)
         if key not in self._grammar_cache:
@@ -1370,6 +1373,7 @@ class PrologParser:
         context: str = "parse/1",
         *,
         apply_char_conversions: bool = True,
+        directive_ops: list[tuple[int, str, str]] | None = None,
     ) -> list[Clause | Directive]:
         """Parse Prolog source code and return list of clauses."""
         try:
@@ -1377,7 +1381,7 @@ class PrologParser:
             if apply_char_conversions:
                 text = self._apply_char_conversions(text)
             cleaned_text, pldoc_comments = self._collect_pldoc_comments(text)
-            self._ensure_parser(cleaned_text)
+            self._ensure_parser(cleaned_text, directive_ops)
             tree = self.parser.parse(cleaned_text)
             transformer = PrologTransformer()
             parsed_items = [self._fold_numeric_unary_minus(item) for item in transformer.transform(tree)]
