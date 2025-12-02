@@ -27,9 +27,9 @@ Status legend:
 | Built-in operator syntax         | ✅      |                                           |
 | `:- op/3` declaration            | ✅      | Full support - defines operators dynamically |
 | Custom operator syntax in source | ❌      | Parser doesn't use dynamic operators (future) |
-| Directive prefix operator `:-` (1200, fx) | ❌ | **ISO-required** - Prefix form for directives |
+| Directive prefix operator `:-` (1200, fx) | ✅ | **ISO-required** - Prefix form for directives |
 | Query prefix operator `?-` (1200, fx) | ❌ | **ISO-required** - Query prefix           |
-| DCG rule operator `-->` (1200, xfx) | ❌    | **ISO-required** - DCG syntax             |
+| DCG rule operator `-->` (1200, xfx) | ✅    | **ISO-required** - DCG syntax |
 | `:- char_conversion/2`           | ❌      | **ISO-mandatory**                         |
 
 ---
@@ -153,19 +153,19 @@ Status legend:
 | `is/2`                            | ✅      |                                       |
 | Arithmetic comparison operators   | ✅      |                                       |
 | Arithmetic evaluation: `+/2`, `-/2`, `*/2`, `//2`, `///2`, `mod/2`, `div/2` | ✅      | **ISO-required** - Used within `is/2` |
-| Integer division: `div/2`         | ❌      | **ISO-required** - Missing operator   |
+| Integer division: `div/2`         | ✅      | **ISO-required** - Operator available   |
 | Unary operators: `-/1`, `+/1`     | ✅      | **ISO-required** - Negation and plus  |
-| Power operators: `^/2`, `**/2`    | ❌      | **ISO-required** - Exponentiation     |
+| Power operators: `^/2`, `**/2`    | ✅      | **ISO-required** - Operators available     |
 | `abs/1`                           | ✅      |                                       |
 | `min/2`, `max/2`                  | ✅      |                                       |
 | `sqrt/1`                          | ✅      |                                       |
 | Trig / exp / log                  | ✅      |                                       |
 | `floor/1`, `ceiling/1`, `round/1` | ✅      |                                       |
 | `rem/2`                           | ✅      | **ISO-required** - Integer remainder  |
-| Bitwise AND: `/\`                 | ❌      | **ISO-required** - Missing operator   |
-| Bitwise OR: `\/`                  | ❌      | **ISO-required** - Missing operator   |
-| Bitwise complement: `\`           | ❌      | **ISO-required** - Missing operator   |
-| Bitwise shift: `<<`, `>>`         | ❌      | **ISO-required** - Missing operators  |
+| Bitwise AND: `/\`                 | ✅      | **ISO-required** - Operator available   |
+| Bitwise OR: `\/`                  | ✅      | **ISO-required** - Operator available   |
+| Bitwise complement: `\`           | ✅      | **ISO-required** - Operator available   |
+| Bitwise shift: `<<`, `>>`         | ✅      | **ISO-required** - Operators available  |
 | `between/3`                       | ✅      | **ISO-required** - Integer generation |
 | `succ/2`                          | ✅      | **ISO-required** - Successor relation |
 | `plus/3`                          | ✅      | **ISO-required** - Addition relation  |
@@ -388,12 +388,8 @@ These predicates are specific to SWI-Prolog and not part of the ISO standard.
 
 ## ISO Blocking Issues
 
-1. **Missing operators** - Several ISO-required operators are not defined in the operator table:
-   - Arithmetic: `div`, `rem`, `^`, `**`
-   - Bitwise: `/\`, `\/`, `\`, `<<`, `>>`
-   - Directives: `:-` (prefix), `?-`, `-->`
-2. `op/3` must affect parsing (§6.3) - Operators declared dynamically don't affect subsequent parsing
-3. `char_conversion/2` missing (§6.4, §7.4)
+1. `op/3` must affect parsing (§6.3) - Operators declared dynamically don't affect subsequent parsing
+2. `char_conversion/2` missing (§6.4, §7.4)
 
 ## Common Extensions Worth Implementing
 
