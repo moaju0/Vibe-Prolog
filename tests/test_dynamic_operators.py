@@ -1,14 +1,13 @@
 """Tests for dynamic operator handling.
 
 This module tests the operator table, current_op/3 queries, and operator
-use in write_term. Dynamic parsing of custom operator syntax is a complex
-feature that requires Lark grammar extension - this is documented as a
-future enhancement.
+use in write_term.
 """
 
 import pytest
 from vibeprolog import PrologInterpreter
 from vibeprolog.exceptions import PrologThrow
+from vibeprolog.terms import Atom, Compound
 
 
 class TestOperatorDefinition:
@@ -392,11 +391,6 @@ class TestOperatorIntegration:
 
     def test_custom_and_builtin_operators_coexist(self):
         """Custom and built-in operators can be defined together.
-        
-        Note: Custom operator syntax parsing is not yet implemented.
-        This test verifies that operators can be defined while built-in
-        operators continue to work. Actual infix syntax would require
-        parser integration (future enhancement).
         """
         prolog = PrologInterpreter()
         prolog.consult_string("""
@@ -416,16 +410,14 @@ class TestOperatorIntegration:
         prolog = PrologInterpreter()
         prolog.consult_string("""
             :- op(500, xfx, loves).
-            
-            compatible(X, Y) :- loves(X, Y), loves(Y, X).
-            
-            loves(alice, bob).
-            loves(bob, alice).
+
+            compatible(X, Y) :- X loves Y, Y loves X.
+
+            alice loves bob.
+            bob loves alice.
         """)
-        
-        # Note: This uses canonical form - full syntax parsing not yet implemented
-        # But we can define and query facts
-        assert prolog.has_solution("loves(alice, bob)")
+
+        assert prolog.has_solution("alice loves bob")
 
     def test_multiple_custom_operators(self):
         """Multiple custom operators can be used together."""
@@ -445,13 +437,31 @@ class TestOperatorIntegration:
     def test_operator_persistence_across_consults(self):
         """Operators defined in one consult persist in another."""
         prolog = PrologInterpreter()
-        
+
         prolog.consult_string(":- op(500, xfx, custom1).")
         prolog.consult_string(":- op(400, xfx, custom2).")
-        
+
         # Both should be available
         assert prolog.has_solution("current_op(500, xfx, custom1)")
         assert prolog.has_solution("current_op(400, xfx, custom2)")
+
+    def test_operator_precedence_and_associativity(self):
+        """Generated grammar respects precedence and associativity."""
+        prolog = PrologInterpreter()
+        prolog.consult_string("""
+            :- op(600, xfx, '><').
+            :- op(400, yfx, '++').
+            :- op(200, xfy, '^^').
+
+            expr(Expr) :- Expr = a >< b ++ c ^^ d.
+        """)
+
+        result = prolog.query_once("expr(Expr)")
+        assert result is not None
+        expected = {
+            "><": ["a", {"++": ["b", {"^^": ["c", "d"]}]}]
+        }
+        assert result["Expr"] == expected
 
 
 class TestOperatorEdgeCases:

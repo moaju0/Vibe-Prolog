@@ -71,6 +71,22 @@ class TestBasicParsing:
         assert isinstance(clause.head.args[0], Number)
         assert clause.head.args[0].value == -42
 
+    def test_parse_spaced_negative_number(self):
+        """Ensure unary minus folds numbers even when spaced."""
+        parser = PrologParser()
+        clauses = parser.parse("neg(- 42).")
+        clause = clauses[0]
+        assert isinstance(clause.head.args[0], Number)
+        assert clause.head.args[0].value == -42
+
+    def test_parse_double_negation(self):
+        """Double unary minus should fold to a positive number."""
+        parser = PrologParser()
+        clauses = parser.parse("test(- - 42).")
+        clause = clauses[0]
+        assert isinstance(clause.head.args[0], Number)
+        assert clause.head.args[0].value == 42
+
     def test_parse_decimal_starting_with_dot(self):
         """Test parsing numbers starting with decimal point (e.g., .5, .10)."""
         parser = PrologParser()

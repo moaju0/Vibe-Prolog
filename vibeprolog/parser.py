@@ -1,13 +1,15 @@
 """Prolog parser using Lark."""
 
 import re
+from collections import defaultdict
+from dataclasses import dataclass
+from typing import Any, Iterable
 
 from lark import Lark, Transformer, v_args
 from lark.exceptions import LarkError, UnexpectedCharacters, UnexpectedToken
-from dataclasses import dataclass
-from typing import Any
 
 from vibeprolog.exceptions import PrologError, PrologThrow
+from vibeprolog.operator_defaults import DEFAULT_OPERATORS
 from vibeprolog.terms import Atom, Variable, Number, Compound
 
 
@@ -34,6 +36,11 @@ class Cut:
 
     def __repr__(self):
         return "!"
+
+
+@dataclass(frozen=True)
+class ParenthesizedComma(Compound):
+    """Marker type for comma terms wrapped in parentheses to prevent flattening."""
 
 
 @dataclass
@@ -83,12 +90,12 @@ PROLOG_GRAMMAR = r"""
     start: (clause | directive)+
 
     clause: rule | dcg_rule | fact
-    fact: atom_or_compound "."
+    fact: term "."
     rule: term ":-" goals "."
     dcg_rule: term "-->" goals "."
     atom_or_compound: atom
         | atom "(" args ")"
-    
+
     directive: ":-" (op_directive | prefix_directive | property_directive | term) "."
 
     prefix_directive: "dynamic" predicate_indicators -> dynamic_directive
@@ -98,53 +105,24 @@ PROLOG_GRAMMAR = r"""
     property_directive: "dynamic" "(" predicate_indicators ")"    -> dynamic_directive
         | "multifile" "(" predicate_indicators ")"   -> multifile_directive
         | "discontiguous" "(" predicate_indicators ")" -> discontiguous_directive
-    
+
     op_directive: "op" "(" number "," ATOM "," op_arg_list ")" -> op_directive
-    
+
     op_arg_list: op_symbol_or_atom
         | "[" op_symbol_or_atom ("," op_symbol_or_atom)* "]" -> op_arg_list_items
-    
+
     // operator symbol or atom for op/3 - avoid parsing as expressions
     op_symbol_or_atom: OP_SYMBOL | ATOM | SPECIAL_ATOM | OPERATOR_ATOM
-    
+
     // Operator symbols - must match complete sequences before breaking into component operators
     // Priority set to ensure special atoms like -$ are recognized, but still below SPECIAL_ATOM_OPS
     OP_SYMBOL: /[+\-*\/<>=\\@#$&!~:?^.]+/
 
-    predicate_indicators: comparison_term ("," comparison_term)*
+    predicate_indicators: term ("," term)*
 
     goals: term ("," term)*
 
-    // Operator precedence (lowest to highest):
-    // ; (or/semicolon) < -> (if-then) < , (and/comma) < comparisons < arithmetic
-
-    term: or_term
-
-    or_term: if_then_term (";" if_then_term)*
-
-    if_then_term: and_term ("->" and_term)?
-
-    and_term: comparison_term ("," comparison_term)*
-
-    comparison_term: module_term (COMP_OP module_term)?
-
-    prefix_term: expr
-
-    // Module qualification operator (right-associative, xfy)
-    module_term: prefix_term (":" module_term)?
-
-    expr: add_expr
-
-    add_expr: mul_expr (ADD_OP mul_expr)*
-
-    mul_expr: pow_expr (MUL_OP pow_expr)*
-
-    pow_expr: unary_expr (POW_OP unary_expr)*
-
-    unary_expr: PREFIX_OP unary_expr  -> prefix_op
-        | "-" unary_expr  -> prefix_op
-        | "+" unary_expr  -> prefix_op
-        | primary
+__OPERATOR_GRAMMAR__
 
     primary: SPECIAL_ATOM_OPS -> special_atom_token
         | operator_atom
@@ -158,26 +136,21 @@ PROLOG_GRAMMAR = r"""
         | atom
         | variable
         | list
-        | "(" term ")"
+        | "(" term ")"                     -> parenthesized_term
 
     compound: atom "(" args ")"
     operator_atom: OPERATOR_ATOM
-    args: comparison_term ("," comparison_term)*
+    args: term ("," term)*
 
     curly_braces: "{" term "}"
 
-    COMP_OP: "=.." | "is" | "=" | "\\=" | "=:=" | "=\=" | "<" | ">" | "=<" | ">=" | "==" | "\\==" | "@<" | "@=<" | "@>" | "@>="
     OPERATOR_ATOM: ":-" | "-->"
-    PREFIX_OP.3: "\\+" | /\+(?!\$)/ | /\-(?!\$)/
-    ADD_OP: /\+(?!\$)/ | /\-(?!\$)/
-    POW_OP.2: "**"
-    MUL_OP: "*" | "/" | "//" | "mod"
 
     list: "[" "]"                          -> empty_list
         | "[" list_items "]"               -> list_items_only
-        | "[" list_items "|" comparison_term "]"      -> list_with_tail
+        | "[" list_items "|" term "]"      -> list_with_tail
 
-    list_items: comparison_term ("," comparison_term)*
+    list_items: term ("," term)*
 
     string: STRING
     atom: ATOM | SPECIAL_ATOM | SPECIAL_ATOM_OPS | OP_SYMBOL
@@ -193,7 +166,7 @@ PROLOG_GRAMMAR = r"""
 
     STRING: /"([^"\\]|\\.)*"/ | /'(\\.|''|[^'\\])*'/
     SPECIAL_ATOM: /'([^'\\]|\\.)+'/
-    
+
     // Special atom operators must have HIGHEST priority to prevent being parsed as prefix operators
     SPECIAL_ATOM_OPS.12: /-\$/ | /\$-/
 
@@ -306,19 +279,24 @@ class PrologTransformer(Transformer):
 
     def _flatten_comma_separated(self, items):
         """Flatten comma-separated predicates into a list.
-        
+
         If items is a list with a single Compound with functor ',',
         unwrap it into a flat list of indicators.
         """
-        if isinstance(items, list) and len(items) == 1:
-            item = items[0]
-            if isinstance(item, Compound) and item.functor == ',':
-                # Flatten comma compound
-                return self._collect_comma_terms(item)
-        return items
+        if isinstance(items, ParenthesizedComma):
+            items = Compound(items.functor, items.args)
+        if isinstance(items, Compound) and items.functor == ',':
+            return self._collect_comma_terms(items)
+        if isinstance(items, (list, tuple)) and len(items) == 1:
+            return self._flatten_comma_separated(items[0])
+        if isinstance(items, (list, tuple)):
+            return items
+        return [items]
 
     def _collect_comma_terms(self, compound):
         """Recursively collect terms from a comma compound."""
+        if isinstance(compound, ParenthesizedComma):
+            return [Compound(compound.functor, compound.args)]
         if isinstance(compound, Compound) and compound.functor == ',':
             left = self._collect_comma_terms(compound.args[0])
             right = self._collect_comma_terms(compound.args[1])
@@ -345,6 +323,8 @@ class PrologTransformer(Transformer):
         # This handles cases where ambiguous parsing creates comma compounds
         result = []
         for item in items:
+            if isinstance(item, ParenthesizedComma):
+                item = Compound(item.functor, item.args)
             if isinstance(item, Compound) and item.functor == ',':
                 result.extend(self._collect_comma_terms(item))
             else:
@@ -391,25 +371,23 @@ class PrologTransformer(Transformer):
         # items can be [op, term] or just [term] depending on the rule
         if len(items) == 2:
             op, term = items
-            op_str = str(op)
-            # Special case: convert unary minus applied to a number into a negative number
-            if op_str == "-" and isinstance(term, Number):
-                if isinstance(term.value, int):
-                    return Number(-term.value)
-                else:
-                    return Number(-term.value)
-            return Compound(op_str, (term,))
+            return self._apply_prefix_operator(op, term)
         else:
             # For "-" prefix_term rule, items is just [term]
             # The "-" is implicit in the rule
             term = items[0]
-            # Special case: convert unary minus applied to a number into a negative number
+            return self._apply_prefix_operator("-", term)
+
+    def _apply_prefix_operator(self, op, term):
+        op_str = str(op)
+        if op_str == "-":
             if isinstance(term, Number):
-                if isinstance(term.value, int):
-                    return Number(-term.value)
-                else:
-                    return Number(-term.value)
-            return Compound("-", (term,))
+                return Number(-term.value)
+            if isinstance(term, Compound) and term.functor == "-" and len(term.args) == 1:
+                inner = term.args[0]
+                if isinstance(inner, Number):
+                    return inner
+        return Compound(op_str, (term,))
 
     def module_term(self, items):
         # Module qualification: left:right (right-associative)
@@ -432,6 +410,38 @@ class PrologTransformer(Transformer):
             right = items[i + 1]
             result = Compound(str(op), (result, right))
         return result
+
+    def infix_xfx(self, items):
+        left, op, right = items
+        return Compound(str(op), (left, right))
+
+    def infix_yfx(self, items):
+        left, op, right = items
+        return Compound(str(op), (left, right))
+
+    def infix_xfy(self, items):
+        left, op, right = items
+        return Compound(str(op), (left, right))
+
+    def infix_yfy(self, items):
+        left, op, right = items
+        return Compound(str(op), (left, right))
+
+    def prefix_fx(self, items):
+        op, term = items
+        return self._apply_prefix_operator(op, term)
+
+    def prefix_fy(self, items):
+        op, term = items
+        return self._apply_prefix_operator(op, term)
+
+    def postfix_xf(self, items):
+        term, op = items
+        return Compound(str(op), (term,))
+
+    def postfix_yf(self, items):
+        term, op = items
+        return Compound(str(op), (term,))
 
     def mul_expr(self, items):
         if len(items) == 1:
@@ -463,6 +473,12 @@ class PrologTransformer(Transformer):
     def primary(self, items):
         return items[0]
 
+    def parenthesized_term(self, items):
+        term = items[0]
+        if isinstance(term, Compound) and term.functor == ',':
+            return ParenthesizedComma(term.functor, term.args)
+        return term
+
     def special_atom_token(self, items):
         """Convert SPECIAL_ATOM_OPS token to an Atom."""
         token_str = str(items[0])
@@ -474,7 +490,26 @@ class PrologTransformer(Transformer):
         return Compound(functor.name, tuple(args))
 
     def args(self, items):
-        return items
+        expanded: list[Any] = []
+        for item in items:
+            if isinstance(item, ParenthesizedComma):
+                expanded.append(Compound(item.functor, item.args))
+                continue
+
+            if isinstance(item, Compound) and item.functor == ',':
+                expanded.extend(self._collect_comma_terms(item))
+                continue
+
+            if isinstance(item, Compound):
+                normalized_args = tuple(
+                    Compound(arg.functor, arg.args)
+                    if isinstance(arg, ParenthesizedComma)
+                    else arg
+                    for arg in item.args
+                )
+                item = Compound(item.functor, normalized_args)
+            expanded.append(item)
+        return expanded
 
     def empty_list(self, items):
         return List(elements=())
@@ -488,7 +523,13 @@ class PrologTransformer(Transformer):
         return List(elements=tuple(elements), tail=tail)
 
     def list_items(self, items):
-        return items
+        expanded: list[Any] = []
+        for item in items:
+            if isinstance(item, Compound) and item.functor == ',':
+                expanded.extend(self._collect_comma_terms(item))
+            else:
+                expanded.append(item)
+        return expanded
 
     def string(self, items):
         # Remove quotes from the string (both double and single quotes)
@@ -576,15 +617,11 @@ class PrologTransformer(Transformer):
             return Number(int(value))
 
     def negative_number(self, items):
-        # items[0] is the dash, items[1] is the number
-        num = items[1]
-        # Negate the number
-        if isinstance(num, Number):
-            if isinstance(num.value, int):
-                return Number(-num.value)
-            else:
-                return Number(-num.value)
-        return num
+        # The grammar rule `primary: "-" number -> negative_number` ensures
+        # that the number has already been transformed into a Number object.
+        num = items[-1]
+        assert isinstance(num, Number), f"Expected Number, got {type(num).__name__}"
+        return Number(-num.value)
 
     def _parse_base_number(self, value):
         """Parse base'digits syntax like 16'ff or -2'abcd."""
@@ -826,63 +863,106 @@ def tokenize_prolog_statements(prolog_code: str) -> list[str]:
     return chunks
 
 
+def _strip_quotes(token: str) -> str:
+    if token.startswith("'") and token.endswith("'"):
+        inner = token[1:-1]
+        return inner.replace("''", "'")
+    elif token.startswith('"') and token.endswith('"'):
+        inner = token[1:-1]
+        return inner.replace('\\"', '"').replace('\\\\', '\\')
+    return token
+
+
+def _split_top_level_commas(text: str) -> list[str]:
+    parts: list[str] = []
+    current: list[str] = []
+    depth = 0
+    in_single = False
+    in_double = False
+    escape_next = False
+
+    for ch in text:
+        if escape_next:
+            current.append(ch)
+            escape_next = False
+            continue
+
+        if ch == "\\" and (in_single or in_double):
+            current.append(ch)
+            escape_next = True
+            continue
+
+        if ch == "'" and not in_double:
+            in_single = not in_single
+            current.append(ch)
+            continue
+        if ch == '"' and not in_single:
+            in_double = not in_double
+            current.append(ch)
+            continue
+
+        if ch in "([{" and not in_single and not in_double:
+            depth += 1
+        elif ch in ")]}" and not in_single and not in_double and depth > 0:
+            depth -= 1
+
+        if ch == "," and not in_single and not in_double and depth == 0:
+            parts.append("".join(current).strip())
+            current = []
+            continue
+
+        current.append(ch)
+
+    if current:
+        parts.append("".join(current).strip())
+    return parts
+
+
+def _parse_operator_name_list(raw: str) -> list[str]:
+    if raw.startswith("[") and raw.endswith("]"):
+        inner = raw[1:-1]
+        entries = _split_top_level_commas(inner)
+    else:
+        entries = [raw]
+
+    operators: list[str] = []
+    for entry in entries:
+        if not entry:
+            continue
+        operators.append(_strip_quotes(entry))
+    return operators
+
+
 def extract_op_directives(source: str) -> list[tuple[int, str, str]]:
     """Extract op/3 directives from source code.
-    
+
     Args:
         source: Prolog source code string
-        
+
     Returns:
         List of (precedence, type, operator) tuples, in order of appearance
-        
-    Examples:
-        >>> extract_op_directives(":- op(500, xfx, @).")
-        [(500, 'xfx', '@')]
     """
-    operators = []
-    
-    # Match :- op(Precedence, Type, Operator).
-    # Handles atom, single-quoted atoms, and lists
-    pattern = r':-\s*op\s*\(\s*(\d+)\s*,\s*(\w+)\s*,\s*([^)]+)\s*\)\s*\.'
-    
-    for match in re.finditer(pattern, source):
-        precedence_str = match.group(1)
-        op_type = match.group(2)
-        operator_part = match.group(3).strip()
-        
+
+    operators: list[tuple[int, str, str]] = []
+    directive_pattern = re.compile(r"^\s*:-\s*op\s*\((.*)\)\s*\.$", re.DOTALL)
+
+    for statement in tokenize_prolog_statements(source):
+        match = directive_pattern.match(statement.strip())
+        if not match:
+            continue
+        contents = match.group(1)
+        args = _split_top_level_commas(contents)
+        if len(args) != 3:
+            continue
         try:
-            precedence = int(precedence_str)
-            
-            # Handle single operator or list
-            # For now, simple cases: atoms or quoted atoms
-            operator_names = []
-            
-            # Try to parse as a list [op1, op2, ...]
-            if operator_part.startswith('[') and operator_part.endswith(']'):
-                # Simple list parsing
-                list_content = operator_part[1:-1]
-                for item in re.split(r',', list_content):
-                    item = item.strip()
-                    # Remove quotes if present
-                    if (item.startswith("'") and item.endswith("'")) or \
-                       (item.startswith('"') and item.endswith('"')):
-                        operator_names.append(item[1:-1])
-                    else:
-                        operator_names.append(item)
-            else:
-                # Single operator (quoted or unquoted)
-                if (operator_part.startswith("'") and operator_part.endswith("'")) or \
-                   (operator_part.startswith('"') and operator_part.endswith('"')):
-                    operator_names.append(operator_part[1:-1])
-                else:
-                    operator_names.append(operator_part)
-            
-            for op_name in operator_names:
-                operators.append((precedence, op_type, op_name))
-        except (ValueError, AttributeError):
-            # Skip malformed directives - they'll be caught by parser
-            pass
-    
+            precedence = int(args[0].strip())
+        except ValueError:
+            continue
+        op_type = _strip_quotes(args[1].strip())
+        operator_names = _parse_operator_name_list(args[2].strip())
+        for op_name in operator_names:
+            operators.append((precedence, op_type, op_name))
+
     return operators
 
 
@@ -901,41 +981,123 @@ def escape_for_lark(s: str) -> str:
     return s
 
 
+VALID_OPERATOR_SPECS = {"xfx", "xfy", "yfx", "yfy", "fx", "fy", "xf", "yf"}
+
+
+def _format_operator_literals(ops: Iterable[str]) -> str:
+    formatted: list[str] = []
+    for op in sorted(set(ops)):
+        if re.match(r"^[A-Za-z0-9_]+$", op):
+            formatted.append(f"/(?<![A-Za-z0-9_]){re.escape(op)}(?![A-Za-z0-9_])/")
+        else:
+            formatted.append(f'"{escape_for_lark(op)}"')
+    return " | ".join(formatted)
+
+
+def _merge_operators(
+    base_ops: Iterable[tuple[int, str, str]], directives: list[tuple[int, str, str]]
+) -> list[tuple[int, str, str]]:
+    table: dict[tuple[str, str], int] = {}
+    for precedence, spec, name in base_ops:
+        if spec not in VALID_OPERATOR_SPECS:
+            continue
+        table[(name, spec)] = precedence
+
+    for precedence, spec, name in directives:
+        if spec not in VALID_OPERATOR_SPECS:
+            continue
+        key = (name, spec)
+        if precedence == 0:
+            table.pop(key, None)
+        else:
+            table[key] = precedence
+
+    merged: list[tuple[int, str, str]] = []
+    for (name, spec), precedence in table.items():
+        merged.append((precedence, spec, name))
+    merged.sort(key=lambda item: (item[0], item[1], item[2]))
+    return merged
+
+
 def generate_operator_rules(operators: list[tuple[int, str, str]]) -> str:
-    """Generate grammar extension rules for custom operators.
-    
-    Args:
-        operators: List of (precedence, type, operator) tuples
-        
-    Returns:
-        String containing additional grammar rules for custom operators
+    """Generate grammar rules for operators ordered by precedence.
+
+    ISO Prolog uses 1 as highest precedence. The generated rules build from
+    highest binding (small number) to lowest (large number) so the resulting
+    ``term`` rule respects the intended precedence tree.
     """
+
     if not operators:
-        return ""
-    
-    # Group operators by their precedence and type
-    # Build rules to integrate custom operators into the expression hierarchy
-    infix_ops = {}  # precedence -> list of operators
-    prefix_ops = {}  # precedence -> list of operators
-    postfix_ops = {}  # precedence -> list of operators
-    
-    for prec, op_type, op_name in operators:
-        if op_type in ('xfx', 'xfy', 'yfx', 'yfy'):
-            if prec not in infix_ops:
-                infix_ops[prec] = []
-            infix_ops[prec].append((op_type, op_name))
-        elif op_type in ('fx', 'fy'):
-            if prec not in prefix_ops:
-                prefix_ops[prec] = []
-            prefix_ops[prec].append((op_type, op_name))
-        elif op_type in ('xf', 'yf'):
-            if prec not in postfix_ops:
-                postfix_ops[prec] = []
-            postfix_ops[prec].append((op_type, op_name))
-    
-    # For now, return empty - full implementation would need careful precedence handling
-    # This is a placeholder for the complex grammar generation logic
-    return ""
+        return "    ?term: primary\n"
+
+    grouped: dict[int, dict[str, list[str]]] = defaultdict(
+        lambda: {"prefix": defaultdict(list), "infix": defaultdict(list), "postfix": defaultdict(list)}
+    )
+
+    for precedence, spec, name in operators:
+        if spec in {"fx", "fy"}:
+            grouped[precedence]["prefix"][spec].append(name)
+        elif spec in {"xf", "yf"}:
+            grouped[precedence]["postfix"][spec].append(name)
+        else:
+            grouped[precedence]["infix"][spec].append(name)
+
+    rules: list[str] = []
+    tokens: list[str] = []
+
+    lower_rule = "primary"
+    precedence_levels = sorted(grouped.keys())
+
+    for precedence in precedence_levels:
+        rule_name = f"level_{precedence}"
+        parts = [lower_rule]
+        infix_specs = grouped[precedence]["infix"]
+        prefix_specs = grouped[precedence]["prefix"]
+        postfix_specs = grouped[precedence]["postfix"]
+
+        if infix_specs.get("xfx"):
+            token = f"INFIX_XFX_{precedence}"
+            tokens.append(f"    {token}: {_format_operator_literals(infix_specs['xfx'])}")
+            parts.append(f"{lower_rule} {token} {lower_rule} -> infix_xfx")
+        if infix_specs.get("yfx"):
+            token = f"INFIX_YFX_{precedence}"
+            tokens.append(f"    {token}: {_format_operator_literals(infix_specs['yfx'])}")
+            parts.append(f"{rule_name} {token} {lower_rule} -> infix_yfx")
+        if infix_specs.get("xfy"):
+            token = f"INFIX_XFY_{precedence}"
+            tokens.append(f"    {token}: {_format_operator_literals(infix_specs['xfy'])}")
+            parts.append(f"{lower_rule} {token} {rule_name} -> infix_xfy")
+        if infix_specs.get("yfy"):
+            token = f"INFIX_YFY_{precedence}"
+            tokens.append(f"    {token}: {_format_operator_literals(infix_specs['yfy'])}")
+            parts.append(f"{rule_name} {token} {rule_name} -> infix_yfy")
+
+        if prefix_specs.get("fx"):
+            token = f"PREFIX_FX_{precedence}"
+            tokens.append(f"    {token}: {_format_operator_literals(prefix_specs['fx'])}")
+            parts.append(f"{token} {lower_rule} -> prefix_fx")
+        if prefix_specs.get("fy"):
+            token = f"PREFIX_FY_{precedence}"
+            tokens.append(f"    {token}: {_format_operator_literals(prefix_specs['fy'])}")
+            parts.append(f"{token} {rule_name} -> prefix_fy")
+
+        if postfix_specs.get("xf"):
+            token = f"POSTFIX_XF_{precedence}"
+            tokens.append(f"    {token}: {_format_operator_literals(postfix_specs['xf'])}")
+            parts.append(f"{lower_rule} {token} -> postfix_xf")
+        if postfix_specs.get("yf"):
+            token = f"POSTFIX_YF_{precedence}"
+            tokens.append(f"    {token}: {_format_operator_literals(postfix_specs['yf'])}")
+            parts.append(f"{rule_name} {token} -> postfix_yf")
+
+        rule_body = "\n        | ".join(parts)
+        rules.append(f"?{rule_name}: {rule_body}")
+        lower_rule = rule_name
+
+    rules.append(f"?term: {lower_rule}")
+    rules.extend(tokens)
+
+    return "\n".join(rules) + "\n"
 
 
 class PrologParser:
@@ -947,7 +1109,7 @@ class PrologParser:
         # Initially identity (no conversions active)
         self._char_conversions: dict[str, str] = {}
         self._grammar_cache = {}  # Cache compiled grammars by operator set
-        self.parser = self._create_parser(None)
+        self.parser = None
 
     def set_char_conversion(self, from_char: str, to_char: str) -> None:
         """Set a character conversion.
@@ -1028,23 +1190,34 @@ class PrologParser:
         
         return ''.join(result)
 
-    def _create_parser(self, operators: list[tuple[int, str, str]] | None):
-        """Create a Lark parser, optionally with custom operators.
-        
-        Args:
-            operators: List of (precedence, type, operator) tuples, or None for base grammar
-            
-        Returns:
-            Lark parser instance
-        """
-        grammar = PROLOG_GRAMMAR
-        
-        # TODO: Future enhancement - generate grammar with custom operators
-        # For now, we use the base grammar but operators are available for future use
-        
+    def _create_parser(self, grammar: str):
         return Lark(
             grammar, parser="earley", propagate_positions=True, ambiguity='resolve'
         )
+
+    def _base_operator_definitions(self) -> list[tuple[int, str, str]]:
+        if self.operator_table is None:
+            return list(DEFAULT_OPERATORS)
+        return [
+            (info.precedence, info.spec, name)
+            for name, info in self.operator_table.iter_current_ops()
+        ]
+
+    def _build_grammar(self, operators: list[tuple[int, str, str]]) -> str:
+        operator_rules = generate_operator_rules(operators)
+        return PROLOG_GRAMMAR.replace("__OPERATOR_GRAMMAR__", operator_rules)
+
+    def _ensure_parser(self, cleaned_text: str) -> None:
+        try:
+            directive_ops = extract_op_directives(cleaned_text)
+        except ValueError:
+            directive_ops = []
+        operators = _merge_operators(self._base_operator_definitions(), directive_ops)
+        key = tuple(operators)
+        if key not in self._grammar_cache:
+            grammar = self._build_grammar(operators)
+            self._grammar_cache[key] = self._create_parser(grammar)
+        self.parser = self._grammar_cache[key]
 
     def _strip_block_comments(self, text: str) -> tuple[str, list[tuple[int, str]]]:
         """Strip block comments from text, handling nesting and quoted strings.
@@ -1203,10 +1376,11 @@ class PrologParser:
             # Apply character conversions before parsing
             if apply_char_conversions:
                 text = self._apply_char_conversions(text)
-            text, pldoc_comments = self._collect_pldoc_comments(text)
-            tree = self.parser.parse(text)
+            cleaned_text, pldoc_comments = self._collect_pldoc_comments(text)
+            self._ensure_parser(cleaned_text)
+            tree = self.parser.parse(cleaned_text)
             transformer = PrologTransformer()
-            parsed_items = transformer.transform(tree)
+            parsed_items = [self._fold_numeric_unary_minus(item) for item in transformer.transform(tree)]
             # Associate PlDoc comments with items
             self._associate_pldoc_comments(parsed_items, pldoc_comments)
             return parsed_items
@@ -1235,6 +1409,33 @@ class PrologParser:
             error_term = PrologError.syntax_error(str(e), context)
             raise PrologThrow(error_term)
 
+    def _fold_numeric_unary_minus(self, term):
+        """Normalize unary minus applications to numeric literals."""
+
+        if isinstance(term, Clause):
+            head = self._fold_numeric_unary_minus(term.head)
+            body = None
+            if term.body is not None:
+                body = [self._fold_numeric_unary_minus(goal) for goal in term.body]
+            return Clause(head, body, term.doc, term.meta, term.dcg)
+
+        if isinstance(term, Directive):
+            goal = self._fold_numeric_unary_minus(term.goal)
+            return Directive(goal, term.doc, term.meta)
+
+        if isinstance(term, List):
+            elements = tuple(self._fold_numeric_unary_minus(e) for e in term.elements)
+            tail = None if term.tail is None else self._fold_numeric_unary_minus(term.tail)
+            return List(elements, tail)
+
+        if isinstance(term, Compound):
+            args = tuple(self._fold_numeric_unary_minus(arg) for arg in term.args)
+            if term.functor == "-" and len(args) == 1 and isinstance(args[0], Number):
+                return Number(-args[0].value)
+            return Compound(term.functor, args)
+
+        return term
+
     def parse_term(
         self,
         text: str,
@@ -1248,8 +1449,9 @@ class PrologParser:
             clause_text = f"dummy({text})."
             if apply_char_conversions:
                 clause_text = self._apply_char_conversions(clause_text)
-            text, _ = self._collect_pldoc_comments(clause_text)
-            tree = self.parser.parse(text)
+            cleaned_text, _ = self._collect_pldoc_comments(clause_text)
+            self._ensure_parser(cleaned_text)
+            tree = self.parser.parse(cleaned_text)
             transformer = PrologTransformer()
             result = transformer.transform(tree)
             if result and isinstance(result[0], Clause):
