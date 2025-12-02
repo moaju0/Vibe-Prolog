@@ -289,16 +289,16 @@ class TestOperatorExports:
     def test_invalid_operator_precedence_in_export(self):
         """Invalid operator precedence should raise error."""
         prolog = PrologInterpreter()
-        with pytest.raises(Exception) as exc_info:
+        with pytest.raises(PrologThrow) as exc_info:
             prolog.consult_string(":- module(bad, [op(2000, fy, ~)]).")
-        assert "domain_error" in str(exc_info.value) or "operator_priority" in str(exc_info.value)
+        assert "domain_error" in str(exc_info.value.term) or "operator_priority" in str(exc_info.value.term)
 
     def test_invalid_operator_associativity_in_export(self):
         """Invalid associativity should raise error."""
         prolog = PrologInterpreter()
-        with pytest.raises(Exception) as exc_info:
+        with pytest.raises(PrologThrow) as exc_info:
             prolog.consult_string(":- module(bad, [op(300, bad_assoc, ~)]).")
-        assert "domain_error" in str(exc_info.value) or "operator_specifier" in str(exc_info.value)
+        assert "domain_error" in str(exc_info.value.term) or "operator_specifier" in str(exc_info.value.term)
 
     def test_clpb_operators(self):
         """Test with actual operators from library(clpb)."""
