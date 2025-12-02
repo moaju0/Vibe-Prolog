@@ -109,9 +109,9 @@ def get_repo_labels() -> set[str]:
         json_output = run(["gh", "label", "list", "--json", "name", "--limit", "1000"])
         data = json.loads(json_output)
         if isinstance(data, list):
-            return {item.get("name") for item in data if isinstance(item, dict) and "name" in item}
-    except Exception:
-        pass
+            return {item["name"] for item in data if isinstance(item, dict) and "name" in item}
+    except (json.JSONDecodeError, SystemExit) as e:
+        print(f"Warning: Could not retrieve repository labels: {e}", file=sys.stderr)
     return set()
 
 
@@ -133,13 +133,12 @@ def add_label_if_needed(item_type: str, item_number: str, label: str = "nac") ->
         json_output = run(["gh", item_type, "view", item_number, "--json", "labels"])
         data = json.loads(json_output)
         labels = data.get("labels", [])
-        existing_labels = {lbl.get("name") for lbl in labels if isinstance(lbl, dict)}
+        existing_labels = {lbl["name"] for lbl in labels if isinstance(lbl, dict) and "name" in lbl}
 
         if label in existing_labels:
             return  # Label already exists on the item
 
         # Add the label
         run(["gh", item_type, "edit", item_number, "--add-label", label], capture_output=False)
-    except Exception:
-        # Silently ignore errors
-        pass
+    except (json.JSONDecodeError, SystemExit) as e:
+        print(f"Warning: Failed to add label '{label}' to {item_type} #{item_number}: {e}", file=sys.stderr)

@@ -50,7 +50,7 @@ def debug_step(step_name: str, data: str | None = None, enabled: bool = False) -
             break
         elif response == "N":
             print("Aborting...")
-            raise SystemExit(0)
+            raise SystemExit("Aborted by user.")
         else:
             print("Please enter Y or N")
 
