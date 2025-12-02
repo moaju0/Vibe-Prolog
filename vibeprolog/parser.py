@@ -386,7 +386,7 @@ class PrologTransformer(Transformer):
             if isinstance(term, Compound) and term.functor == "-" and len(term.args) == 1:
                 inner = term.args[0]
                 if isinstance(inner, Number):
-                    return Number(-inner.value)
+                    return inner
         return Compound(op_str, (term,))
 
     def module_term(self, items):
