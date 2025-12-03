@@ -74,22 +74,20 @@ class TestOperatorExtraction:
 class TestCommentStripping:
     """Tests for the comment stripping functions."""
 
-    def test_strip_line_comments(self):
-        """Test stripping line comments."""
-        prolog = PrologInterpreter()
+    def test_strip_comments(self):
+        """Test stripping comments."""
         text = """
         % comment
         :- op(500, yfx, test).
         """
-        result = prolog._strip_line_comments(text)
+        result = _strip_comments(text)
         assert "% comment" not in result
         assert ":- op(500, yfx, test)" in result
 
-    def test_strip_line_comments_preserves_quoted(self):
-        """Test that line comments inside quoted strings are preserved."""
-        prolog = PrologInterpreter()
+    def test_strip_comments_preserves_quoted(self):
+        """Test that comments inside quoted strings are preserved."""
         text = """atom_with_percent('hello % world')."""
-        result = prolog._strip_line_comments(text)
+        result = _strip_comments(text)
         assert "'hello % world'" in result
 
     def test_strip_block_comments(self):

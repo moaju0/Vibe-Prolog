@@ -17,6 +17,7 @@ from vibeprolog.parser import (
     PredicateIndicator,
     PredicatePropertyDirective,
     PrologParser,
+    _strip_comments,
     extract_op_directives,
     tokenize_prolog_statements,
 )
@@ -457,69 +458,6 @@ class PrologInterpreter:
 
         return (resolved_import, None)
 
-    def _strip_line_comments(self, text: str) -> str:
-        """Strip line comments from text, preserving content inside quoted strings.
-        
-        Args:
-            text: Prolog source code that may contain line comments
-            
-        Returns:
-            Text with line comments removed
-        """
-        result = []
-        i = 0
-        in_single_quote = False
-        in_double_quote = False
-        escape_next = False
-        
-        while i < len(text):
-            char = text[i]
-            
-            if escape_next:
-                result.append(char)
-                escape_next = False
-                i += 1
-                continue
-            
-            if char == '\\' and (in_single_quote or in_double_quote):
-                result.append(char)
-                escape_next = True
-                i += 1
-                continue
-            
-            if char == "'" and not in_double_quote:
-                # Check for doubled quote escape inside single-quoted strings
-                if in_single_quote and i + 1 < len(text) and text[i + 1] == "'":
-                    result.append(char)
-                    result.append(text[i + 1])
-                    i += 2
-                    continue
-                in_single_quote = not in_single_quote
-                result.append(char)
-                i += 1
-                continue
-            
-            if char == '"' and not in_single_quote:
-                in_double_quote = not in_double_quote
-                result.append(char)
-                i += 1
-                continue
-            
-            # Check for line comment (%) outside quoted strings
-            if char == '%' and not in_single_quote and not in_double_quote:
-                # Skip until end of line
-                while i < len(text) and text[i] != '\n':
-                    i += 1
-                # Skip the newline if present
-                if i < len(text) and text[i] == '\n':
-                    result.append('\n')
-                    i += 1
-                continue
-            
-            result.append(char)
-            i += 1
-        
-        return ''.join(result)
 
     def _extract_import_terms(
         self, prolog_code: str, directive_ops: list[tuple[int, str, str]]
@@ -540,8 +478,8 @@ class PrologInterpreter:
         """
         imports: list[tuple[Any, bool]] = []
         for chunk in tokenize_prolog_statements(prolog_code):
-            # Strip line comments to find the actual directive
-            stripped = self._strip_line_comments(chunk).strip()
+            # Strip comments to find the actual directive
+            stripped = _strip_comments(chunk).strip()
             if not stripped.startswith(":-"):
                 continue
             try:
