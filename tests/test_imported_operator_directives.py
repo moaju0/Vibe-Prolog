@@ -32,3 +32,29 @@ def test_nested_imported_operator_directives_are_applied():
     consumer_module = prolog.modules.get("operator_consumer")
     assert consumer_module is not None
     assert ("uses_op", 2) in consumer_module.predicates
+
+
+def test_circular_imports_do_not_cause_infinite_loop():
+    """Test that circular imports are handled gracefully without infinite recursion."""
+    prolog = PrologInterpreter()
+
+    # This should not hang or raise a RecursionError
+    prolog.consult("tests/fixtures/circular_a.pl")
+
+    # Verify both modules loaded successfully
+    assert "circular_a" in prolog.modules
+    assert "circular_b" in prolog.modules
+
+    # Verify operators from both modules are available
+    op_a = prolog.operator_table.lookup("<<<", "xfx")
+    op_b = prolog.operator_table.lookup(">>>", "xfy")
+    assert op_a is not None, "Operator <<< from circular_a should be loaded"
+    assert op_b is not None, "Operator >>> from circular_b should be loaded"
+
+    # Verify predicates are accessible
+    module_a = prolog.modules.get("circular_a")
+    module_b = prolog.modules.get("circular_b")
+    assert module_a is not None
+    assert module_b is not None
+    assert ("a_marker", 0) in module_a.predicates
+    assert ("b_marker", 0) in module_b.predicates
