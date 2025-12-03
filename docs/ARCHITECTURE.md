@@ -202,12 +202,25 @@ non-deterministic predicates.
 
 ### Predicate properties and mutability
 
-- `PrologInterpreter.predicate_properties` maps `(functor, arity)` to a set of
-  properties (`dynamic`, `multifile`, `discontiguous`, `static`, `built_in`).
-- `PrologInterpreter._predicate_sources` tracks which consult call introduced
-  each predicate so non-multifile predicates cannot be extended by later files.
-- The same structures are shared with `PrologEngine` so runtime database
-  operations enforce the recorded properties.
+Predicate properties are tracked at two levels:
+
+- **Global level**: `PrologInterpreter.predicate_properties` tracks built-in predicates
+  and provides backward compatibility for global predicate lookups.
+- **Module level**: `PrologInterpreter._module_predicate_properties` maps
+  `module_name -> {(functor, arity) -> set[str]}` for module-scoped predicate properties.
+
+This allows different modules to define predicates with the same name/arity without
+conflict. For example, `library(error)` can export `must_be/2` while `library(clpz)`
+defines its own `must_be/2` for internal use.
+
+Property resolution order:
+1. Check if predicate is a built-in (global, always accessible)
+2. Check module-scoped properties for the current module
+3. Fall back to global properties for backward compatibility
+
+`PrologInterpreter._predicate_sources` and `_module_predicate_sources` track which
+consult call introduced each predicate so non-multifile predicates cannot be extended
+by later files within the same module.
 
 User-defined predicates start as **static**, meaning `asserta/1`, `assertz/1`,
 `retract/1`, and `abolish/1` raise `permission_error` unless the predicate was
@@ -322,9 +335,11 @@ job(bob, engineer).
 - Each module is represented by a `Module` object stored in `PrologInterpreter.modules`.
 - Module declaration uses `:- module(Name, Exports).` and sets the current module context for subsequent clauses during consultation.
 - Predicates defined in modules are associated with their defining module; clauses carry a `module` attribute.
+- **Predicate namespaces are isolated per module**: Different modules can define predicates with the same name/arity without conflict. For example, if `library(error)` exports `must_be/2` and `library(clpz)` imports other predicates from `error` but defines its own `must_be/2`, both can coexist.
 - Module-qualified calls use the syntax `Module:Goal` and resolve only against the specified module's predicates (and built-ins).
 - Export lists control which predicates are accessible from outside the module; attempting to call a non-exported predicate via `Module:Pred` raises a permission error.
 - The default module for non-module code is `user` and its predicates are globally accessible.
+- **Predicate resolution order**: current module → imported predicates → user module → built-ins.
 
 ### Standard Library
 

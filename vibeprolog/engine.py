@@ -724,9 +724,34 @@ class PrologEngine:
 
         return Compound("/", (Atom(functor), Number(arity)))
 
-    def _get_predicate_properties(self, key: tuple[str, int]) -> set[str]:
-        """Return the property set for a predicate, defaulting to static."""
-
+    def _get_predicate_properties(self, key: tuple[str, int], module_name: str | None = None) -> set[str]:
+        """Return the property set for a predicate, defaulting to static.
+        
+        Args:
+            key: Tuple of (functor, arity)
+            module_name: Optional module name to check module-scoped properties.
+                        If None, uses the current module context.
+        """
+        # First check if it's a built-in (global)
+        if key in self.predicate_properties:
+            props = self.predicate_properties[key]
+            if "built_in" in props:
+                return props
+        
+        # Try module-scoped properties if interpreter is available
+        interpreter = getattr(self, "interpreter", None)
+        if interpreter is not None:
+            if module_name is None:
+                module_name = getattr(self, "current_module", None) or getattr(interpreter, "current_module", "user")
+            
+            module_props = interpreter._get_module_predicate_properties(module_name, key)
+            if module_props:
+                properties = set(module_props)
+                if "dynamic" in properties and "static" in properties:
+                    properties.discard("static")
+                return properties
+        
+        # Fall back to global properties
         properties = self.predicate_properties.setdefault(key, set())
         if not properties:
             properties.add("static")
@@ -734,11 +759,16 @@ class PrologEngine:
             properties.discard("static")
         return properties
 
-    def _ensure_dynamic_permission(self, key: tuple[str, int], context: str) -> None:
-        """Raise permission_error if predicate is not dynamic."""
-
+    def _ensure_dynamic_permission(self, key: tuple[str, int], context: str, module_name: str | None = None) -> None:
+        """Raise permission_error if predicate is not dynamic.
+        
+        Args:
+            key: Tuple of (functor, arity)
+            context: Context string for error messages
+            module_name: Optional module name to check module-scoped properties.
+        """
         functor, arity = key
-        properties = self._get_predicate_properties(key)
+        properties = self._get_predicate_properties(key, module_name)
         if "dynamic" not in properties:
             indicator = self._indicator_from_key(functor, arity)
             error_term = PrologError.permission_error(
