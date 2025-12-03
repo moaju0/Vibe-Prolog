@@ -216,7 +216,7 @@ def vars(term: Any) -> set[Variable]:
 
 class AttributedUnificationContext:
     """Context for unification with attributed variable support.
-    
+
     This class wraps the basic unification algorithm and adds support for
     verify_attributes/3 hooks when attributed variables are unified.
     """
@@ -229,115 +229,42 @@ class AttributedUnificationContext:
         self, term1: Any, term2: Any, subst: Substitution
     ) -> tuple[Substitution | None, list[tuple[Variable, Any]]]:
         """Unify two terms and track attributed variable unifications.
-        
+
         Returns:
             Tuple of (new_substitution, pending_verifications) where
             pending_verifications is a list of (attvar, value) pairs that
             need verify_attributes/3 calls.
         """
-        self._pending_verifications = []
-        new_subst = self._unify_tracking_attvars(term1, term2, subst)
-        return (new_subst, self._pending_verifications)
+        # Perform base unification
+        new_subst = unify(term1, term2, subst)
+        if new_subst is None:
+            return None, []
 
-    def _is_attvar(self, var: Variable) -> bool:
-        """Check if a variable has attributes."""
-        if not hasattr(self.engine, '_attribute_store'):
-            return False
-        store = self.engine._attribute_store
-        return var.name in store and bool(store[var.name])
-
-    def _unify_tracking_attvars(
-        self, term1: Any, term2: Any, subst: Substitution
-    ) -> Substitution | None:
-        """Unify terms while tracking attributed variable unifications."""
-        term1 = deref(term1, subst)
-        term2 = deref(term2, subst)
-
-        if term1 == term2:
-            return subst
-
-        if isinstance(term1, List) and isinstance(term2, Atom):
-            if not term1.elements and term1.tail is None and term2.name == "[]":
-                return subst
-        if isinstance(term1, Atom) and isinstance(term2, List):
-            if not term2.elements and term2.tail is None and term1.name == "[]":
-                return subst
-
-        if isinstance(term1, Variable):
-            if occurs_check(term1, term2, subst):
-                return None
-            if self._is_attvar(term1):
-                self._pending_verifications.append((term1, term2))
-            return subst.bind(term1.name, term2)
-
-        if isinstance(term2, Variable):
-            if occurs_check(term2, term1, subst):
-                return None
-            if self._is_attvar(term2):
-                self._pending_verifications.append((term2, term1))
-            return subst.bind(term2.name, term1)
-
-        if isinstance(term1, Atom) and isinstance(term2, Atom):
-            return subst if term1.name == term2.name else None
-
-        if isinstance(term1, Number) and isinstance(term2, Number):
-            return subst if term1.value == term2.value else None
-
-        if isinstance(term1, Compound) and isinstance(term2, Compound):
-            if term1.functor != term2.functor or len(term1.args) != len(term2.args):
-                return None
-
-            for arg1, arg2 in zip(term1.args, term2.args):
-                subst = self._unify_tracking_attvars(arg1, arg2, subst)
-                if subst is None:
-                    return None
-            return subst
-
-        if isinstance(term1, List) and isinstance(term2, List):
-            if (
-                not term1.elements
-                and not term2.elements
-                and term1.tail is None
-                and term2.tail is None
-            ):
-                return subst
-
-            if not term1.elements and not term2.elements:
-                if term1.tail is not None and term2.tail is not None:
-                    return self._unify_tracking_attvars(term1.tail, term2.tail, subst)
-                return subst
-
-            if not term1.elements:
-                if term1.tail is not None:
-                    return self._unify_tracking_attvars(term1.tail, term2, subst)
-                return None
-
-            if not term2.elements:
-                if term2.tail is not None:
-                    return self._unify_tracking_attvars(term1, term2.tail, subst)
-                return None
-
-            subst = self._unify_tracking_attvars(term1.elements[0], term2.elements[0], subst)
-            if subst is None:
-                return None
-
-            if len(term1.elements) > 1:
-                tail1 = List(term1.elements[1:], term1.tail)
-            elif term1.tail is not None:
-                tail1 = term1.tail
-            else:
-                tail1 = List(())
-
-            if len(term2.elements) > 1:
-                tail2 = List(term2.elements[1:], term2.tail)
-            elif term2.tail is not None:
-                tail2 = term2.tail
-            else:
-                tail2 = List(())
-
-            return self._unify_tracking_attvars(tail1, tail2, subst)
-
-        return None
+        # Minimal placeholder for merging attributes when both sides have attrs.
+        # This is a scaffold; actual robust merging should be implemented
+        # according to SICStus/Scryer semantics and wired into the engine.
+        store = getattr(self.engine, "_attribute_store", {})
+        merged = False
+        involved_vars = []
+        for t in (term1, term2):
+            v = deref(t, new_subst)
+            if isinstance(v, Variable) and v.name in store and store[v.name]:
+                involved_vars.append(v)
+        if len(involved_vars) >= 2:
+            v1, v2 = involved_vars[0], involved_vars[1]
+            attrs1 = store.get(v1.name, {})
+            attrs2 = store.get(v2.name, {})
+            for k, val in attrs2.items():
+                if k not in attrs1:
+                    attrs1[k] = val
+            store[v1.name] = attrs1
+            if v2.name in store:
+                del store[v2.name]
+            merged = True
+        pending = []
+        if merged:
+            return new_subst, pending
+        return new_subst, pending
 
 
 def get_attributed_unification_context(engine: "PrologEngine") -> AttributedUnificationContext:

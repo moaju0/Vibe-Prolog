@@ -246,13 +246,17 @@ class TestIntegration:
                 integer(Value).
             verify_attributes(_, _, []).
         """)
-        
+
         # Should succeed with integer
         result = prolog.query_once(
             "put_atts(X, +integer_only), X = 42"
         )
         assert result is not None
         assert result["X"] == 42
+        # Should fail with non-integer
+        assert not prolog.has_solution(
+            "put_atts(X, +integer_only), X = abc"
+        )
         
     def test_domain_constraint(self):
         """Domain constraint: variable restricted to specific values."""
@@ -263,13 +267,18 @@ class TestIntegration:
                 member(Value, Domain).
             verify_attributes(_, _, []).
         """)
-        
+
         # Should succeed with value in domain
         result = prolog.query_once(
             "put_atts(X, +domain([a, b, c])), X = b"
         )
         assert result is not None
         assert result["X"] == "b"
+
+        # Should fail with value outside domain
+        assert not prolog.has_solution(
+            "put_atts(X, +domain([a, b, c])), X = d"
+        )
 
 
 class TestLibraryAtts:

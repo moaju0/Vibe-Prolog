@@ -47,23 +47,7 @@ class AttsBuiltins:
             engine._attribute_store = {}
         return engine._attribute_store
 
-    @staticmethod
-    def _get_declared_attributes(engine: EngineContext) -> dict:
-        """Get or create the declared attributes registry for the engine.
-        
-        Maps module_name -> set of (functor, arity) for declared attributes.
-        """
-        if not hasattr(engine, '_declared_attributes'):
-            engine._declared_attributes = {}
-        return engine._declared_attributes
-
-    @staticmethod
-    def _get_var_key(var: Variable, subst: Substitution) -> str:
-        """Get a unique key for a variable, taking into account the substitution."""
-        dereffed = deref(var, subst)
-        if isinstance(dereffed, Variable):
-            return dereffed.name
-        return None
+    # Removed unused helper methods: _get_declared_attributes and _get_var_key
 
     @staticmethod
     def _builtin_put_atts(
@@ -216,10 +200,12 @@ class AttsBuiltins:
             return
 
         elif isinstance(attr_term, Variable):
-            for functor, stored_attr in var_attrs.items():
-                new_subst = unify(attr_term, stored_attr, subst)
-                if new_subst is not None:
-                    yield new_subst
+            # Unify with a list of all attributes, per SICStus/Scryer standard.
+            from vibeprolog.utils.list_utils import python_to_list
+            attrs_list = python_to_list(list(var_attrs.values()))
+            new_subst = unify(attr_term, attrs_list, subst)
+            if new_subst is not None:
+                yield new_subst
             return
 
     @staticmethod
@@ -294,7 +280,7 @@ class AttsBuiltins:
         args: BuiltinArgs, subst: Substitution, engine: EngineContext
     ) -> Iterator[Substitution]:
         """copy_term(Term, Copy, Goals) - Copy term with attributes as goals.
-        
+
         Like copy_term/2, but the third argument is unified with a list of
         goals that represent the attributes of the copied variables.
         """
@@ -305,16 +291,51 @@ class AttsBuiltins:
         copy_term_arg = args[1]
         goals_term = args[2]
 
-        var_names_in_term = collect_vars(term, subst)
-        var_mapping = {}
-        for var_name in var_names_in_term:
-            var_mapping[var_name] = engine._fresh_variable("Copy")
+        # Collect all variables in the term and in attribute values
+        store = AttsBuiltins._get_attribute_store(engine)
+        var_set = set()
+
+        def _collect_vars_from_term(t):
+            t = deref(t, subst)
+            if isinstance(t, Variable):
+                var_set.add(t)
+            elif isinstance(t, Compound):
+                for a in t.args:
+                    _collect_vars_from_term(a)
+            elif isinstance(t, List):
+                for e in t.elements:
+                    _collect_vars_from_term(e)
+                if t.tail is not None:
+                    _collect_vars_from_term(t.tail)
+
+        _collect_vars_from_term(term)
+
+        # Collect vars inside attribute values
+        def _collect_vars_from_attr(val):
+            v = deref(val, subst)
+            if isinstance(v, Variable):
+                var_set.add(v)
+            elif isinstance(v, Compound):
+                for a in v.args:
+                    _collect_vars_from_attr(a)
+            elif isinstance(v, List):
+                for e in v.elements:
+                    _collect_vars_from_attr(e)
+                if v.tail is not None:
+                    _collect_vars_from_attr(v.tail)
+
+        for attrs in store.values():
+            for attr_val in attrs.values():
+                _collect_vars_from_attr(attr_val)
+
+        # Create fresh copies for all collected variables
+        var_mapping = {v: engine._fresh_variable("Copy") for v in var_set}
 
         def copy(t):
             t = deref(t, subst)
             if isinstance(t, Variable):
-                if t.name in var_mapping:
-                    return var_mapping[t.name]
+                if t in var_mapping:
+                    return var_mapping[t]
                 return t
             elif isinstance(t, Compound):
                 new_args = tuple(copy(arg) for arg in t.args)
@@ -323,7 +344,6 @@ class AttsBuiltins:
                 new_elems = tuple(copy(e) for e in t.elements)
                 new_tail = copy(t.tail) if t.tail is not None else None
                 return List(new_elems, new_tail)
-            return t
 
         copied = copy(term)
         new_subst = unify(copy_term_arg, copied, subst)
@@ -333,7 +353,8 @@ class AttsBuiltins:
         store = AttsBuiltins._get_attribute_store(engine)
         goals = []
 
-        for old_name, new_var in var_mapping.items():
+        for old_var, new_var in var_mapping.items():
+            old_name = old_var.name
             if old_name in store and store[old_name]:
                 for functor, attr in store[old_name].items():
                     copied_attr = copy(attr)
