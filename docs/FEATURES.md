@@ -422,29 +422,5 @@ Controls how the interpreter handles library definitions that conflict with buil
 |------|----------|
 | `skip` | **(Default)** Silently skip the library definition and use the existing built-in. Allows libraries like `clpz` to load without errors. |
 | `error` | Raise a `permission_error` when a library tries to redefine a built-in predicate. Useful for strict checking and debugging library compatibility. |
-| `shadow` | *Reserved for future implementation.* Will allow modules to shadow built-ins within their namespace. Currently raises "not implemented" error. |
-
-**Examples:**
-
-```bash
-# Default behavior - skip conflicts silently
-uv run vibeprolog.py ./examples/sudoku.pl
-
-# Strict mode - fail on conflicts
-uv run vibeprolog.py --builtin-conflict=error ./examples/sudoku.pl
-```
-
-**Programmatic Usage:**
-
-```python
-from vibeprolog import PrologInterpreter
-
-# Default (skip mode)
-prolog = PrologInterpreter()
-
-# Explicit skip mode
-prolog = PrologInterpreter(builtin_conflict="skip")
-
-# Error mode for strict checking
-prolog = PrologInterpreter(builtin_conflict="error")
+| `shadow` | *Reserved for future implementation.* When used via the CLI, it raises a "not implemented" error. When used programmatically, it currently defaults to skip behavior. |
 ```

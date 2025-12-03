@@ -105,13 +105,17 @@ class TestBuiltinConflictErrorMode:
 class TestBuiltinConflictShadowMode:
     """Tests for shadow mode (placeholder - not yet implemented)."""
 
-    def test_shadow_mode_not_implemented_in_interpreter(self):
-        """Shadow mode should work at the interpreter level but has no special behavior."""
-        # At the interpreter level, shadow behaves like skip (placeholder)
+    def test_shadow_mode_falls_back_to_skip_programmatically(self):
+        """Programmatically, shadow mode should fall back to 'skip' behavior."""
         prolog = PrologInterpreter(builtin_conflict="shadow")
-        # This should work - the interpreter doesn't reject shadow mode
-        prolog.consult_string("foo(1).")
-        assert prolog.has_solution("foo(1)")
+        # Define a predicate that conflicts with the built-in length/2
+        prolog.consult_string("""
+            length([], zero).
+        """)
+        # The built-in length/2 should still work, proving the redefinition was skipped.
+        result = prolog.query_once("length([a, b], L)")
+        assert result is not None
+        assert result["L"] == 2
 
 
 class TestBuiltinConflictCLI:
