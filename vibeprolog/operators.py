@@ -10,6 +10,7 @@ from vibeprolog.operator_defaults import DEFAULT_OPERATORS
 from vibeprolog.parser import List
 from vibeprolog.terms import Atom, Compound, Number, Variable
 from vibeprolog.utils.list_utils import list_to_python
+from .utils import reconstruct_operator_name_from_term
 
 
 @dataclass(frozen=True)
@@ -101,16 +102,6 @@ class OperatorTable:
         return spec
 
     def _parse_operator_names(self, name_term, context: str) -> list[str]:
-        def _flatten_symbol_term(term):
-            """Flatten nested unary operator terms into a symbol name."""
-            if isinstance(term, Atom):
-                return term.name
-            if isinstance(term, Compound) and len(term.args) == 1:
-                tail = _flatten_symbol_term(term.args[0])
-                if tail is None:
-                    return None
-                return f"{term.functor}{tail}"
-            return None
 
         if isinstance(name_term, Variable):
             error_term = PrologError.instantiation_error(context)
@@ -129,14 +120,14 @@ class OperatorTable:
                 if isinstance(element, Variable):
                     error_term = PrologError.instantiation_error(context)
                     raise PrologThrow(error_term)
-                symbol_name = _flatten_symbol_term(element)
+                symbol_name = reconstruct_operator_name_from_term(element)
                 if symbol_name is None:
                     error_term = PrologError.type_error("atom", element, context)
                     raise PrologThrow(error_term)
                 names.append(symbol_name)
             return names
 
-        flattened = _flatten_symbol_term(name_term)
+        flattened = reconstruct_operator_name_from_term(name_term)
         if flattened is not None:
             return [flattened]
 

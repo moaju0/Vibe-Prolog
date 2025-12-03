@@ -24,6 +24,7 @@ from vibeprolog.operators import OperatorTable
 from vibeprolog.terms import Atom, Compound, Number, Variable
 from vibeprolog.unification import Substitution, apply_substitution
 from vibeprolog.dcg import expand_dcg_clause
+from .utils import reconstruct_operator_name_from_term
 
 # Constants
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -699,14 +700,8 @@ class PrologInterpreter:
         return normalized_name.name, int(arity_term.value)
 
     def _reconstruct_operator_name(self, term):
-        """Reconstruct operator name from compound term representing operator application."""
-        if isinstance(term, Atom):
-            return term.name
-        if isinstance(term, Compound) and len(term.args) == 1:
-            tail = self._reconstruct_operator_name(term.args[0])
-            if tail is not None:
-                return f"{term.functor}{tail}"
-        return None
+        """Reconstruct an operator name from its AST representation as a compound term."""
+        return reconstruct_operator_name_from_term(term)
 
     def _normalize_operator_in_indicator(self, term):
         """Normalize operator applications in predicate indicators to atoms."""
