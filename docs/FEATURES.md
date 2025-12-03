@@ -358,7 +358,8 @@ These predicates are specific to SWI-Prolog and not part of the ISO standard.
 | `use_module/1,2`                  | ✅      | Supports full and selective imports, including `library(Name)`; library/ preferred over examples/modules/ for module resolution |
 | **Operator exports in module/2**  | ✅      | **SWI-Prolog compatible - operators can be exported**          |
 | Imported operator discovery       | ✅      | Operators declared in imported modules are collected before parsing dependents |
-| Cross-module dynamic semantics    | ⚠️     | Implemented; further test coverage recommended                 |
+| **Module-scoped predicate namespaces** | ✅  | Each module can define predicates with the same name/arity without conflict. `library(a):foo/1` and `library(b):foo/1` are distinct |
+| Cross-module dynamic semantics    | ⚠️     | Implemented; dynamic predicate isolation per module needs further work |
 
 ---
 

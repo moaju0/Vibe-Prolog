@@ -69,8 +69,13 @@ class PrologInterpreter:
         self.builtin_conflict = builtin_conflict
         self.engine = None
         self.initialization_goals = []
+        # Global predicate properties - for built-ins and backward compatibility
         self.predicate_properties: dict[tuple[str, int], set[str]] = {}
         self._predicate_sources: dict[tuple[str, int], set[str]] = {}
+        # Module-scoped predicate properties: module_name -> {(functor, arity) -> set[str]}
+        self._module_predicate_properties: dict[str, dict[tuple[str, int], set[str]]] = {}
+        # Module-scoped predicate sources: module_name -> {(functor, arity) -> set[str]}
+        self._module_predicate_sources: dict[str, dict[tuple[str, int], set[str]]] = {}
         self.predicate_docs: dict[tuple[str, int], str] = {}
         self._consult_counter = 0
         self._builtins_seeded = False
@@ -642,16 +647,22 @@ class PrologInterpreter:
         """Apply a predicate property directive."""
 
         context = f"{directive.property}/1"
+        module_name = self.current_module
+        
         for indicator in directive.indicators:
             key = self._validate_predicate_indicator(indicator, context)
-            properties = self.predicate_properties.setdefault(key, set())
-
-            if "built_in" in properties and directive.property == "dynamic":
+            
+            # Check global properties for built-in check
+            global_properties = self.predicate_properties.get(key, set())
+            if "built_in" in global_properties and directive.property == "dynamic":
                 indicator_term = self._indicator_from_key(key)
                 error_term = PrologError.permission_error(
                     "modify", "static_procedure", indicator_term, context
                 )
                 raise PrologThrow(error_term)
+
+            # Get or create module-scoped properties
+            properties = self._get_module_predicate_properties(module_name, key).copy()
 
             if directive.property == "dynamic":
                 properties.discard("static")
@@ -660,6 +671,12 @@ class PrologInterpreter:
                 properties.add(directive.property)
                 if "dynamic" not in properties:
                     properties.add("static")
+
+            # Update module-scoped properties
+            self._set_module_predicate_properties(module_name, key, properties)
+            
+            # Also update global for backward compatibility
+            self.predicate_properties.setdefault(key, set()).update(properties)
 
             if directive.property == "discontiguous" and key in closed_predicates:
                 closed_predicates.discard(key)
@@ -722,6 +739,43 @@ class PrologInterpreter:
         name, arity = key
         return Compound("/", (Atom(name), Number(arity)))
 
+    def _get_module_predicate_properties(
+        self, module_name: str, key: tuple[str, int]
+    ) -> set[str]:
+        """Get predicate properties for a specific module. Returns an empty set if not found."""
+        # First check if it's a built-in (global)
+        if key in self.predicate_properties:
+            props = self.predicate_properties[key]
+            if "built_in" in props:
+                return props
+
+        # Check module-specific properties
+        module_props = self._module_predicate_properties.get(module_name, {})
+        if key in module_props:
+            return module_props[key]
+
+        return set()
+
+    def _set_module_predicate_properties(
+        self, module_name: str, key: tuple[str, int], properties: set[str]
+    ) -> None:
+        """Set predicate properties for a specific module."""
+        self._module_predicate_properties.setdefault(module_name, {})[key] = properties
+
+    def _get_module_predicate_sources(
+        self, module_name: str, key: tuple[str, int]
+    ) -> set[str]:
+        """Get predicate sources for a specific module."""
+        module_sources = self._module_predicate_sources.setdefault(module_name, {})
+        return module_sources.get(key, set())
+
+    def _add_module_predicate_source(
+        self, module_name: str, key: tuple[str, int], source: str
+    ) -> None:
+        """Add a source to a predicate's source set in a specific module."""
+        module_sources = self._module_predicate_sources.setdefault(module_name, {})
+        module_sources.setdefault(key, set()).add(source)
+
     def _extract_character(self, term: Any, context: str) -> str:
         """Extract a single character from a term for char_conversion.
         
@@ -752,11 +806,12 @@ class PrologInterpreter:
         else:
             return last_predicate
 
-        properties = self.predicate_properties.setdefault(key, {"static"})
-        if "dynamic" in properties:
-            properties.discard("static")
-
-        if "built_in" in properties:
+        # Get the module for this clause
+        module_name = getattr(clause, "module", self.current_module)
+        
+        # Check if it's a built-in (global check)
+        global_properties = self.predicate_properties.get(key, set())
+        if "built_in" in global_properties:
             if self.builtin_conflict == "skip":
                 # Silently skip the library definition and use the existing built-in
                 return last_predicate
@@ -768,7 +823,18 @@ class PrologInterpreter:
                 raise PrologThrow(error_term)
             # Note: "shadow" mode is not implemented; it's rejected at CLI level
 
-        sources = self._predicate_sources.setdefault(key, set())
+        # Get module-scoped properties
+        properties = self._get_module_predicate_properties(module_name, key)
+        if not properties:
+            # Initialize with default 'static' property for this module
+            properties = {"static"}
+            self._set_module_predicate_properties(module_name, key, properties)
+        
+        if "dynamic" in properties:
+            properties.discard("static")
+
+        # Check sources within the same module
+        sources = self._get_module_predicate_sources(module_name, key)
         if "static" in properties and sources and source_name not in sources and "multifile" not in properties:
             indicator = self._indicator_from_key(key)
             error_term = PrologError.permission_error(
@@ -787,15 +853,20 @@ class PrologInterpreter:
             raise PrologThrow(error_term)
 
         if last_predicate is not None and last_predicate != key:
-            last_properties = self.predicate_properties.get(last_predicate, {"static"})
+            last_properties = self._get_module_predicate_properties(module_name, last_predicate)
+            if not last_properties:
+                last_properties = {"static"}
             if "discontiguous" not in last_properties:
                 closed_predicates.add(last_predicate)
 
         self.clauses.append(clause)
-        sources.add(source_name)
+        self._add_module_predicate_source(module_name, key, source_name)
+        
+        # Also update global tracking for backward compatibility
+        self.predicate_properties.setdefault(key, set()).update(properties)
+        self._predicate_sources.setdefault(key, set()).add(source_name)
 
         # Register clause under module if present
-        module_name = getattr(clause, "module", "user")
         self.modules.setdefault(module_name, Module(module_name, set()))
 
         mod = self.modules[module_name]
