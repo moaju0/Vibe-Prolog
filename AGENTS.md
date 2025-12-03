@@ -120,6 +120,9 @@ uv run pytest
 # Run all tests including performance (skipped by default). This is slow so run only when required.
 uv run pytest --run-performance
 
+# Run all slow tests (tests empirically longer than ~4 seconds). Skip unless flag is present.
+uv run pytest --run-slow-tests
+
 # Run specific test file
 uv run pytest tests/test_builtins.py
 

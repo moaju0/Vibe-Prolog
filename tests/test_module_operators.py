@@ -173,6 +173,7 @@ class TestImportTermExtraction:
 class TestModuleOperatorImport:
     """Tests for importing operators from modules."""
 
+    @pytest.mark.slow
     def test_import_operators_from_clpz(self):
         """Test that operators from clpz.pl are correctly collected."""
         prolog = PrologInterpreter()
@@ -274,6 +275,7 @@ class TestOperatorUsageAfterImport:
 class TestParsingWithImportedOperators:
     """Tests for parsing code that uses imported operators."""
 
+    @pytest.mark.slow
     def test_parse_sudoku_style_code(self):
         """Test parsing code similar to sudoku.pl that uses clpz operators."""
         prolog = PrologInterpreter()
@@ -305,6 +307,7 @@ class TestParsingWithImportedOperators:
             )
             assert len(items) > 0
 
+    @pytest.mark.slow
     def test_parse_range_operator(self):
         """Test parsing the .. range operator from clpz."""
         prolog = PrologInterpreter()
@@ -334,6 +337,7 @@ class TestParsingWithImportedOperators:
 class TestCircularImports:
     """Tests for handling circular module imports."""
 
+    @pytest.mark.slow
     def test_circular_import_detection(self):
         """Test that circular imports don't cause infinite loops in operator collection."""
         prolog = PrologInterpreter()
@@ -353,6 +357,7 @@ class TestCircularImports:
 class TestRecursiveModuleLoading:
     """Tests for recursive module operator collection."""
 
+    @pytest.mark.slow
     def test_operators_from_transitive_imports(self):
         """Test that operators from transitively imported modules are collected."""
         prolog = PrologInterpreter()
@@ -374,6 +379,7 @@ class TestRecursiveModuleLoading:
 class TestIntegration:
     """Integration tests for the complete operator import workflow."""
 
+    @pytest.mark.slow
     def test_sudoku_parsing(self):
         """Test that sudoku.pl can be parsed successfully with imported operators."""
         sudoku_path = Path("examples/not yet working/sudoku.pl")

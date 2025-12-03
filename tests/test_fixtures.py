@@ -23,6 +23,7 @@ def prolog_interpreter():
         ("large_facts.pl", "findall(X, person(X), L), length(L, Len)", {"Len": 500}),
     ],
 )
+@pytest.mark.slow
 def test_fixture_queries(prolog_interpreter, fixture_file, query, expected):
     """Parameterized test to validate multiple fixture files and queries."""
     p = PrologInterpreter()

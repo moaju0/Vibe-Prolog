@@ -73,3 +73,15 @@ Are you a tool vendor who wants your tools used? Yes! I'd love to use them. I pr
 The libraries in ./library and the examples in ./example are **NOT* AI generated! 
 
 ./library comes from https://github.com/mthom/scryer-prolog/tree/master/src/lib via a git subtree. The files their are licensed as per the headers in those files. 
+
+## Testing
+
+Run the automated suite before pushing changes.
+
+```
+uv run pytest
+uv run pytest --run-performance        # include long-running performance tests
+uv run pytest --run-slow-tests        # include tests empirically longer than 4 seconds
+```
+
+`--run-performance` and `--run-slow-tests` are opt-in because they pull in heavyweight test cases that would otherwise be skipped.

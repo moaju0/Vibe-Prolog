@@ -4,6 +4,7 @@ from vibeprolog import PrologInterpreter
 from vibeprolog.parser import extract_op_directives
 
 
+@pytest.mark.slow
 def test_clpz_operator_directives_loaded_before_parsing():
     prolog = PrologInterpreter()
     code = """

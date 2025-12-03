@@ -425,3 +425,13 @@ Controls how the interpreter handles library definitions that conflict with buil
 | `error` | Raise a `permission_error` when a library tries to redefine a built-in predicate. Useful for strict checking and debugging library compatibility. |
 | `shadow` | *Reserved for future implementation.* When used via the CLI, it raises a "not implemented" error. When used programmatically, it currently defaults to skip behavior. |
 ```
+
+### `--run-slow-tests` Flag
+
+Controls whether pytest includes the subset of tests that currently take longer than ~4 seconds.
+
+```
+uv run pytest --run-slow-tests
+```
+
+These slow tests are skipped by default so the typical fast feedback loop remains snappy; enable the flag when you need to validate the heavy operator-import and fixture cases that power the performance/memory safety guarantees.
