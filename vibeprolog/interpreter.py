@@ -26,6 +26,13 @@ from vibeprolog.unification import Substitution, apply_substitution
 from vibeprolog.dcg import expand_dcg_clause
 
 
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+LIBRARY_SEARCH_PATHS = [
+    PROJECT_ROOT / "library",
+    PROJECT_ROOT / "examples" / "modules",
+]
+
+
 class Module:
     def __init__(self, name: str, exports: set[tuple[str, int]] | None):
         self.name = name
@@ -360,17 +367,11 @@ class PrologInterpreter:
                 error_term = PrologError.type_error("atom", lib_term, context)
                 raise PrologThrow(error_term)
             lib_name = lib_term.name
-            # Look in library/ first, then examples/modules/
-            candidates = [
-                Path(f"library/{lib_name}.pl"),
-                Path(f"examples/modules/{lib_name}.pl")
-            ]
-            for candidate in candidates:
-                candidate_path = candidate
-                if base_path is not None and not candidate.is_absolute():
-                    candidate_path = base_path / candidate
-                if candidate_path.exists():
-                    return str(candidate_path)
+            # Look in predefined library search paths, ignoring the caller's base path
+            for root in LIBRARY_SEARCH_PATHS:
+                candidate = root / f"{lib_name}.pl"
+                if candidate.exists():
+                    return str(candidate)
             error_term = PrologError.existence_error("file", file_term, context)
             raise PrologThrow(error_term)
         else:
