@@ -178,17 +178,25 @@ class PrologEngine:
                     )
                     raise PrologThrow(error_term)
 
-            # Try builtins first (builtins are module-global)
-            builtin_results = self._try_builtin(inner_goal, subst)
+            # Try builtins first (builtins are module-global, but check for shadows)
+            builtin_results = self._try_builtin(inner_goal, subst, module_name)
             if builtin_results is not None:
-                return builtin_results
+                try:
+                    for new_subst in builtin_results:
+                        if new_subst is not None:
+                            yield from self._solve_goals(remaining_goals, new_subst, module_name, depth)
+                except CutException:
+                    raise
+                except PrologThrow:
+                    raise
+                return
 
             # Delegate clause-search to the module's predicate index when available
             for result in self._solve_module_predicate(module_name, key, inner_goal, subst, remaining_goals, current_module, depth):
                 yield result
             return
 
-        builtin_results = self._try_builtin(goal, subst)
+        builtin_results = self._try_builtin(goal, subst, current_module)
         if builtin_results is not None:
             try:
                 for new_subst in builtin_results:
@@ -318,7 +326,7 @@ class PrologEngine:
                     raise
 
     def _try_builtin(
-        self, goal: Compound, subst: Substitution
+        self, goal: Compound, subst: Substitution, module_name: str | None = None
     ) -> Iterator[Substitution] | None:
         """Try to solve goal as a built-in predicate. Returns None if not a builtin."""
         if isinstance(goal, Cut):
@@ -340,6 +348,13 @@ class PrologEngine:
 
         if key is None:
             return None
+
+        # Check if this builtin is shadowed in the current module
+        interpreter = getattr(self, "interpreter", None)
+        if module_name is not None and interpreter is not None:
+            module = interpreter.modules.get(module_name)
+            if module is not None and key in module.shadowed_builtins:
+                return None  # Use the module's definition instead
 
         handler = self._builtin_registry.get(key)
         if handler is None:

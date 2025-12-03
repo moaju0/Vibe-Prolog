@@ -251,10 +251,7 @@ Examples:
 
     args = parser.parse_args()
 
-    # Handle shadow mode (not yet implemented)
-    if args.builtin_conflict == 'shadow':
-        print("Error: --builtin-conflict=shadow is not yet implemented", file=sys.stderr)
-        return 1
+    # Shadow mode is now implemented
 
     # Create interpreter
     prolog = PrologInterpreter(argv=args.program_args, builtin_conflict=args.builtin_conflict)

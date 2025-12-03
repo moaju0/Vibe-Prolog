@@ -46,6 +46,8 @@ class Module:
         self.imports: dict[tuple[str, int], str] = {}
         # Exported operators: set of (precedence, associativity, name)
         self.exported_operators: set[tuple[int, str, str]] = set()
+        # Predicates that shadow built-ins: set of (functor, arity)
+        self.shadowed_builtins: set[tuple[str, int]] = set()
 
 
 class PrologInterpreter:
@@ -63,6 +65,7 @@ class PrologInterpreter:
         self.clauses = []
         # Module system
         self.modules: dict[str, "Module"] = {}
+        self.modules["user"] = Module("user", None)  # Default user module
         self.current_module: str = "user"
 
         self._argv: list[str] = argv or []
@@ -822,7 +825,11 @@ class PrologInterpreter:
 
         # Get the module for this clause
         module_name = getattr(clause, "module", self.current_module)
-        
+
+        # Register clause under module if present
+        self.modules.setdefault(module_name, Module(module_name, set()))
+        mod = self.modules[module_name]
+
         # Check if it's a built-in (global check)
         global_properties = self.predicate_properties.get(key, set())
         if "built_in" in global_properties:
@@ -835,7 +842,10 @@ class PrologInterpreter:
                     "modify", "static_procedure", indicator, "consult/1"
                 )
                 raise PrologThrow(error_term)
-            # Note: "shadow" mode is not implemented; it's rejected at CLI level
+            elif self.builtin_conflict == "shadow":
+                # Allow the module to define a shadowing predicate
+                # Mark it as shadowed in the module
+                mod.shadowed_builtins.add(key)
 
         # Get module-scoped properties
         properties = self._get_module_predicate_properties(module_name, key)
@@ -880,10 +890,6 @@ class PrologInterpreter:
         self.predicate_properties.setdefault(key, set()).update(properties)
         self._predicate_sources.setdefault(key, set()).add(source_name)
 
-        # Register clause under module if present
-        self.modules.setdefault(module_name, Module(module_name, set()))
-
-        mod = self.modules[module_name]
         mod.predicates.setdefault(key, []).append(clause)
 
         return key

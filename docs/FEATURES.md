@@ -423,7 +423,36 @@ Controls how the interpreter handles library definitions that conflict with buil
 |------|----------|
 | `skip` | **(Default)** Silently skip the library definition and use the existing built-in. Allows libraries like `clpz` to load without errors. |
 | `error` | Raise a `permission_error` when a library tries to redefine a built-in predicate. Useful for strict checking and debugging library compatibility. |
-| `shadow` | *Reserved for future implementation.* When used via the CLI, it raises a "not implemented" error. When used programmatically, it currently defaults to skip behavior. |
+| `shadow` | Allow a module to define a predicate that shadows a built-in within that module's namespace. Module-qualified calls use the module's definition; unqualified calls from user context use the built-in. |
+
+**Examples:**
+
+Skip mode (default):
+```prolog
+% Program tries to define length/2
+:- module(my_lib, [length/2]).
+length([], custom_zero).
+length([_|T], s(N)) :- length(T, N).
+
+?- length([a, b], L).  % Uses built-in: L = 2
+```
+
+Shadow mode:
+```prolog
+% Same program with --builtin-conflict=shadow
+:- module(my_lib, [length/2]).
+length([], custom_zero).
+length([_|T], s(N)) :- length(T, N).
+
+?- my_lib:length([a, b], L).  % Uses module version: L = s(s(custom_zero))
+?- length([a, b], L).         % Uses built-in: L = 2
+?- user:length([a, b], L).    % Uses built-in: L = 2
+```
+
+When importing a shadowed predicate:
+```prolog
+:- use_module(my_lib, [length/2]).
+?- length([a, b], L).  % Uses imported shadow: L = s(s(custom_zero))
 ```
 
 ### `--run-slow-tests` Flag
