@@ -9,6 +9,7 @@ import pytest
 from vibeprolog.parser import PrologParser, Clause, Compound, Atom, Variable, Number, List
 from vibeprolog.interpreter import PrologInterpreter
 from vibeprolog.exceptions import PrologThrow
+from vibeprolog.operator_defaults import DEFAULT_OPERATORS
 
 
 class TestQueryOperatorParsing:
@@ -16,7 +17,7 @@ class TestQueryOperatorParsing:
 
     def test_query_operator_in_operator_table(self):
         """Verify that ?- is defined in the default operator table."""
-        from vibeprolog.operator_defaults import DEFAULT_OPERATORS
+        # DEFAULT_OPERATORS imported at module scope to comply with E402
         
         # Check that ?- is in the operator table
         query_ops = [op for op in DEFAULT_OPERATORS if op[2] == '?-']
