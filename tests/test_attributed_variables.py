@@ -181,16 +181,19 @@ class TestVerifyAttributes:
             verify_attributes(Var, Value, []) :-
                 get_atts(Var, domain(Domain)),
                 member(Value, Domain).
-        """)
-        
-        # Set up a domain constraint
-        prolog.query_once("put_atts(X, +domain([1, 2, 3]))")
+        """
+        )
         
         # Unification with value in domain should succeed
         result = prolog.query_once(
             "put_atts(X, +domain([1, 2, 3])), X = 2"
         )
         assert result is not None
+
+        # Unification with value outside domain should fail
+        assert not prolog.has_solution(
+            "put_atts(X, +domain([1, 2, 3])), X = 4"
+        )
 
     def test_verify_attributes_returns_goals(self):
         """Goals returned by verify_attributes/3 are executed."""
