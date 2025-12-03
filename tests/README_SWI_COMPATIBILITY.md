@@ -10,18 +10,18 @@ This directory contains comprehensive compatibility tests comparing Vibe-Prolog 
 
 ## Test Categories
 
-| Category | Tests | File Location |
-|----------|-------|----------------|
-| Control Flow | 10 | Lines 37-108 |
-| Arithmetic | 15 | Lines 111-230 |
-| List Operations | 13 | Lines 233-346 |
-| Term Manipulation | 10 | Lines 349-510 |
-| Type Testing | 13 | Lines 513-618 |
-| Comparison | 5 | Lines 621-680 |
-| Atom Processing | 7 | Lines 683-766 |
-| Meta-Predicates | 5 | Lines 769-835 |
-| Higher-Order | 3 | Lines 838-899 |
-| Prolog Semantics | 9 | Lines 902-974 |
+| Category | Tests |
+|----------|-------|
+| Control Flow | 10 |
+| Arithmetic | 15 |
+| List Operations | 13 |
+| Term Manipulation | 10 |
+| Type Testing | 13 |
+| Comparison | 5 |
+| Atom Processing | 7 |
+| Meta-Predicates | 5 |
+| Higher-Order | 3 |
+| Prolog Semantics | 9 |
 
 ## Running Tests
 
