@@ -4,6 +4,8 @@ import time
 import pytest
 from vibeprolog import PrologInterpreter
 
+pytestmark = pytest.mark.performance
+
 
 class TestIndexingPerformance:
     """Benchmark tests for first-argument indexing."""

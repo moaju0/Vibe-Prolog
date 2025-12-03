@@ -5,6 +5,7 @@ from __future__ import annotations
 DEFAULT_OPERATORS: list[tuple[int, str, str]] = [
     (1200, "xfx", ":-"),
     (1200, "fx", ":-"),
+    (1200, "fx", "?-"),
     (1200, "xfx", "-->"),
     (1100, "xfy", ";"),
     (1050, "xfy", "->"),

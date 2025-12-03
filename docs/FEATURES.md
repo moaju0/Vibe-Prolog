@@ -28,7 +28,7 @@ Status legend:
 | `:- op/3` declaration            | ✅      | Full support - defines operators dynamically |
 | Directive prefix operator `:-` (1200, fx) | ❌ | **ISO-required** - Prefix form for directives |
 | Custom operator syntax in source | ✅      | Parser dynamically generates grammar for custom operators (infix/prefix/postfix) |
-| Query prefix operator `?-` (1200, fx) | ❌ | **ISO-required** - Query prefix           |
+| Query prefix operator `?-` (1200, fx) | ✅ | **ISO-required** - Parsed via operator table |
 | DCG rule operator `-->` (1200, xfx) | ✅    | **ISO-required** - DCG syntax |
 | `:- char_conversion/2`           | ❌      | **ISO-mandatory**                         |
 

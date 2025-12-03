@@ -108,9 +108,8 @@ Handle Prolog errors like this:
 # Run all tests
 uv run pytest 
 
-# Run tests without the long-running performance tests
-# usually this is sufficient to check nothing new broke
-uv run pytest --ignore=tests/performance
+# Run all tests including performance (skipped by default). This is slow so run only when required.
+uv run pytest --run-performance
 
 # Run specific test file
 uv run pytest tests/test_builtins.py

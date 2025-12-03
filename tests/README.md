@@ -9,6 +9,11 @@ Run everything:
 uv run pytest
 ```
 
+Performance tests are skipped by default; enable them explicitly:
+```bash
+uv run pytest --run-performance
+```
+
 Verbose or focused runs:
 ```bash
 uv run pytest -v                           # verbose
