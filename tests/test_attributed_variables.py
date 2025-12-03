@@ -309,7 +309,7 @@ class TestEdgeCases:
         # In our implementation, attributes are keyed by variable name
         # so this might not work exactly as in some Prolog systems
         # For now, we just test that no error is raised
-        assert result is None or result.get("C") == "red"
+        assert result is not None and result.get("C") == "red"
 
     def test_nested_attvar_in_compound(self):
         """Attributed variables can appear in compound terms."""
