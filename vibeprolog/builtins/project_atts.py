@@ -13,6 +13,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Iterator
 
 from vibeprolog.builtins import BuiltinRegistry, register_builtin
+from vibeprolog.exceptions import PrologThrow
 from vibeprolog.builtins.atts import AttsBuiltins
 from vibeprolog.builtins.common import BuiltinArgs, EngineContext
 from vibeprolog.parser import List
@@ -23,6 +24,11 @@ if TYPE_CHECKING:
     pass
 
 
+class AmbiguousAttributeDefinitionError(Exception):
+    """Raised when multiple modules define the same attribute functor."""
+    pass
+
+
 class ProjectAttsBuiltins:
     """Built-ins for residual goal projection."""
 
@@ -30,10 +36,16 @@ class ProjectAttsBuiltins:
     def register(registry: BuiltinRegistry, engine: EngineContext | None) -> None:
         """Register project_atts predicate handlers."""
         register_builtin(
-            registry, "term_residual_goals", 2, ProjectAttsBuiltins._builtin_term_residual_goals
+            registry,
+            "term_residual_goals",
+            2,
+            ProjectAttsBuiltins._builtin_term_residual_goals,
         )
         register_builtin(
-            registry, "project_attributes", 2, ProjectAttsBuiltins._builtin_project_attributes
+            registry,
+            "project_attributes",
+            2,
+            ProjectAttsBuiltins._builtin_project_attributes,
         )
 
     @staticmethod
@@ -128,9 +140,12 @@ class ProjectAttsBuiltins:
         tried_modules = set()
 
         for functor, attr in var_attrs.items():
-            module_name = ProjectAttsBuiltins._infer_module_from_attribute(
-                functor, engine
-            )
+            try:
+                module_name = ProjectAttsBuiltins._infer_module_from_attribute(
+                    functor, engine
+                )
+            except AmbiguousAttributeDefinitionError:
+                module_name = None
 
             if module_name and module_name not in tried_modules:
                 tried_modules.add(module_name)
@@ -151,26 +166,28 @@ class ProjectAttsBuiltins:
     def _infer_module_from_attribute(functor: str, engine: EngineContext) -> str | None:
         """Infer which module defined an attribute based on its functor.
 
-        This checks if any loaded module has declared attributes with this functor.
-
-        Args:
-            functor: The attribute functor name
-            engine: Engine context
-
-        Returns:
-            Module name if found, None otherwise
+        Return the unique module that exports the given attribute functor.
+        If zero modules export it, return None.
+        If more than one module exports it, raise AmbiguousAttributeDefinitionError.
         """
         interpreter = getattr(engine, "_interpreter", None)
         if interpreter is None:
             return None
 
-        for module_name in interpreter.modules:
-            module_attrs = getattr(engine, "_module_attributes", {})
-            if module_name in module_attrs:
-                if functor in module_attrs[module_name]:
-                    return module_name
+        module_attrs = getattr(engine, "_module_attributes", {})
+        candidates: list[str] = []
 
-        return None
+        for module_name in interpreter.modules:
+            if module_name in module_attrs and functor in module_attrs[module_name]:
+                candidates.append(module_name)
+
+        if len(candidates) == 0:
+            return None
+        if len(candidates) > 1:
+            raise AmbiguousAttributeDefinitionError(
+                f"Ambiguous attribute functor '{functor}' defined by modules: {sorted(candidates)}"
+            )
+        return candidates[0]
 
     @staticmethod
     def _try_attribute_goals_hook(
@@ -227,7 +244,7 @@ class ProjectAttsBuiltins:
                 goals_list, remainder, result_subst
             )
 
-        except Exception:
+        except PrologThrow:
             return None
 
     @staticmethod
@@ -253,31 +270,28 @@ class ProjectAttsBuiltins:
         end = deref(remainder, subst)
 
         while True:
+            current = deref(current, subst)
             if isinstance(current, Variable) or current == end:
                 break
 
+            # If it's a proper List, flatten elements and move to tail
             if isinstance(current, List):
                 if current.elements:
-                    goals.append(current.elements[0])
-                    if len(current.elements) > 1:
-                        from vibeprolog.utils.list_utils import python_to_list
-
-                        current = python_to_list(list(current.elements[1:]), current.tail)
-                    elif current.tail is not None:
-                        current = deref(current.tail, subst)
-                    else:
-                        break
-                elif current.tail is not None:
-                    current = deref(current.tail, subst)
-                else:
-                    break
-            elif isinstance(current, Compound) and current.functor == "." and len(current.args) == 2:
+                    for el in current.elements:
+                        goals.append(deref(el, subst))
+                # Move to tail; if tail is None, we stop
+                current = deref(current.tail, subst) if current.tail is not None else end
+                continue
+            # If it's a cons cell represented with "."/2, extract head and move to tail
+            if isinstance(current, Compound) and current.functor == "." and len(current.args) == 2:
                 goals.append(deref(current.args[0], subst))
                 current = deref(current.args[1], subst)
-            elif isinstance(current, Atom) and current.name == "[]":
+                continue
+            # If it's an empty list atom, stop
+            if isinstance(current, Atom) and current.name == "[]":
                 break
-            else:
-                break
+            # Unknown structure; stop parsing
+            break
 
         return goals
 
@@ -383,7 +397,7 @@ class ProjectAttsBuiltins:
                 for sol in engine._solve_goals([goal], subst, 0):
                     subst = sol
                     break
-            except Exception:
+            except PrologThrow:
                 pass
 
         return subst
