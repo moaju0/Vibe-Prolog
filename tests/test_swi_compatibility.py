@@ -828,8 +828,10 @@ class TestSWIMetaPredicates:
         results = list(prolog.query("bagof(Y, parent(X, Y), L)"))
         assert len(results) == 2
         # bagof's solution order is not guaranteed, so check for both expected results.
-        assert {'X': 'a', 'L': ['b', 'c']} in results
-        assert {'X': 'd', 'L': ['e']} in results
+        # Extract only X and L from the results (Y is a free variable that may be included)
+        simplified_results = [{'X': r['X'], 'L': r['L']} for r in results]
+        assert {'X': 'a', 'L': ['b', 'c']} in simplified_results
+        assert {'X': 'd', 'L': ['e']} in simplified_results
 
     def test_setof_sorts_results(self):
         """
