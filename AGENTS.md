@@ -33,6 +33,15 @@ See @docs/FEATURES.md
 
 You must keep ./docs/FEATURES.md up to date when you add or change these
 
+## Documentation
+
+**All new markdown documentation should go in @docs/** 
+
+Standard documentation files:
+- `@docs/ARCHITECTURE.md` - System architecture and design
+- `@docs/FEATURES.md` - ISO Prolog conformance matrix and feature checklist
+- `@docs/` - Any additional documentation, guides, or specs
+
 ## Error Handling 
 
 Handle Prolog errors like this:
