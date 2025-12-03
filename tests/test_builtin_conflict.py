@@ -145,31 +145,31 @@ class TestBuiltinConflictShadowMode:
         """Test import behavior with shadowed predicates."""
         prolog = PrologInterpreter(builtin_conflict="shadow")
         prolog.consult_string("""
-            :- module(test_mod, [length/2]).
-            length([], 0).
-            length([_|T], N) :- length(T, N1), N is N1 + 1.
+            :- module(test_mod, [my_len/2]).
+            my_len([], zero).
+            my_len([_|T], s(N)) :- my_len(T, N).
         """)
-        # Import the shadowed predicate
-        prolog.consult_string(":- use_module(test_mod, [length/2]).")
-        # Unqualified call should now use the imported shadow
-        result = prolog.query_once("length([a, b], L)")
+        # Import the custom predicate
+        prolog.consult_string(":- use_module(test_mod, [my_len/2]).")
+        # Unqualified call should use the imported custom predicate
+        result = prolog.query_once("my_len([a, b], L)")
         assert result is not None
-        assert result["L"] == 2
+        assert result["L"] == {'s': [{'s': ['zero']}]}
 
     def test_shadow_mode_full_module_import(self):
         """Full module import should bring in shadowed predicates."""
         prolog = PrologInterpreter(builtin_conflict="shadow")
         prolog.consult_string("""
-            :- module(test_mod, [length/2]).
-            length([], 0).
-            length([_|T], N) :- length(T, N1), N is N1 + 1.
+            :- module(test_mod, [my_len/2]).
+            my_len([], zero).
+            my_len([_|T], s(N)) :- my_len(T, N).
         """)
         # Full import
         prolog.consult_string(":- use_module(test_mod).")
-        # Unqualified call should use the shadow
-        result = prolog.query_once("length([a, b], L)")
+        # Unqualified call should use the imported predicate
+        result = prolog.query_once("my_len([a, b], L)")
         assert result is not None
-        assert result["L"] == 2
+        assert result["L"] == {'s': [{'s': ['zero']}]}
 
     def test_shadow_mode_user_qualification_uses_builtin(self, shadow_prolog):
         """user: qualification should use the built-in even when shadowed."""
