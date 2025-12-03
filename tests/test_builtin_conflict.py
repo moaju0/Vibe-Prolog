@@ -108,8 +108,9 @@ def shadow_prolog():
     prolog = PrologInterpreter(builtin_conflict="shadow")
     prolog.consult_string("""
         :- module(test_mod, [length/2, test_length/2]).
-        length([], 0).
-        length([_|T], N) :- length(T, N1), N is N1 + 1.
+        % This version returns a Peano-style number to distinguish from the built-in
+        length([], zero).
+        length([_|T], s(N)) :- length(T, N).
         test_length(List, N) :- length(List, N).
     """)
     return prolog
@@ -127,7 +128,7 @@ class TestBuiltinConflictShadowMode:
         """Module-qualified calls should use the module's shadowing definition."""
         result = shadow_prolog.query_once("test_mod:length([a, b, c], L)")
         assert result is not None
-        assert result["L"] == 3
+        assert result["L"] == {'s': [{'s': [{'s': ['zero']}]}]}
 
     def test_shadow_mode_unqualified_uses_builtin(self, shadow_prolog):
         """Unqualified calls from user context should use the built-in."""
@@ -139,7 +140,7 @@ class TestBuiltinConflictShadowMode:
         """Within module clause bodies, unqualified calls should use the shadowing definition."""
         result = shadow_prolog.query_once("test_mod:test_length([a, b, c], L)")
         assert result is not None
-        assert result["L"] == 3
+        assert result["L"] == {'s': [{'s': [{'s': ['zero']}]}]}
 
     def test_shadow_mode_import_behavior(self):
         """Test import behavior with shadowed predicates."""
