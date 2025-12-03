@@ -1027,9 +1027,13 @@ class PrologEngine:
                     elif isinstance(goals_term, Atom) and goals_term.name == "[]":
                         goals = []
                     else:
-                        goals = [goals_term]
-                except (ValueError, TypeError):
-                    goals = []
+                        # Not a list or the empty list atom, raise a type error
+                        error_term = PrologError.type_error("list", goals_term, "verify_attributes/3")
+                        raise PrologThrow(error_term)
+                except TypeError:
+                    # list_to_python can raise TypeError on improper lists
+                    error_term = PrologError.type_error("list", goals_term, "verify_attributes/3")
+                    raise PrologThrow(error_term)
                 
                 if not goals:
                     yield from self._verify_pending_attributes(rest, body_subst, current_module, depth)
