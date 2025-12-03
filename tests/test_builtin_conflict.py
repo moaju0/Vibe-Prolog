@@ -128,7 +128,7 @@ class TestBuiltinConflictShadowMode:
         """Module-qualified calls should use the module's shadowing definition."""
         result = shadow_prolog.query_once("test_mod:length([a, b, c], L)")
         assert result is not None
-        assert result["L"] == 3
+        assert result["L"] == {'s': [{'s': [{'s': ['zero']}]}]}
 
     def test_shadow_mode_unqualified_uses_builtin(self, shadow_prolog):
         """Unqualified calls from user context should use the built-in."""
