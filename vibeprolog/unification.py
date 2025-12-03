@@ -260,10 +260,19 @@ class AttributedUnificationContext:
             # deref2 is an attvar being unified with value deref1
             pending.append((deref2, deref1))
         elif attvar1 and attvar2:
-            # Both are attributed variables - merge attributes
+            # Both are attributed variables - need to verify both
+            # The first variable's attributes need to be verified against the second variable
+            # and vice versa. We add both to pending for verify_attributes/3 hooks.
             v1, v2 = deref1, deref2
             attrs1 = store.get(v1.name, {})
             attrs2 = store.get(v2.name, {})
+            
+            # Both attvars need verification - v1's attrs against v2, v2's attrs against v1
+            # After unification, one variable points to the other, so we verify both
+            pending.append((v1, v2))
+            pending.append((v2, v1))
+            
+            # Merge attributes onto the surviving variable (v1)
             for k, val in attrs2.items():
                 if k not in attrs1:
                     attrs1[k] = val

@@ -310,7 +310,7 @@ class AttsBuiltins:
 
         _collect_vars_from_term(term)
 
-        # Collect vars inside attribute values
+        # Collect vars inside attribute values of variables in the term
         def _collect_vars_from_attr(val):
             v = deref(val, subst)
             if isinstance(v, Variable):
@@ -324,9 +324,12 @@ class AttsBuiltins:
                 if v.tail is not None:
                     _collect_vars_from_attr(v.tail)
 
-        for attrs in store.values():
-            for attr_val in attrs.values():
-                _collect_vars_from_attr(attr_val)
+        # Only collect variables from attributes of variables that are in the term
+        term_var_names = {v.name for v in var_set}
+        for var_name in term_var_names:
+            if var_name in store:
+                for attr_val in store[var_name].values():
+                    _collect_vars_from_attr(attr_val)
 
         # Create fresh copies for all collected variables
         var_mapping = {v: engine._fresh_variable("Copy") for v in var_set}
