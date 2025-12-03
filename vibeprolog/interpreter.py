@@ -24,6 +24,7 @@ from vibeprolog.operators import OperatorTable
 from vibeprolog.terms import Atom, Compound, Number, Variable
 from vibeprolog.unification import Substitution, apply_substitution
 from vibeprolog.dcg import expand_dcg_clause
+from .utils import reconstruct_operator_name_from_term
 
 # Constants
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -205,10 +206,11 @@ class PrologInterpreter:
                     # Each elt should be Name/Arity (Compound "/") or op/3
                     elif isinstance(elt, Compound) and elt.functor == "/" and len(elt.args) == 2:
                         name_arg, arity_arg = elt.args
-                        if not isinstance(name_arg, Atom) or not isinstance(arity_arg, Number):
+                        normalized_name = self._normalize_operator_in_indicator(name_arg)
+                        if not isinstance(normalized_name, Atom) or not isinstance(arity_arg, Number):
                             error_term = PrologError.type_error("predicate_indicator", elt, "module/2")
                             raise PrologThrow(error_term)
-                        exports.add((name_arg.name, int(arity_arg.value)))
+                        exports.add((normalized_name.name, int(arity_arg.value)))
                     else:
                         error_term = PrologError.type_error("predicate_indicator", elt, "module/2")
                         raise PrologThrow(error_term)
@@ -337,10 +339,11 @@ class PrologInterpreter:
                 # Each elt should be Name/Arity (Compound "/")
                 if isinstance(elt, Compound) and elt.functor == "/" and len(elt.args) == 2:
                     name_arg, arity_arg = elt.args
-                    if not isinstance(name_arg, Atom) or not isinstance(arity_arg, Number):
+                    normalized_name = self._normalize_operator_in_indicator(name_arg)
+                    if not isinstance(normalized_name, Atom) or not isinstance(arity_arg, Number):
                         error_term = PrologError.type_error("predicate_indicator", elt, context)
                         raise PrologThrow(error_term)
-                    imports.add((name_arg.name, int(arity_arg.value)))
+                    imports.add((normalized_name.name, int(arity_arg.value)))
                 else:
                     error_term = PrologError.type_error("predicate_indicator", elt, context)
                     raise PrologThrow(error_term)
@@ -677,7 +680,8 @@ class PrologInterpreter:
             error_term = PrologError.instantiation_error(context)
             raise PrologThrow(error_term)
 
-        if not isinstance(name_term, Atom):
+        normalized_name = self._normalize_operator_in_indicator(name_term)
+        if not isinstance(normalized_name, Atom):
             error_term = PrologError.type_error("atom", name_term, context)
             raise PrologThrow(error_term)
 
@@ -693,7 +697,20 @@ class PrologInterpreter:
             error_term = PrologError.domain_error("not_less_than_zero", arity_term, context)
             raise PrologThrow(error_term)
 
-        return name_term.name, int(arity_term.value)
+        return normalized_name.name, int(arity_term.value)
+
+    def _reconstruct_operator_name(self, term):
+        """Reconstruct an operator name from its AST representation as a compound term."""
+        return reconstruct_operator_name_from_term(term)
+
+    def _normalize_operator_in_indicator(self, term):
+        """Normalize operator applications in predicate indicators to atoms."""
+        if isinstance(term, Atom):
+            return term
+        reconstructed = self._reconstruct_operator_name(term)
+        if reconstructed is not None:
+            return Atom(reconstructed)
+        return term
 
     def _indicator_from_key(self, key: tuple[str, int]) -> Compound:
         name, arity = key
