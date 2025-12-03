@@ -455,5 +455,3 @@ When importing a shadowed predicate:
 :- use_module(my_lib, [length/2]).
 ?- length([a, b], L).  % Uses imported shadow: L = s(s(custom_zero))
 ```
-
-```

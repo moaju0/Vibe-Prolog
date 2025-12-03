@@ -102,53 +102,42 @@ class TestBuiltinConflictErrorMode:
         assert prolog.has_solution("another_predicate(1, 2)")
 
 
+@pytest.fixture
+def shadow_prolog():
+    """Provides a PrologInterpreter with shadow mode and a pre-loaded test module."""
+    prolog = PrologInterpreter(builtin_conflict="shadow")
+    prolog.consult_string("""
+        :- module(test_mod, [length/2, test_length/2]).
+        length([], 0).
+        length([_|T], N) :- length(T, N1), N is N1 + 1.
+        test_length(List, N) :- length(List, N).
+    """)
+    return prolog
+
+
 class TestBuiltinConflictShadowMode:
     """Tests for shadow mode."""
 
-    def test_shadow_mode_allows_module_to_define_builtin(self):
+    def test_shadow_mode_allows_module_to_define_builtin(self, shadow_prolog):
         """Shadow mode should allow modules to define predicates that shadow built-ins."""
-        prolog = PrologInterpreter(builtin_conflict="shadow")
-        prolog.consult_string("""
-            :- module(test_mod, [length/2]).
-            length([], 0).
-            length([_|T], N) :- length(T, N1), N is N1 + 1.
-        """)
-        # Should not raise an error
+        # Should not raise an error during consultation
+        assert shadow_prolog is not None
 
-    def test_shadow_mode_module_qualified_uses_module_version(self):
+    def test_shadow_mode_module_qualified_uses_module_version(self, shadow_prolog):
         """Module-qualified calls should use the module's shadowing definition."""
-        prolog = PrologInterpreter(builtin_conflict="shadow")
-        prolog.consult_string("""
-            :- module(test_mod, [length/2]).
-            length([], 0).
-            length([_|T], N) :- length(T, N1), N is N1 + 1.
-        """)
-        result = prolog.query_once("test_mod:length([a, b, c], L)")
+        result = shadow_prolog.query_once("test_mod:length([a, b, c], L)")
         assert result is not None
         assert result["L"] == 3
 
-    def test_shadow_mode_unqualified_uses_builtin(self):
+    def test_shadow_mode_unqualified_uses_builtin(self, shadow_prolog):
         """Unqualified calls from user context should use the built-in."""
-        prolog = PrologInterpreter(builtin_conflict="shadow")
-        prolog.consult_string("""
-            :- module(test_mod, [length/2]).
-            length([], 0).
-            length([_|T], N) :- length(T, N1), N is N1 + 1.
-        """)
-        result = prolog.query_once("length([a, b, c], L)")
+        result = shadow_prolog.query_once("length([a, b, c], L)")
         assert result is not None
         assert result["L"] == 3  # Built-in returns integer
 
-    def test_shadow_mode_within_module_body_uses_shadow(self):
+    def test_shadow_mode_within_module_body_uses_shadow(self, shadow_prolog):
         """Within module clause bodies, unqualified calls should use the shadowing definition."""
-        prolog = PrologInterpreter(builtin_conflict="shadow")
-        prolog.consult_string("""
-            :- module(test_mod, [test_length/2]).
-            length([], 0).
-            length([_|T], N) :- length(T, N1), N is N1 + 1.
-            test_length(List, N) :- length(List, N).
-        """)
-        result = prolog.query_once("test_mod:test_length([a, b, c], L)")
+        result = shadow_prolog.query_once("test_mod:test_length([a, b, c], L)")
         assert result is not None
         assert result["L"] == 3
 
@@ -182,16 +171,10 @@ class TestBuiltinConflictShadowMode:
         assert result is not None
         assert result["L"] == 2
 
-    def test_shadow_mode_user_qualification_uses_builtin(self):
+    def test_shadow_mode_user_qualification_uses_builtin(self, shadow_prolog):
         """user: qualification should use the built-in even when shadowed."""
-        prolog = PrologInterpreter(builtin_conflict="shadow")
-        prolog.consult_string("""
-            :- module(test_mod, [length/2]).
-            length([], 0).
-            length([_|T], N) :- length(T, N1), N is N1 + 1.
-        """)
         # user: should use built-in
-        result = prolog.query_once("user:length([a, b], L)")
+        result = shadow_prolog.query_once("user:length([a, b], L)")
         assert result is not None
         assert result["L"] == 2
 
