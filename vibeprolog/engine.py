@@ -386,6 +386,7 @@ class PrologEngine:
             io,
             list_ops,
             operators,
+            project_atts,
             reflection,
             term_manipulation,
             type_tests,
@@ -406,6 +407,7 @@ class PrologEngine:
             higher_order.HigherOrderBuiltins,
             operators.OperatorBuiltins,
             atts.AttsBuiltins,
+            project_atts.ProjectAttsBuiltins,
         ]:
             module.register(registry, self)
 

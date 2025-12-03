@@ -346,6 +346,10 @@ Attributed variables are the foundation for constraint logic programming. They a
 | `del_atts/1` | ✅ | Delete all attributes from a variable |
 | `verify_attributes/3` hook | ✅ | Called on attributed variable unification |
 | `library(atts)` | ✅ | Module providing attributed variable predicates |
+| `term_residual_goals/2` | ✅ | Collect residual goals from attributed variables |
+| `project_attributes/2` | ✅ | Project constraints onto query variables |
+| `attribute_goals//1` hook | ✅ | Module hook for custom goal representation |
+| `library($project_atts)` | ✅ | Internal module for residual goal projection |
 
 **Usage example:**
 ```prolog
