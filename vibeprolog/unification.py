@@ -1,7 +1,14 @@
 """Unification algorithm for Prolog terms."""
 
-from typing import Any
-from vibeprolog.parser import Variable, Atom, Number, Compound, List
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
+
+from vibeprolog.parser import List
+from vibeprolog.terms import Variable, Atom, Number, Compound
+
+if TYPE_CHECKING:
+    from vibeprolog.engine import PrologEngine
 
 
 class Substitution:
@@ -205,3 +212,84 @@ def vars(term: Any) -> set[Variable]:
                 yield from _walk(term.tail)
 
     return set(_walk(term))
+
+
+class AttributedUnificationContext:
+    """Context for unification with attributed variable support.
+
+    This class wraps the basic unification algorithm and adds support for
+    verify_attributes/3 hooks when attributed variables are unified.
+    """
+
+    def __init__(self, engine: "PrologEngine"):
+        self.engine = engine
+        self._pending_verifications: list[tuple[Variable, Any]] = []
+
+    def unify_with_attributes(
+        self, term1: Any, term2: Any, subst: Substitution
+    ) -> tuple[Substitution | None, list[tuple[Variable, Any]]]:
+        """Unify two terms and track attributed variable unifications.
+
+        Returns:
+            Tuple of (new_substitution, pending_verifications) where
+            pending_verifications is a list of (attvar, value) pairs that
+            need verify_attributes/3 calls.
+        """
+        store = getattr(self.engine, "_attribute_store", {})
+        
+        # Dereference terms before unification to find attributed variables
+        deref1 = deref(term1, subst)
+        deref2 = deref(term2, subst)
+        
+        # Check which terms are attributed variables BEFORE unification
+        attvar1 = isinstance(deref1, Variable) and deref1.name in store and store[deref1.name]
+        attvar2 = isinstance(deref2, Variable) and deref2.name in store and store[deref2.name]
+        
+        # Perform base unification
+        new_subst = unify(term1, term2, subst)
+        if new_subst is None:
+            return None, []
+
+        pending = []
+        
+        # Handle unification involving variables
+        if isinstance(deref1, Variable) and isinstance(deref2, Variable):
+            # Unification of two variables.
+            if attvar1 or attvar2:
+                # At least one is an attributed variable. The `unify` function binds
+                # the first variable argument to the second, so `deref1` is bound to `deref2`.
+                # We must merge attributes from `deref1` into `deref2`.
+                attrs1 = store.get(deref1.name, {})
+                attrs2 = store.get(deref2.name, {})
+
+                for k, val in attrs1.items():
+                    if k not in attrs2:
+                        attrs2[k] = val
+                
+                if attrs2:
+                    store[deref2.name] = attrs2
+                elif deref2.name in store:
+                    del store[deref2.name]
+
+                if deref1.name in store:
+                    del store[deref1.name]
+
+                # If both were attributed variables, verification hooks must be triggered for both.
+                if attvar1 and attvar2:
+                    pending.append((deref1, deref2))
+                    pending.append((deref2, deref1))
+        elif attvar1:
+            # Attributed variable `deref1` unified with a non-variable `deref2`.
+            pending.append((deref1, deref2))
+        elif attvar2:
+            # Attributed variable `deref2` unified with a non-variable `deref1`.
+            pending.append((deref2, deref1))
+        
+        return new_subst, pending
+
+
+def get_attributed_unification_context(engine: "PrologEngine") -> AttributedUnificationContext:
+    """Get or create the attributed unification context for an engine."""
+    if not hasattr(engine, '_attunify_context'):
+        engine._attunify_context = AttributedUnificationContext(engine)
+    return engine._attunify_context

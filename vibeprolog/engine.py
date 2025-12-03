@@ -26,7 +26,13 @@ from vibeprolog.parser import Clause, Cut, List
 from vibeprolog.operators import OperatorTable
 from vibeprolog.streams import Stream
 from vibeprolog.terms import Atom, Compound, Number, Variable
-from vibeprolog.unification import Substitution, apply_substitution, deref, unify
+from vibeprolog.unification import (
+    Substitution,
+    apply_substitution,
+    deref,
+    unify,
+    get_attributed_unification_context,
+)
 from vibeprolog.utils.list_utils import list_to_python, python_to_list
 
 # Import stream constants
@@ -371,6 +377,7 @@ class PrologEngine:
             all_solutions,
             arithmetic,
             atom_processing,
+            atts,
             control,
             database,
             dcg,
@@ -398,6 +405,7 @@ class PrologEngine:
             reflection.ReflectionBuiltins,
             higher_order.HigherOrderBuiltins,
             operators.OperatorBuiltins,
+            atts.AttsBuiltins,
         ]:
             module.register(registry, self)
 
@@ -931,6 +939,121 @@ class PrologEngine:
     def remove_stream(self, handle: Atom) -> Stream | None:
         """Remove and return a stream from the registry."""
         return self._streams.pop(handle.name, None)
+
+    def _unify_with_attvar_support(
+        self, term1: Any, term2: Any, subst: Substitution, current_module: str = "user", depth: int = 0
+    ) -> Iterator[Substitution]:
+        """Unify terms with attributed variable support.
+        
+        When an attributed variable is unified with a value, this method:
+        1. Performs the unification
+        2. Checks for verify_attributes/3 hooks
+        3. Executes the goals returned by the hooks
+        
+        Yields:
+            Substitutions for each successful unification with verified attributes.
+        """
+        ctx = get_attributed_unification_context(self)
+        new_subst, pending_verifications = ctx.unify_with_attributes(term1, term2, subst)
+        
+        if new_subst is None:
+            return
+        
+        if not pending_verifications:
+            yield new_subst
+            return
+        
+        yield from self._verify_pending_attributes(
+            pending_verifications, new_subst, current_module, depth
+        )
+
+    def _verify_pending_attributes(
+        self,
+        pending_verifications: list[tuple[Variable, Any]],
+        subst: Substitution,
+        current_module: str,
+        depth: int,
+    ) -> Iterator[Substitution]:
+        """Execute verify_attributes/3 hooks for pending attributed variable unifications.
+        
+        Args:
+            pending_verifications: List of (attvar, value) pairs needing verification
+            subst: Current substitution
+            current_module: Current module context
+            depth: Current recursion depth
+            
+        Yields:
+            Substitutions after successful attribute verification
+        """
+        if not pending_verifications:
+            yield subst
+            return
+        
+        var, value = pending_verifications[0]
+        rest = pending_verifications[1:]
+        
+        if not hasattr(self, '_attribute_store'):
+            yield from self._verify_pending_attributes(rest, subst, current_module, depth)
+            return
+        
+        var_attrs = self._attribute_store.get(var.name, {})
+        if not var_attrs:
+            yield from self._verify_pending_attributes(rest, subst, current_module, depth)
+            return
+        
+        verify_key = ("verify_attributes", 3)
+        if verify_key not in self._builtin_registry and verify_key not in self._predicate_index:
+            yield from self._verify_pending_attributes(rest, subst, current_module, depth)
+            return
+        
+        goals_var = self._fresh_variable("Goals")
+        
+        attvar_proxy = self._fresh_variable("AttVar")
+        old_attvar_name = attvar_proxy.name
+        self._attribute_store[old_attvar_name] = var_attrs.copy()
+        
+        verify_goal = Compound("verify_attributes", (attvar_proxy, value, goals_var))
+        
+        for clause in self._get_indexed_clauses("verify_attributes", 3, verify_goal):
+            renamed_clause = self._rename_variables(clause)
+            head = renamed_clause.head
+            
+            clause_subst = unify(verify_goal, head, subst)
+            if clause_subst is None:
+                continue
+            
+            new_var = deref(attvar_proxy, clause_subst)
+            if isinstance(new_var, Variable) and new_var.name != old_attvar_name:
+                self._attribute_store[new_var.name] = var_attrs.copy()
+            if clause_subst is None:
+                continue
+            
+            body_goals = [] if renamed_clause.is_fact() else self._flatten_body(renamed_clause.body)
+            
+            for body_subst in self._solve_goals(body_goals, clause_subst, current_module, depth + 1):
+                goals_term = deref(goals_var, body_subst)
+                
+                from vibeprolog.utils.list_utils import list_to_python
+                try:
+                    if isinstance(goals_term, List):
+                        goals = list_to_python(goals_term, body_subst)
+                    elif isinstance(goals_term, Atom) and goals_term.name == "[]":
+                        goals = []
+                    else:
+                        # Not a list or the empty list atom, raise a type error
+                        error_term = PrologError.type_error("list", goals_term, "verify_attributes/3")
+                        raise PrologThrow(error_term)
+                except TypeError:
+                    # list_to_python can raise TypeError on improper lists
+                    error_term = PrologError.type_error("list", goals_term, "verify_attributes/3")
+                    raise PrologThrow(error_term)
+                
+                if not goals:
+                    yield from self._verify_pending_attributes(rest, body_subst, current_module, depth)
+                    continue
+                
+                for goal_subst in self._solve_goals(goals, body_subst, current_module, depth + 1):
+                    yield from self._verify_pending_attributes(rest, goal_subst, current_module, depth)
 
 
 __all__ = [

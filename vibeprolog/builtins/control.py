@@ -46,14 +46,28 @@ class ControlBuiltins:
 
     @staticmethod
     def _builtin_unify(
-        args: BuiltinArgs, subst: Substitution, _engine: EngineContext | None
-    ) -> Substitution | None:
-        return unify(args[0], args[1], subst)
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext | None
+    ) -> Iterator[Substitution]:
+        """Unification with attributed variable support.
+        
+        When unifying attributed variables, verify_attributes/3 hooks
+        are called to allow constraint propagation.
+        """
+        if engine is not None:
+            yield from engine._unify_with_attvar_support(args[0], args[1], subst)
+        else:
+            result = unify(args[0], args[1], subst)
+            if result is not None:
+                yield result
 
     @staticmethod
     def _builtin_not_unifiable(
-        args: BuiltinArgs, subst: Substitution, _engine: EngineContext | None
+        args: BuiltinArgs, subst: Substitution, engine: EngineContext | None
     ) -> Substitution | None:
+        if engine is not None:
+            for _ in engine._unify_with_attvar_support(args[0], args[1], subst):
+                return None
+            return subst
         return subst if unify(args[0], args[1], subst) is None else None
 
     @staticmethod

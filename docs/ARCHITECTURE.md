@@ -269,6 +269,82 @@ The `vibeprolog/dcg.py` module handles the expansion of DCG syntax into regular 
 
 DCG rules are expanded at parse time, not runtime, ensuring efficient execution.
 
+## Attributed Variables
+
+Attributed variables provide the foundation for constraint logic programming (CLP) in Vibe-Prolog. They allow metadata (attributes) to be attached to unbound variables, with hooks called when those variables are unified.
+
+### Implementation Architecture
+
+The attributed variable system is implemented across several modules:
+
+1. **Attribute Storage** (`vibeprolog/engine.py`): Attributes are stored in a dictionary (`_attribute_store`) that maps variable names to dictionaries of attributes. Each attribute is keyed by its functor.
+
+2. **Built-in Predicates** (`vibeprolog/builtins/atts.py`): Implements the core predicates:
+   - `put_atts/2`: Add or remove attributes from variables
+   - `get_atts/2`: Query attributes on variables
+   - `attvar/1`: Test if a variable has attributes
+   - `term_attvars/2`: Collect all attributed variables in a term
+   - `copy_term/3`: Copy term with attributes as goals
+   - `del_atts/1`: Delete all attributes from a variable
+
+3. **Unification Integration** (`vibeprolog/unification.py`): The `AttributedUnificationContext` class extends unification to track when attributed variables are unified, enabling the `verify_attributes/3` hook mechanism.
+
+4. **Hook Execution** (`vibeprolog/engine.py`): The `_unify_with_attvar_support` method handles the complete workflow:
+   - Perform standard unification while tracking attributed variable unifications
+   - Call `verify_attributes/3` for each attributed variable being unified
+   - Execute any goals returned by the hook
+   - Fail unification if the hook fails or returned goals fail
+
+### Attribute Storage Model
+
+```python
+# Engine's attribute store structure
+_attribute_store = {
+    'X': {'domain': Compound('domain', ([1, 2, 3],)), 'label': Atom('foo')},
+    'Y': {'type': Compound('type', (Atom('integer'),))}
+}
+```
+
+Attributes persist across the lifetime of a query. When a variable is unified with a value, the attributes remain in the store but the `verify_attributes/3` hook is triggered to validate the unification.
+
+### The verify_attributes/3 Hook
+
+When an attributed variable is unified with a term:
+
+1. The engine creates a fresh proxy variable with the same attributes
+2. Calls `verify_attributes(ProxyVar, Value, Goals)` where:
+   - `ProxyVar`: A variable with the original attributes accessible via `get_atts/2`
+   - `Value`: The term being unified with the attributed variable
+   - `Goals`: Output - list of goals to execute after unification
+3. If `verify_attributes/3` fails, the unification fails
+4. If it succeeds, the returned goals are executed; if any fail, unification fails
+
+### Usage Example
+
+```prolog
+:- use_module(library(atts)).
+
+% Domain constraint: variable can only be unified with values in domain
+verify_attributes(Var, Value, []) :-
+    get_atts(Var, domain(Domain)),
+    member(Value, Domain).
+
+% Using the constraint
+?- put_atts(X, +domain([a, b, c])), X = b.
+X = b.
+
+?- put_atts(X, +domain([a, b, c])), X = d.
+false.
+```
+
+### Integration with CLP Libraries
+
+The `library(atts)` module provides the foundation for constraint libraries like CLP(Z) and CLP(B). These libraries use attributed variables to:
+
+- Attach constraint metadata to variables
+- Implement constraint propagation through `verify_attributes/3`
+- Handle unification of constrained variables
+
 ## Recursion Depth Limits
 
 The engine enforces a maximum recursion depth to prevent Python stack overflow and provide clear error messages for infinite recursion.
