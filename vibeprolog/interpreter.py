@@ -51,6 +51,7 @@ class PrologInterpreter:
     def __init__(self, argv: list[str] | None = None, max_recursion_depth: int = 400) -> None:
         self.operator_table = OperatorTable()
         self.parser = PrologParser(self.operator_table)
+        self._import_scanner_parser = PrologParser(OperatorTable())
         self.clauses = []
         # Module system
         self.modules: dict[str, "Module"] = {}
@@ -390,19 +391,18 @@ class PrologInterpreter:
         self, prolog_code: str, directive_ops: list[tuple[int, str, str]]
     ) -> list[tuple[Any, bool]]:
         imports: list[tuple[Any, bool]] = []
-        temp_parser = PrologParser(OperatorTable())
         for chunk in tokenize_prolog_statements(prolog_code):
             stripped = chunk.strip()
             if not stripped.startswith(":-"):
                 continue
             try:
-                directives = temp_parser.parse(
+                directives = self._import_scanner_parser.parse(
                     stripped,
                     "import_scan",
                     apply_char_conversions=False,
                     directive_ops=directive_ops,
                 )
-            except (ValueError, LarkError):
+            except (ValueError, LarkError, PrologThrow):
                 # If we cannot parse the directive with default operators, skip it
                 continue
             for item in directives:
@@ -450,10 +450,10 @@ class PrologInterpreter:
 
         try:
             local_ops = extract_op_directives(module_source)
-        except ValueError as exc:
+        except ValueError:
             visited.remove(cache_key)
-            error_term = PrologError.syntax_error(str(exc), "consult/1")
-            raise PrologThrow(error_term)
+            self._import_operator_cache[cache_key] = []
+            return []
         imports = self._extract_import_terms(module_source, local_ops)
 
         collected_ops: list[tuple[int, str, str]] = []
