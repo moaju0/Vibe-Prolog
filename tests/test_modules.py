@@ -339,3 +339,100 @@ class TestOperatorExports:
             test :- sat(1).
         """)
         assert prolog.has_solution("test")
+
+
+class TestOperatorPredicateIndicators:
+    """Tests for operator predicate indicators in module exports and imports."""
+
+    def test_module_exports_operator_predicate(self):
+        """Module can export operator predicates like (#\=)/2."""
+        prolog = PrologInterpreter()
+        prolog.consult_string("""
+            :- op(700, xfx, #\=).
+            :- module(ops, [(#\=)/2, test/1]).
+            test(a #\= b).
+        """)
+        # Check that the module was created and the predicate is accessible
+        assert prolog.has_solution("ops:test(a #\= b)")
+
+    def test_prefix_operator_predicate_export(self):
+        """Test exporting prefix operator predicates like (#\)/1."""
+        prolog = PrologInterpreter()
+        prolog.consult_string("""
+            :- op(710, fy, #\).
+            :- module(prefix_ops, [(#\)/1, test/1]).
+            test(#\ X) :- X = true.
+        """)
+        assert prolog.has_solution("prefix_ops:test(#\ true)")
+
+    def test_infix_operator_predicate_export(self):
+        """Test exporting infix operator predicates like (#>)/2."""
+        prolog = PrologInterpreter()
+        prolog.consult_string("""
+            :- op(700, xfx, #>).
+            :- module(infix_ops, [(#>)/2, test/1]).
+            #>(A, B) :- A > B.
+            test(X) :- 5 #> 3.
+        """)
+        assert prolog.has_solution("infix_ops:test(X)")
+
+    def test_multiple_operator_predicates_export(self):
+        """Test exporting multiple operator predicates."""
+        prolog = PrologInterpreter()
+        prolog.consult_string("""
+            :- op(700, xfx, #=).
+            :- op(700, xfx, #\=).
+            :- module(multi_ops, [(#=)/2, (#\=)/2, test/1]).
+            #=(A, B) :- A =:= B.
+            #\=(A, B) :- A =\= B.
+            test(X) :- X #= 5, X #\= 6.
+        """)
+        assert prolog.has_solution("multi_ops:test(5)")
+
+    def test_selective_import_operator_predicates(self):
+        """Test selective import of operator predicates."""
+        prolog = PrologInterpreter()
+        prolog.consult_string("""
+            :- op(700, xfx, #=).
+            :- op(700, xfx, #\=).
+            :- module(source, [(#=)/2, (#\=)/2, regular/1]).
+            #=(A, B) :- A =:= B.
+            #\=(A, B) :- A =\= B.
+            regular(ok).
+        """)
+        prolog.consult_string("""
+            :- use_module(source, [(#\=)/2]).
+            test :- 5 #\= 6.
+        """)
+        # Should work for imported operator predicate
+        assert prolog.has_solution("test")
+        # Should fail for non-imported predicate
+        assert not prolog.has_solution("regular(X)")
+
+    def test_nested_operator_predicate(self):
+        """Test operator predicates with nested operators."""
+        prolog = PrologInterpreter()
+        prolog.consult_string("""
+            :- op(710, fy, #\).
+            :- module(nested_ops, [(#\)/1, test/1]).
+            test(#\ (#\ X)) :- X = true.
+        """)
+        assert prolog.has_solution("nested_ops:test(#\ (#\ true))")
+
+    def test_mixed_exports_operators_and_regular(self):
+        """Test module with both operator predicates and regular predicates."""
+        prolog = PrologInterpreter()
+        prolog.consult_string("""
+            :- op(700, xfx, #=).
+            :- module(mixed, [(#=)/2, regular/1, op(300, fy, ~)]).
+            #=(A, B) :- A =:= B.
+            regular(value).
+        """)
+        # Both should be accessible
+        assert prolog.has_solution("mixed:regular(value)")
+        # Test that operator predicate export works
+        prolog.consult_string("""
+            :- use_module(mixed, [(#=)/2]).
+            test_eq :- 2 #= 2.
+        """)
+        assert prolog.has_solution("test_eq")
