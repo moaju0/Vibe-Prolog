@@ -127,6 +127,7 @@ __OPERATOR_GRAMMAR__
 
     primary: SPECIAL_ATOM_OPS -> special_atom_token
         | operator_atom
+        | operator_compound
         | compound
         | curly_braces
         | string
@@ -137,16 +138,31 @@ __OPERATOR_GRAMMAR__
         | atom
         | variable
         | list
+        | "(" operator_as_atom ")"          -> parenthesized_operator_atom
         | "(" term ")"                     -> parenthesized_term
 
     compound: atom "(" args ")"
+    // Allow operator symbols as functors: ;(a,b), |(a,b), ,(a,b), ->(a,b), etc.
+    operator_compound: operator_functor "(" args ")" -> operator_compound
+    // Operators that can be used as functors when followed by (
+    operator_functor: INFIX_OP_FUNCTOR | CONTROL_OP_FUNCTOR | COMPARISON_OP_FUNCTOR | ARITH_OP_FUNCTOR
+    // Infix operators like ;, |, ,, ->, etc.
+    INFIX_OP_FUNCTOR.30: /;/ | /\|/ | /,/ | /->/ | /:/ | /=/ 
+    // Control operators
+    CONTROL_OP_FUNCTOR.30: /\\+/
+    // Comparison operators - but not < and > alone as they're in OP_SYMBOL
+    COMPARISON_OP_FUNCTOR.30: /=:=/ | /=\\=/ | /=</ | />=/ | /=\\=/ | /=@=/ | /\\=@=/ | /==/ | /\\==/
+    // Arithmetic operators that can also be prefix/postfix - must be followed by ( for functor use
+    ARITH_OP_FUNCTOR.30: /\+/ | /-/ | /\*/ | /\//
+    // Parenthesized operator as atom: (;), (|), (,), (->), etc.
+    operator_as_atom: INFIX_OP_FUNCTOR | CONTROL_OP_FUNCTOR | COMPARISON_OP_FUNCTOR | ARITH_OP_FUNCTOR | OP_SYMBOL
     operator_atom: OPERATOR_ATOM
     args: term ("," term)*
 
     curly_braces: "{" term "}"
 
-    DCG_ARROW.20: "-->"
-    OPERATOR_ATOM.15: ":-"
+    DCG_ARROW.35: "-->"
+    OPERATOR_ATOM.35: ":-"
 
     list: "[" "]"                          -> empty_list
         | "[" list_items "]"               -> list_items_only
@@ -487,6 +503,29 @@ class PrologTransformer(Transformer):
         token_str = str(items[0])
         return Atom(token_str)
 
+    def parenthesized_operator_atom(self, items):
+        """Handle parenthesized operator as atom: (;), (|), (,), (->), etc."""
+        token_str = str(items[0])
+        return Atom(token_str)
+
+    def operator_as_atom(self, items):
+        """Convert operator token to Atom."""
+        token_str = str(items[0])
+        return Atom(token_str)
+
+    def operator_functor(self, items):
+        """Convert operator token to Atom for use as functor."""
+        token_str = str(items[0])
+        return Atom(token_str)
+
+    def operator_compound(self, items):
+        """Handle operator as functor: ;(a, b), |(a, b), etc."""
+        functor = items[0]
+        args = items[1] if len(items) > 1 else []
+        if isinstance(functor, Atom):
+            return Compound(functor.name, tuple(args))
+        return Compound(str(functor), tuple(args))
+
     def compound(self, items):
         functor = items[0]
         args = items[1] if len(items) > 1 else []
@@ -583,6 +622,14 @@ class PrologTransformer(Transformer):
                 "Unexpected '.' - dot is a clause terminator and cannot be used as an atom",
                 "atom/1"
             ))
+        # Handle SPECIAL_ATOM (quoted atoms like ';', '|', etc.)
+        if atom_str.startswith("'") and atom_str.endswith("'") and len(atom_str) >= 2:
+            # Strip the quotes and handle escape sequences
+            atom_str = atom_str[1:-1]
+            # In Prolog, single quotes are escaped by doubling them
+            atom_str = atom_str.replace("''", "'")
+            # Handle backslash escapes
+            atom_str = self._unescape_string(atom_str)
         return Atom(atom_str)
 
     def operator_atom(self, items):
