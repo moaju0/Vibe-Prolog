@@ -96,6 +96,12 @@ class PrologInterpreter:
         # Cleared when the interpreter instance is destroyed.
         self._import_operator_cache: dict[str, list[tuple[int, str, str]]] = {}
         self._current_source_path: Path | None = None
+        # Stack for conditional compilation directives (if/else/endif)
+        # Each entry is (is_active, has_seen_else, any_branch_taken) where:
+        # - is_active: True if we are currently including code
+        # - has_seen_else: True if we have seen an else clause (to prevent multiple else)
+        # - any_branch_taken: True if any if/elif branch has been taken (for else logic)
+        self._conditional_stack: list[tuple[bool, bool, bool]] = []
 
     @property
     def argv(self) -> list[str]:
@@ -115,6 +121,110 @@ class PrologInterpreter:
         error_term = PrologError.syntax_error(str(exc), location)
         raise PrologThrow(error_term)
 
+    def _is_conditionally_active(self) -> bool:
+        """Return True if all parent conditionals are active (we should include code)."""
+        return all(is_active for is_active, _, _ in self._conditional_stack)
+
+    def _handle_if_directive(self, condition) -> None:
+        """Handle :- if(Condition). directive."""
+        # If a parent conditional is inactive, this nested if is also inactive
+        # We don't evaluate the condition but still track the nesting
+        if not self._is_conditionally_active():
+            self._conditional_stack.append((False, False, False))
+            return
+
+        # Evaluate the condition
+        condition_succeeded = self._evaluate_condition(condition)
+        # (is_active, has_seen_else, any_branch_taken)
+        self._conditional_stack.append((condition_succeeded, False, condition_succeeded))
+
+    def _handle_elif_directive(self, condition) -> None:
+        """Handle :- elif(Condition). directive (else-if)."""
+        if not self._conditional_stack:
+            error_term = PrologError.syntax_error("elif without matching if", "elif/1")
+            raise PrologThrow(error_term)
+
+        is_active, has_seen_else, any_branch_taken = self._conditional_stack[-1]
+
+        if has_seen_else:
+            error_term = PrologError.syntax_error("elif after else in conditional block", "elif/1")
+            raise PrologThrow(error_term)
+
+        # Check if parent conditionals are active (excluding current level)
+        parent_active = all(active for active, _, _ in self._conditional_stack[:-1])
+
+        if not parent_active:
+            # Parent is inactive, so this elif is also inactive
+            # Keep has_seen_else=False to allow more elif/else
+            return
+
+        if any_branch_taken:
+            # A previous branch was taken, so skip this elif and all subsequent
+            self._conditional_stack[-1] = (False, False, True)
+        else:
+            # No previous branch taken, evaluate this condition
+            condition_succeeded = self._evaluate_condition(condition)
+            self._conditional_stack[-1] = (condition_succeeded, False, condition_succeeded)
+
+    def _handle_else_directive(self) -> None:
+        """Handle :- else. directive."""
+        if not self._conditional_stack:
+            error_term = PrologError.syntax_error("else without matching if", "else/0")
+            raise PrologThrow(error_term)
+
+        is_active, has_seen_else, any_branch_taken = self._conditional_stack[-1]
+
+        if has_seen_else:
+            error_term = PrologError.syntax_error("multiple else clauses in conditional block", "else/0")
+            raise PrologThrow(error_term)
+
+        # Check if parent conditionals are active (excluding current level)
+        parent_active = all(active for active, _, _ in self._conditional_stack[:-1])
+
+        if not parent_active:
+            # Parent is inactive, so this else block is also inactive
+            self._conditional_stack[-1] = (False, True, any_branch_taken)
+        else:
+            # Include else only if no previous branch was taken
+            self._conditional_stack[-1] = (not any_branch_taken, True, True)
+
+    def _handle_endif_directive(self) -> None:
+        """Handle :- endif. directive."""
+        if not self._conditional_stack:
+            error_term = PrologError.syntax_error("endif without matching if", "endif/0")
+            raise PrologThrow(error_term)
+
+        self._conditional_stack.pop()
+
+    def _evaluate_condition(self, condition) -> bool:
+        """Evaluate a conditional compilation condition.
+        
+        Returns True if the condition succeeds, False otherwise.
+        """
+        # Create a temporary engine if needed
+        if self.engine is None:
+            temp_engine = PrologEngine(
+                self.clauses,
+                self.argv,
+                self.predicate_properties,
+                self._predicate_sources,
+                self.predicate_docs,
+                operator_table=self.operator_table,
+                max_depth=self.max_recursion_depth,
+            )
+            temp_engine.interpreter = self
+        else:
+            temp_engine = self.engine
+
+        # Try to find at least one solution
+        try:
+            solutions = temp_engine._solve_goals([condition], {})
+            # Check if at least one solution exists
+            next(solutions)
+            return True
+        except (StopIteration, PrologThrow, CutException):
+            return False
+
     def _ensure_builtin_properties(self) -> None:
         """Seed predicate_properties with built-ins for directive validation."""
 
@@ -130,6 +240,18 @@ class PrologInterpreter:
             # Expose interpreter to engine for module introspection
             eng.interpreter = self
             self._builtins_seeded = True
+
+    def _is_conditional_directive(self, item) -> bool:
+        """Check if item is a conditional compilation directive (if/else/endif/elif)."""
+        if not isinstance(item, Directive):
+            return False
+        goal = item.goal
+        if isinstance(goal, Compound) and len(goal.args) == 1:
+            return goal.functor in ("if", "elif")
+        if isinstance(goal, Atom):
+            return goal.name in ("else", "endif")
+        return False
+
 
     def _process_items(
         self,
@@ -154,6 +276,15 @@ class PrologInterpreter:
             closed_predicates = set()
 
         for item in items:
+            # Conditional compilation directives are always processed
+            if self._is_conditional_directive(item):
+                self._handle_directive(item, closed_predicates, source_name)
+                continue
+            
+            # Skip non-conditional items when not in an active conditional block
+            if not self._is_conditionally_active():
+                continue
+
             if isinstance(item, Clause):
                 # Expand DCG clauses before adding
                 if item.dcg:
@@ -216,6 +347,27 @@ class PrologInterpreter:
                 SyntaxWarning,
                 stacklevel=2
             )
+            return
+
+        # Handle conditional compilation directives: if/else/elif/endif
+        # :- if(Condition). - begin conditional block
+        if isinstance(goal, Compound) and goal.functor == "if" and len(goal.args) == 1:
+            self._handle_if_directive(goal.args[0])
+            return
+
+        # :- elif(Condition). - else-if (alternative condition)
+        if isinstance(goal, Compound) and goal.functor == "elif" and len(goal.args) == 1:
+            self._handle_elif_directive(goal.args[0])
+            return
+
+        # :- else. - toggle inclusion state
+        if isinstance(goal, Atom) and goal.name == "else":
+            self._handle_else_directive()
+            return
+
+        # :- endif. - end conditional block
+        if isinstance(goal, Atom) and goal.name == "endif":
+            self._handle_endif_directive()
             return
 
         # Module declaration: :- module(Name, Exports).
@@ -1043,6 +1195,16 @@ class PrologInterpreter:
             # take effect before subsequent parsing
             last_predicate = self._process_items(items, source_name, closed_predicates, last_predicate)
             all_items.extend(items)
+
+        # Check for unclosed conditional directives
+        if self._conditional_stack:
+            error_term = PrologError.syntax_error(
+                f"unclosed if directive ({len(self._conditional_stack)} level(s) deep)",
+                "consult/1"
+            )
+            # Clear the stack before raising to allow recovery
+            self._conditional_stack.clear()
+            raise PrologThrow(error_term)
 
         self.engine = PrologEngine(
             self.clauses,
