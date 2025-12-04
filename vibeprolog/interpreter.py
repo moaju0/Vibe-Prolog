@@ -89,6 +89,7 @@ class PrologInterpreter:
         self.predicate_docs: dict[tuple[str, int], str] = {}
         self._consult_counter = 0
         self._builtins_seeded = False
+        self._tabled_predicates: set[tuple[str, int]] = set()
         # Cache of imported operator directives by resolved file path.
         # Maps file paths to lists of (precedence, associativity, name) tuples.
         # Grows unbounded with the number of unique modules consulted, but memory
@@ -536,7 +537,31 @@ class PrologInterpreter:
                 error_term = PrologError.type_error("callable", init_goal, "initialization/1")
                 raise PrologThrow(error_term)
             self.initialization_goals.append(init_goal)
+            return
+
+        # Tabling directive: :- table Name/Arity[, Name2/Arity2].
+        if isinstance(goal, Compound) and goal.functor == "table" and len(goal.args) == 1:
+            indicators = self._parse_table_indicators(goal.args[0])
+            for indicator in indicators:
+                self._tabled_predicates.add(indicator)
+            return
         # Other directives can be added here
+
+    def _parse_table_indicators(self, term: Any) -> list[tuple[str, int]]:
+        """Parse the argument to a table/1 directive into predicate indicators."""
+
+        def _flatten_args(arg: Any) -> list[Any]:
+            if isinstance(arg, ParserList):
+                return list(arg.elements)
+            if isinstance(arg, Compound) and arg.functor == "," and len(arg.args) == 2:
+                return _flatten_args(arg.args[0]) + _flatten_args(arg.args[1])
+            return [arg]
+
+        indicators: list[tuple[str, int]] = []
+        for raw in _flatten_args(term):
+            key = self._validate_predicate_indicator(raw, "table/1")
+            indicators.append(key)
+        return indicators
 
     def _parse_import_list(self, imports_term, context: str) -> set[tuple[str, int]]:
         """Parse import list for use_module/2."""
@@ -1214,6 +1239,7 @@ class PrologInterpreter:
             self.predicate_docs,
             operator_table=self.operator_table,
             max_depth=self.max_recursion_depth,
+            tabled_predicates=self._tabled_predicates,
         )
         # Expose interpreter to engine for module-aware resolution
         self.engine.interpreter = self
@@ -1269,6 +1295,7 @@ class PrologInterpreter:
                 self.predicate_docs,
                 operator_table=self.operator_table,
                 max_depth=self.max_recursion_depth,
+                tabled_predicates=self._tabled_predicates,
             )
             self.engine.interpreter = self
 

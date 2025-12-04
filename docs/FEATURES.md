@@ -391,10 +391,22 @@ These predicates are specific to SWI-Prolog and not part of the ISO standard.
 | **DDE (Windows)** | `open_dde_conversation/3`, `close_dde_conversation/1`, `dde_request/3`, `dde_execute/2`, `dde_poke/3`, `dde_register_service/2` | 🚫 Won't Implement | Windows Dynamic Data Exchange - obsolete technology |
 | **CLP(Z)** | `#=/2`, `#</2`, `#>/2`, `#=</2`, `#>=/2`, `ins/2`, `in/2`, etc. | 📘 | Constraint Logic Programming over Integers - Implemented in [library/clpz.pl](../library/clpz.pl) (8041 lines, Markus Triska) - **Requires library(atts)** |
 | **CLP(B)** | `sat/1`, `taut/2`, `labeling/1`, Boolean operators | 📘 | Constraint Logic Programming over Booleans - Implemented in [library/clpb.pl](../library/clpb.pl) (1970 lines, Markus Triska) - **Requires library(atts)** |
-| **Tabling** | `:- table/1` directive | 🔽 Low Priority | Tabled execution (memoization) - advanced optimization |
+| **Tabling** | `:- table/1` directive | ✅ | Variant tabling with memoized answers |
 | **CHR** | `:- chr_constraint/1` | ❌ | Constraint Handling Rules |
 | **RDF** | `:- rdf_meta/1` | 🔽 Low Priority | RDF (Resource Description Framework) support - specialized use case |
 | **Random** | `random/1` | ❌ | Random number generation (non-ISO) |
+
+---
+
+## Tabling (Memoization)
+
+Basic variant tabling is available via the `:- table` directive.
+
+| Feature | Status | Notes |
+| --- | --- | --- |
+| `:- table pred/arity` | ✅ | Declare predicates for memoized execution |
+| Variant-based caching | ✅ | Calls with identical shapes reuse cached answers |
+| Multiple predicate indicators | ✅ | `:- table foo/1, bar/2.` supported |
 
 ---
 

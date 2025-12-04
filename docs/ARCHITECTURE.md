@@ -143,6 +143,23 @@ _variable_first_arg_clauses = {
 - Retrieval uses `_get_indexed_clauses()` for efficient filtering
 - Dynamic database operations update the index automatically
 
+## Tabling at a Glance
+
+Tabling allows the engine to memoize predicate calls so repeated queries reuse
+previously discovered substitutions. When a `:- table` directive is seen during
+consult, the interpreter records the functor/arity pair. During execution the
+engine computes a variant-based signature for the call (ignoring variable
+names) and stores the resulting substitutions. Later calls with the same
+structure return cached answers directly, avoiding redundant recomputation.
+
+This implementation focuses on simple variant tabling:
+
+- Predicate indicators: `:- table foo/1, bar/2.`
+- Call signatures normalize variables positionally so variants map to the same
+  cache entry.
+- Answers are cached per predicate per signature and replayed on subsequent
+  invocations.
+
 ## Built-in Registry
 
 Built-ins live under `vibeprolog/builtins/` and register themselves via
