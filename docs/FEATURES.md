@@ -26,11 +26,11 @@ Status legend:
 | Character code syntax (`0'X`)    | ✅      | Minor ISO edge gaps                       |
 | Built-in operator syntax         | ✅      |                                           |
 | `:- op/3` declaration            | ✅      | Full support - defines operators dynamically |
-| Directive prefix operator `:-` (1200, fx) | ❌ | **ISO-required** - Prefix form for directives |
+| Directive prefix operator `:-` (1200, fx) | ✅ | **ISO-required** - Prefix form for directives |
 | Custom operator syntax in source | ✅      | Parser dynamically generates grammar for custom operators (infix/prefix/postfix) |
 | Query prefix operator `?-` (1200, fx) | ✅ | **ISO-required** - Parsed via operator table |
 | DCG rule operator `-->` (1200, xfx) | ✅    | **ISO-required** - DCG syntax |
-| `:- char_conversion/2`           | ❌      | **ISO-mandatory**                         |
+| `:- char_conversion/2`           | ✅      | **ISO-mandatory** - Character conversion during parsing |
 
 ---
 
@@ -62,7 +62,7 @@ Status legend:
 | `:- discontiguous/1`   | ✅      |                                          |
 | `:- initialization/1`  | ✅      |                                          |
 | `:- op/3`              | ✅      | Full support - defines operators with validation |
-| `:- char_conversion/2` | ❌      | **ISO-required**                         |
+| `:- char_conversion/2` | ✅      | **ISO-required** - Character conversion during parsing |
 
 ---
 
@@ -421,7 +421,7 @@ These predicates are specific to SWI-Prolog and not part of the ISO standard.
 | Term I/O (§8.12)          | ✅ Strong - All ISO-required predicates implemented        |
 | Stream control (§8.13)    | ✅ Strong - All ISO-required predicates implemented        |
 | Errors & exceptions       | ✅ Strong                                                   |
-| Parsing & syntax          | ⚠️ op/3 ✅, custom operator syntax parsing ✅, ISO operators ✅, missing: prefix `:-` and char_conversion ❌ |
+| Parsing & syntax          | ✅ Strong - op/3 ✅, custom operator syntax parsing ✅, ISO operators ✅, prefix `:-` ✅, char_conversion ✅ |
 | Modules                   | ✅ Largely ISO-consistent (Part 1)                          |
 | Reflection                | ⚠️ Partial                                                 |
 
@@ -429,8 +429,7 @@ These predicates are specific to SWI-Prolog and not part of the ISO standard.
 
 ## ISO Blocking Issues
 
-1. **Directive prefix operator** - The prefix form of `:-` (1200, fx) is not yet implemented
-2. `char_conversion/2` missing (§6.4, §7.4) - ISO-mandatory character conversion directive
+_No blocking issues remain. All ISO-required syntax features are now implemented._
 
 ## Common Extensions Status
 
