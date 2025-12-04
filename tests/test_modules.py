@@ -528,6 +528,8 @@ class TestModuleQualifiedClauseHeads:
         # Note: m1 and m2 are auto-created but without exports
         r1 = prolog.query_once("user:foo(X)")
         assert r1 is not None and r1["X"] == "from_user"
+        assert prolog.has_solution("m1:foo(from_m1)")
+        assert prolog.has_solution("m2:foo(from_m2)")
 
     def test_atom_head_fact(self):
         """Test module-qualified fact with atom head (zero-arity predicate)."""
@@ -561,6 +563,7 @@ class TestModuleQualifiedClauseHeads:
         assert "newmod" in prolog.modules
         # Predicate should be accessible (though not exported)
         assert ("new_pred", 1) in prolog.modules["newmod"].predicates
+        assert prolog.has_solution("newmod:new_pred(value)")
 
     def test_module_qualified_head_with_variable_module(self):
         """Using a variable for the module in a qualified head raises an error."""
