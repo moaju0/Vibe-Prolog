@@ -151,7 +151,7 @@ __OPERATOR_GRAMMAR__
     // Control operators
     CONTROL_OP_FUNCTOR.30: /\\+/
     // Comparison operators - but not < and > alone as they're in OP_SYMBOL
-    COMPARISON_OP_FUNCTOR.30: /=:=/ | /=\\=/ | /=</ | />=/ | /=\\=/ | /=@=/ | /\\=@=/ | /==/ | /\\==/
+    COMPARISON_OP_FUNCTOR.30: /=:=/ | /=\\=/ | /=</ | />=/ | /=@=/ | /\\=@=/ | /==/ | /\\==/
     // Arithmetic operators that can also be prefix/postfix - must be followed by ( for functor use
     ARITH_OP_FUNCTOR.30: /\+/ | /-/ | /\*/ | /\//
     // Parenthesized operator as atom: (;), (|), (,), (->), etc.
