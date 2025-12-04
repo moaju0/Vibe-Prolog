@@ -428,6 +428,7 @@ Basic variant tabling is available via the `:- table` directive.
 | Imported operator discovery       | ✅      | Two-pass parsing: operators from `use_module` targets are pre-scanned and registered before parsing dependent code. Handles block comments, line comments, and recursive imports |
 | **Module-scoped predicate namespaces** | ✅  | Each module can define predicates with the same name/arity without conflict. `library(a):foo/1` and `library(b):foo/1` are distinct |
 | **DCG predicate indicators**      | ✅📘    | SWI-Prolog extension: `Name//Arity` in module exports (expanded to `Name/Arity+2`) |
+| **Module-qualified clause heads** | ✅      | `Module:Head :- Body` syntax for cross-module predicate definitions (e.g., `user:goal_expansion/2`) |
 | Cross-module dynamic semantics    | ⚠️     | Implemented; dynamic predicate isolation per module needs further work |
 
 ---

@@ -1072,9 +1072,40 @@ class PrologInterpreter:
         closed_predicates: set[tuple[str, int]],
         last_predicate: tuple[str, int] | None,
     ) -> tuple[str, int] | None:
-        """Insert a clause while enforcing predicate properties."""
+        """Insert a clause while enforcing predicate properties.
+
+        Supports module-qualified clause heads like `Module:Head :- Body`.
+        When the head is a `:/2` compound, the clause is added to the
+        specified module rather than the current module.
+        """
 
         head = clause.head
+        is_cross_module_definition = False  # Track if this is a module-qualified head
+
+        # Handle module-qualified clause heads (Module:Head :- Body)
+        if isinstance(head, Compound) and head.functor == ":" and len(head.args) == 2:
+            module_term = head.args[0]
+            actual_head = head.args[1]
+
+            # Module must be an atom - raise appropriate errors for invalid types
+            if isinstance(module_term, Variable):
+                # Variable module specifier is an instantiation error
+                raise PrologThrow(
+                    PrologError.instantiation_error("consult/1")
+                )
+            elif not isinstance(module_term, Atom):
+                # Non-atom module specifier (e.g., number, compound) is a type error
+                raise PrologThrow(
+                    PrologError.type_error("atom", module_term, "consult/1")
+                )
+
+            # Valid atom module specifier - modify clause in-place
+            head = actual_head
+            clause.head = actual_head
+            clause.module = module_term.name
+            is_cross_module_definition = True
+
+        # Compute key from (possibly updated) head
         if isinstance(head, Compound):
             key = (head.functor, len(head.args))
         elif isinstance(head, Atom):
@@ -1082,12 +1113,23 @@ class PrologInterpreter:
         else:
             return last_predicate
 
-        # Get the module for this clause
+        # Get the module for this clause (set above for module-qualified heads,
+        # or from _process_items, or fall back to current_module)
         module_name = getattr(clause, "module", self.current_module)
+
+        # Check if module already exists before potentially creating it
+        module_existed = module_name in self.modules
 
         # Register clause under module if present
         self.modules.setdefault(module_name, Module(module_name, set()))
         mod = self.modules[module_name]
+
+        # If this is a cross-module definition (Module:Head) and the module was
+        # just created, export the predicate so it can be called. However, if
+        # the module already existed with a declared export list, respect that
+        # interface and don't auto-export (the module author controls exports).
+        if is_cross_module_definition and not module_existed:
+            mod.exports.add(key)
 
         # Check if it's a built-in (global check)
         global_properties = self.predicate_properties.get(key, set())

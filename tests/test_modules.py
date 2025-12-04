@@ -436,3 +436,145 @@ class TestOperatorPredicateIndicators:
             test_eq :- 2 #= 2.
         """)
         assert prolog.has_solution("test_eq")
+
+
+class TestModuleQualifiedClauseHeads:
+    """Tests for defining predicates with module-qualified heads (Module:Head :- Body)."""
+
+    def test_define_fact_in_user_module(self):
+        """Define a fact in user module from another module."""
+        prolog = PrologInterpreter()
+        prolog.consult_string("""
+            :- module(mylib, []).
+            user:my_hook(x, transformed_x).
+        """)
+        assert prolog.has_solution("user:my_hook(x, Y), Y = transformed_x")
+
+    def test_define_rule_in_user_module(self):
+        """Define a rule with module-qualified head in user module."""
+        prolog = PrologInterpreter()
+        prolog.consult_string("""
+            :- module(mymod, []).
+            user:doubled(X, Y) :- Y is X * 2.
+        """)
+        result = prolog.query_once("user:doubled(5, Y)")
+        assert result is not None and result["Y"] == 10
+
+    def test_define_in_named_module(self):
+        """Define predicate in a specific named module."""
+        prolog = PrologInterpreter()
+        prolog.consult_string("""
+            :- module(target, [helper/1]).
+            :- module(source, []).
+            target:helper(1).
+            target:helper(2).
+        """)
+        results = list(prolog.query("target:helper(X)"))
+        assert len(results) == 2
+        values = {r["X"] for r in results}
+        assert values == {1, 2}
+
+    def test_multiple_clauses_same_predicate(self):
+        """Multiple clauses for the same module-qualified predicate."""
+        prolog = PrologInterpreter()
+        prolog.consult_string("""
+            :- module(mylib, []).
+            user:color(red).
+            user:color(green).
+            user:color(blue).
+        """)
+        results = list(prolog.query("user:color(X)"))
+        assert len(results) == 3
+        colors = {r["X"] for r in results}
+        assert colors == {"red", "green", "blue"}
+
+    def test_module_qualified_head_with_body(self):
+        """Module-qualified head with complex body."""
+        prolog = PrologInterpreter()
+        prolog.consult_string("""
+            :- module(lib, []).
+            user:sum_list([], 0).
+            user:sum_list([H|T], S) :- user:sum_list(T, S1), S is H + S1.
+        """)
+        result = prolog.query_once("user:sum_list([1, 2, 3, 4], S)")
+        assert result is not None and result["S"] == 10
+
+    def test_goal_expansion_pattern(self):
+        """Test the goal_expansion hook pattern used in libraries."""
+        prolog = PrologInterpreter()
+        prolog.consult_string("""
+            :- module(dcgs_lib, []).
+            user:goal_expansion(phrase(GRBody, S), phrase(GRBody, S, [])).
+        """)
+        # Verify the clause was added to user module by calling it directly
+        result = prolog.query_once("user:goal_expansion(phrase(foo, bar), Expanded)")
+        assert result is not None
+        # Expanded should be phrase(foo, bar, [])
+        expanded = result["Expanded"]
+        # Result format is {'phrase': ['foo', 'bar', []]}
+        assert "phrase" in expanded
+        assert expanded["phrase"] == ["foo", "bar", []]
+
+    def test_cross_module_predicate_definition(self):
+        """Define predicates across multiple modules."""
+        prolog = PrologInterpreter()
+        prolog.consult_string("""
+            :- module(definer, []).
+            m1:foo(from_m1).
+            m2:foo(from_m2).
+            user:foo(from_user).
+        """)
+        # Ensure all modules got their predicates
+        # Note: m1 and m2 are auto-created but without exports
+        r1 = prolog.query_once("user:foo(X)")
+        assert r1 is not None and r1["X"] == "from_user"
+        assert prolog.has_solution("m1:foo(from_m1)")
+        assert prolog.has_solution("m2:foo(from_m2)")
+
+    def test_atom_head_fact(self):
+        """Test module-qualified fact with atom head (zero-arity predicate)."""
+        prolog = PrologInterpreter()
+        prolog.consult_string("""
+            :- module(mylib, []).
+            user:my_flag.
+        """)
+        assert prolog.has_solution("user:my_flag")
+
+    def test_preserves_clause_order(self):
+        """Ensure clause order is preserved for module-qualified heads."""
+        prolog = PrologInterpreter()
+        prolog.consult_string("""
+            :- module(lib, []).
+            user:num(1).
+            user:num(2).
+            user:num(3).
+        """)
+        results = list(prolog.query("user:num(X)"))
+        values = [r["X"] for r in results]
+        assert values == [1, 2, 3]
+
+    def test_module_created_if_not_exists(self):
+        """Target module is created if it doesn't exist."""
+        prolog = PrologInterpreter()
+        prolog.consult_string("""
+            newmod:new_pred(value).
+        """)
+        # Module should exist now
+        assert "newmod" in prolog.modules
+        # Predicate should be accessible (though not exported)
+        assert ("new_pred", 1) in prolog.modules["newmod"].predicates
+        assert prolog.has_solution("newmod:new_pred(value)")
+
+    def test_module_qualified_head_with_variable_module(self):
+        """Using a variable for the module in a qualified head raises an error."""
+        prolog = PrologInterpreter()
+        with pytest.raises(PrologThrow) as excinfo:
+            prolog.consult_string("M:foo(a).")
+        assert "instantiation_error" in str(excinfo.value.term)
+
+    def test_module_qualified_head_with_non_atom_module(self):
+        """Using a non-atom for the module in a qualified head raises an error."""
+        prolog = PrologInterpreter()
+        with pytest.raises(PrologThrow) as excinfo:
+            prolog.consult_string("123:foo(a).")
+        assert "type_error" in str(excinfo.value.term)
