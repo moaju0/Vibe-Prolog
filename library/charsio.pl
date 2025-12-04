@@ -305,7 +305,9 @@ continuation(Code, Chars, Nb) --> [Byte],
 
 % invalid continuation byte
 % each remaining continuation byte (if any) will raise 0xFFFD too
-continuation(_, ['\xFFFD\'|T], _) --> [_], decode_utf8(T).
+% NOTE: Original Scryer syntax '\xFFFD\'' not supported in Vibe-Prolog
+% Using Unicode replacement character directly
+continuation(_, ['\xFFFD'|T], _) --> [_], decode_utf8(T).
 
 %% get_line_to_chars(+Stream, -Chars, +InitialChars).
 %

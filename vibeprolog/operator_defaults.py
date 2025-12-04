@@ -46,6 +46,10 @@ DEFAULT_OPERATORS: list[tuple[int, str, str]] = [
     (200, "fy", "-"),
     # Scryer-specific operator (recognized but directive is ignored)
     (700, "fx", "non_counted_backtracking"),
+    # Attribute declaration for attributed variables
+    (1150, "fx", "attribute"),
+    # Rational division (Scryer-specific)
+    (400, "yfx", "rdiv"),
 ]
 
 __all__ = ["DEFAULT_OPERATORS"]

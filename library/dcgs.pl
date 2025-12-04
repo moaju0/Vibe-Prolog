@@ -35,7 +35,7 @@ to learn more about them.
 
 :- meta_predicate(','(2, 2, ?, ?)).
 
-:- meta_predicate(;(2, 2, ?, ?)).
+:- meta_predicate(';'(2, 2, ?, ?)).
 
 %% phrase(+Body, ?Ls).
 %
@@ -160,7 +160,7 @@ dcg_body(NonTerminal, S0, S, Goal1) :-
     \+ dcg_constr(NonTerminal),
     loader:strip_module(NonTerminal, M, NonTerminal0),
     dcg_non_terminal(NonTerminal0, S0, S, Goal0),
-    (  functor(NonTerminal, (:), 2) ->
+    (  functor(NonTerminal, ':', 2) ->
        Goal1 = M:Goal0
     ;  Goal1 = Goal0
     ).
@@ -171,7 +171,7 @@ dcg_constr([]). % 7.14.1
 dcg_constr([_|_]). % 7.14.2 - terminal sequence
 dcg_constr(( _, _ )). % 7.14.3 - concatenation
 dcg_constr(( _ ; _ )). % 7.14.4 - alternative
-dcg_constr(( _'|'_ )). % 7.14.6 - alternative
+dcg_constr('|'(_, _)). % 7.14.6 - alternative
 dcg_constr({_}). % 7.14.7
 dcg_constr(call(_)). % 7.14.8
 dcg_constr(phrase(_)). % 7.14.9
@@ -200,7 +200,7 @@ dcg_cbody(( GRCond ; GRElse ), S0, S, ( Cond ; Else )) :-
     subsumes_term(( _GRIf -> _GRThen ), GRCond),
     dcg_cbody(GRCond, S0, S, Cond),
     dcg_body(GRElse, S0, S, Else).
-dcg_cbody(( GREither '|' GROr ), S0, S, ( Either ; Or )) :-
+dcg_cbody('|'(GREither, GROr), S0, S, ( Either ; Or )) :-
     dcg_body(GREither, S0, S, Either),
     dcg_body(GROr, S0, S, Or).
 dcg_cbody({Goal}, S0, S, ( Goal, S0 = S )).
@@ -216,11 +216,12 @@ dcg_cbody(( GRIf -> GRThen ), S0, S, ( If -> Then )) :-
 
 
 % When DCG expansion throws an exception – remove offending term and rethrow.
-user:term_expansion(throw_dcg_expansion_error(E), _) :-
-    throw(E).
-user:term_expansion(Term0, Term) :-
-    nonvar(Term0),
-    catch(dcg_rule(Term0, Term), E, Term = throw_dcg_expansion_error(E)).
+% NOTE: Module-qualified clause heads not yet supported in Vibe-Prolog
+% user:term_expansion(throw_dcg_expansion_error(E), _) :-
+%     throw(E).
+% user:term_expansion(Term0, Term) :-
+%     nonvar(Term0),
+%     catch(dcg_rule(Term0, Term), E, Term = throw_dcg_expansion_error(E)).
 
 %% seq(Seq)//
 % 
@@ -258,23 +259,24 @@ error_goal(error(representation_error(dcg_body), Context),
            error(representation_error(dcg_body), Context)).
 error_goal(E, _) :- throw(E).
 
-user:goal_expansion(phrase(GRBody, S, S0), GRBody2) :-
-    loader:strip_module(GRBody, M, GRBody0),
-    nonvar(GRBody0),
-    catch(dcgs:dcg_body(GRBody0, S, S0, GRBody1),
-          E,
-          dcgs:error_goal(E, GRBody1)
-         ),
-    (  E = error(instantiation_error, _),
-       GRBody0 = [T|Ts] ->
-       GRBody2 = (error:must_be(list, [T|Ts]),
-                  lists:append([T|Ts], S0, S))
-    ;  GRBody = (_:_) ->
-       GRBody2 = M:GRBody1
-    ;  GRBody2 = GRBody1
-    ).
-
-user:goal_expansion(phrase(GRBody, S), phrase(GRBody, S, [])).
+% NOTE: Module-qualified clause heads not yet supported in Vibe-Prolog
+% user:goal_expansion(phrase(GRBody, S, S0), GRBody2) :-
+%     loader:strip_module(GRBody, M, GRBody0),
+%     nonvar(GRBody0),
+%     catch(dcgs:dcg_body(GRBody0, S, S0, GRBody1),
+%           E,
+%           dcgs:error_goal(E, GRBody1)
+%          ),
+%     (  E = error(instantiation_error, _),
+%        GRBody0 = [T|Ts] ->
+%        GRBody2 = (error:must_be(list, [T|Ts]),
+%                   lists:append([T|Ts], S0, S))
+%     ;  GRBody = (_:_) ->
+%        GRBody2 = M:GRBody1
+%     ;  GRBody2 = GRBody1
+%     ).
+%
+% user:goal_expansion(phrase(GRBody, S), phrase(GRBody, S, [])).
 
 
 % (-->)/2 behaves as if it didn't exist. We export (and define) it

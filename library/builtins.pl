@@ -1151,11 +1151,11 @@ clause(H, B) :-
     (  var(H) ->
        throw(error(instantiation_error, clause/2))
     ;  callable(H), functor(H, Name, Arity) ->
-       (  Name == (:),
-          Arity =:= 2 ->
-          arg(1, H, Module),
-          arg(2, H, F),
-          '$module_clause'(F, B, Module)
+       (  Name == ':',
+           Arity =:= 2 ->
+           arg(1, H, Module),
+           arg(2, H, F),
+           '$module_clause'(F, B, Module)
        ;  '$no_such_predicate'(user, H) ->
           '$fail'
        ;  '$head_is_dynamic'(user, H) ->
@@ -1168,7 +1168,7 @@ clause(H, B) :-
     ).
 
 
-:- meta_predicate(asserta(:)).
+:- meta_predicate(asserta(':')).
 
 %% asserta(Clause).
 %
@@ -1184,7 +1184,7 @@ asserta_(Module, (Head :- Body)) :-
 asserta_(Module, Fact) :-
     '$asserta'(Module, Fact, true).
 
-:- meta_predicate(assertz(:)).
+:- meta_predicate(assertz(':')).
 
 %% assertz(Clause).
 %
@@ -1201,7 +1201,7 @@ assertz_(Module, Fact) :-
     '$assertz'(Module, Fact, true).
 
 
-:- meta_predicate(retract(:)).
+:- meta_predicate(retract(':')).
 
 %% retract(Clause)
 %
@@ -1250,11 +1250,11 @@ retract_clause(Head, Body) :-
        throw(error(instantiation_error, retract/1))
     ;  callable(Head),
        functor(Head, Name, Arity) ->
-       (  Name == (:),
-          Arity =:= 2 ->
-          arg(1, Head, Module),
-          arg(2, Head, Head1),
-          retract_module_clause(Head1, Body, Module)
+       (  Name == ':',
+           Arity =:= 2 ->
+           arg(1, Head, Module),
+           arg(2, Head, Head1),
+           retract_module_clause(Head1, Body, Module)
        ;  '$no_such_predicate'(user, Head) ->
           '$fail'
        ;  '$head_is_dynamic'(user, Head) ->
@@ -1278,7 +1278,7 @@ retract_module_clause(Head, Body, Module) :-
     ;  throw(error(type_error(callable, Head), retract/1))
     ).
 
-:- meta_predicate(retractall(:)).
+:- meta_predicate(retractall(':')).
 
 %% retractall(Head)
 %
@@ -1318,7 +1318,7 @@ module_abolish(Pred, Module) :-
     ;  throw(error(type_error(predicate_indicator, Module:Pred), abolish/1))
     ).
 
-:- meta_predicate(abolish(:)).
+:- meta_predicate(abolish(':')).
 
 %% abolish(Pred).
 %
