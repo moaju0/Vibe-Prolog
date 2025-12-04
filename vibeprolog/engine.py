@@ -62,6 +62,7 @@ class PrologEngine:
         predicate_docs: dict[tuple[str, int], str] | None = None,
         operator_table: OperatorTable | None = None,
         max_depth: int = 10000,
+        tabled_predicates: set[tuple[str, int]] | None = None,
     ):
         self.clauses = clauses
         # Explicit dependency so engine can reference interpreter state if needed
@@ -101,6 +102,11 @@ class PrologEngine:
         self.input_stack = []
         self.output_stack = []
         self.stream_properties = {}  # Stream handle -> properties dict
+        # Tabling support
+        self._tabled_predicates: set[tuple[str, int]] = tabled_predicates or set()
+        self._table_cache: dict[
+            tuple[str, int], dict[tuple, dict[str, Any]]
+        ] = {}
 
     # Compatibility wrappers retained for tests and external callers.
     def _list_to_python(
@@ -116,7 +122,12 @@ class PrologEngine:
         yield from self._solve_goals(goals, Substitution(), depth=0)
 
     def _solve_goals(
-        self, goals: list[Compound], subst: Substitution, current_module: str = "user", depth: int = 0
+        self,
+        goals: list[Compound],
+        subst: Substitution,
+        current_module: str = "user",
+        depth: int = 0,
+        use_tabling: bool = True,
     ) -> Iterator[Substitution]:
         """Solve a list of goals with backtracking."""
         # Check recursion depth limit
@@ -190,7 +201,9 @@ class PrologEngine:
                 try:
                     for new_subst in builtin_results:
                         if new_subst is not None:
-                            yield from self._solve_goals(remaining_goals, new_subst, module_name, depth)
+                            yield from self._solve_goals(
+                                remaining_goals, new_subst, module_name, depth, use_tabling=use_tabling
+                            )
                 except CutException:
                     raise
                 except PrologThrow:
@@ -198,7 +211,9 @@ class PrologEngine:
                 return
 
             # Delegate clause-search to the module's predicate index when available
-            for result in self._solve_module_predicate(module_name, key, inner_goal, subst, remaining_goals, current_module, depth):
+            for result in self._solve_module_predicate(
+                module_name, key, inner_goal, subst, remaining_goals, current_module, depth, use_tabling
+            ):
                 yield result
             return
 
@@ -207,23 +222,33 @@ class PrologEngine:
             try:
                 for new_subst in builtin_results:
                     if new_subst is not None:
-                        yield from self._solve_goals(remaining_goals, new_subst, current_module, depth)
+                        yield from self._solve_goals(
+                            remaining_goals, new_subst, current_module, depth, use_tabling=use_tabling
+                        )
             except CutException:
                 raise
             except PrologThrow:
                 raise
             return
 
+        if use_tabling and self._is_tabled_goal(goal):
+            yield from self._solve_tabled(goal, remaining_goals, subst, current_module, depth)
+            return
+
         # Check if goal is an imported predicate in current module
         imported_module = self._check_imported_predicate(current_module, goal)
         if imported_module is not None:
             # Resolve from imported module
-            for result in self._solve_module_predicate(imported_module, None, goal, subst, remaining_goals, current_module, depth):
+            for result in self._solve_module_predicate(
+                imported_module, None, goal, subst, remaining_goals, current_module, depth, use_tabling
+            ):
                 yield result
             return
 
         # Try to solve from current module predicates first
-        for result in self._solve_module_predicate(current_module, None, goal, subst, remaining_goals, current_module, depth):
+        for result in self._solve_module_predicate(
+            current_module, None, goal, subst, remaining_goals, current_module, depth, use_tabling
+        ):
             yield result
 
         # If no solutions from current module, try global predicates (user module and others)
@@ -257,10 +282,14 @@ class PrologEngine:
                 clause_module = getattr(renamed_clause, 'module', 'user')
                 try:
                     if renamed_clause.is_fact():
-                        yield from self._solve_goals(remaining_goals, new_subst, clause_module, depth)
+                        yield from self._solve_goals(
+                            remaining_goals, new_subst, clause_module, depth, use_tabling=use_tabling
+                        )
                     else:
                         new_goals = body_goals + remaining_goals
-                        yield from self._solve_goals(new_goals, new_subst, clause_module, depth + 1)
+                        yield from self._solve_goals(
+                            new_goals, new_subst, clause_module, depth + 1, use_tabling=use_tabling
+                        )
                 except CutException:
                     if clause_has_cut:
                         cut_executed = True
@@ -268,6 +297,78 @@ class PrologEngine:
                         raise
                 except PrologThrow:
                     raise
+
+    def _is_tabled_goal(self, goal: Any) -> bool:
+        """Check if the given goal corresponds to a tabled predicate."""
+
+        key = None
+        if isinstance(goal, Compound):
+            key = (goal.functor, len(goal.args))
+        elif isinstance(goal, Atom):
+            key = (goal.name, 0)
+        return key in self._tabled_predicates if key is not None else False
+
+    def _compute_call_signature(self, goal: Compound | Atom, subst: Substitution) -> tuple:
+        """Create a hashable signature for a tabled call based on its arguments."""
+
+        normalized_goal = apply_substitution(goal, subst)
+        var_ids: dict[int, int] = {}
+
+        def _normalize(term: Any) -> Any:
+            term = deref(term, subst)
+            if isinstance(term, Variable):
+                idx = var_ids.setdefault(id(term), len(var_ids))
+                return ("_", idx)
+            if isinstance(term, Atom):
+                return ("atom", term.name)
+            if isinstance(term, Number):
+                return ("number", term.value)
+            if isinstance(term, Compound):
+                return (term.functor, tuple(_normalize(arg) for arg in term.args))
+            if isinstance(term, List):
+                elems = tuple(_normalize(elem) for elem in term.elements)
+                tail = _normalize(term.tail) if term.tail is not None else None
+                return ("list", elems, tail)
+            return term
+
+        if isinstance(normalized_goal, Atom):
+            return (normalized_goal.name, ())
+        return (normalized_goal.functor, tuple(_normalize(arg) for arg in normalized_goal.args))
+
+    def _solve_tabled(
+        self,
+        goal: Compound | Atom,
+        remaining_goals: list[Compound],
+        subst: Substitution,
+        current_module: str,
+        depth: int,
+    ) -> Iterator[Substitution]:
+        key = (goal.functor, len(goal.args)) if isinstance(goal, Compound) else (goal.name, 0)
+        if key is None:
+            return iter(())
+
+        signature = self._compute_call_signature(goal, subst)
+        predicate_cache = self._table_cache.setdefault(key, {})
+        entry = predicate_cache.get(signature)
+
+        if entry is not None:
+            for answer_subst in entry.get("answers", []):
+                yield from self._solve_goals(remaining_goals, answer_subst, current_module, depth)
+            # If another call is currently computing this signature, rely on it
+            if entry.get("computing", False):
+                return
+            return
+
+        entry = {"answers": [], "computing": True}
+        predicate_cache[signature] = entry
+        try:
+            for answer_subst in self._solve_goals(
+                [goal], subst, current_module, depth, use_tabling=False
+            ):
+                entry["answers"].append(answer_subst)
+                yield from self._solve_goals(remaining_goals, answer_subst, current_module, depth)
+        finally:
+            entry["computing"] = False
 
     def _check_imported_predicate(self, current_module_name: str, goal) -> str | None:
         """Check if goal is an imported predicate in current module, return source module name."""
@@ -292,7 +393,17 @@ class PrologEngine:
         # Check imports
         return current_mod.imports.get(key)
 
-    def _solve_module_predicate(self, module_name, key, inner_goal, subst, remaining_goals, current_module="user", depth=0):
+    def _solve_module_predicate(
+        self,
+        module_name,
+        key,
+        inner_goal,
+        subst,
+        remaining_goals,
+        current_module="user",
+        depth=0,
+        use_tabling: bool = True,
+    ):
         # Resolve a module-qualified goal by consulting the module's predicate index if available.
         module = getattr(self.interpreter, "modules", {}).get(module_name)
         if module is None:
@@ -319,10 +430,14 @@ class PrologEngine:
                 clause_has_cut = any(isinstance(g, Cut) for g in body_goals)
                 try:
                     if renamed_clause.is_fact():
-                        yield from self._solve_goals(remaining_goals, new_subst, module_name, depth)
+                        yield from self._solve_goals(
+                            remaining_goals, new_subst, module_name, depth, use_tabling=use_tabling
+                        )
                     else:
                         new_goals = body_goals + remaining_goals
-                        yield from self._solve_goals(new_goals, new_subst, module_name, depth + 1)
+                        yield from self._solve_goals(
+                            new_goals, new_subst, module_name, depth + 1, use_tabling=use_tabling
+                        )
                 except CutException:
                     if clause_has_cut:
                         cut_executed = True
