@@ -345,6 +345,43 @@ The `library(atts)` module provides the foundation for constraint libraries like
 - Implement constraint propagation through `verify_attributes/3`
 - Handle unification of constrained variables
 
+### Residual Goal Projection
+
+The `library($project_atts)` module (`vibeprolog/builtins/project_atts.py`) handles projection of attributed variable constraints into residual goals. This is used for:
+
+1. **`copy_term/3`**: When copying a term with attributed variables, the third argument receives a list of goals that represent the constraints.
+
+2. **Toplevel display**: When a query completes with attributed variables, residual goals show the remaining constraints in human-readable form.
+
+**Key predicates:**
+
+- **`term_residual_goals(Term, Goals)`**: Collects all attributed variables in `Term` and converts their attributes to goal terms. For each attributed variable:
+  1. If the defining module exports `attribute_goals//1`, that DCG hook is called
+  2. Otherwise, a default `put_atts(Var, +Attr)` goal is generated
+
+- **`project_attributes(QueryVars, AttrVars)`**: Projects constraints from `AttrVars` onto `QueryVars`. For each module with attributes:
+  1. If the module exports `project_attributes/2`, it is called for module-specific projection
+  2. This allows constraint libraries to hide internal variables from the user
+
+**The `attribute_goals//1` hook:**
+
+Modules define this DCG to describe how their attributes should appear as goals:
+
+```prolog
+% In library(freeze)
+attribute_goals(Var) -->
+    { get_atts(Var, frozen(Goals)),
+      put_atts(Var, -frozen(_)) },
+    [freeze:freeze(Var, Goals)].
+```
+
+**Implementation details:**
+
+- The `$` prefix in `$project_atts` indicates an internal/system module
+- Goals are collected by traversing the term for attributed variables using `term_attvars/2`
+- The DCG hook mechanism attempts to call `Module:attribute_goals(Var, S0, S)` and extracts goals from the difference list
+- If no hook is defined, the raw attribute is wrapped in a `put_atts/2` goal
+
 ## Recursion Depth Limits
 
 The engine enforces a maximum recursion depth to prevent Python stack overflow and provide clear error messages for infinite recursion.
