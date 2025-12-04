@@ -1062,20 +1062,24 @@ class PrologInterpreter:
             module_term = head.args[0]
             actual_head = head.args[1]
 
-            # Module must be an atom
-            if isinstance(module_term, Atom):
-                target_module = module_term.name
-                head = actual_head  # Use the actual head for key computation
-                # Create a new clause with the actual head (without module qualification)
-                clause = Clause(
-                    head=actual_head,
-                    body=clause.body,
-                    doc=getattr(clause, "doc", None),
-                    meta=getattr(clause, "meta", None),
-                    dcg=getattr(clause, "dcg", False),
+            # Module must be an atom - raise appropriate errors for invalid types
+            if isinstance(module_term, Variable):
+                # Variable module specifier is an instantiation error
+                raise PrologThrow(
+                    PrologError.instantiation_error("consult/1")
                 )
-                # Set the module attribute on the new clause
-                clause.module = target_module
+            elif not isinstance(module_term, Atom):
+                # Non-atom module specifier (e.g., number, compound) is a type error
+                raise PrologThrow(
+                    PrologError.type_error("atom", module_term, "consult/1")
+                )
+
+            # Valid atom module specifier
+            target_module = module_term.name
+            head = actual_head  # Use the actual head for key computation
+            # Modify the clause in-place to use the actual head
+            clause.head = actual_head
+            clause.module = target_module
 
         # Compute key from (possibly updated) head
         if isinstance(head, Compound):

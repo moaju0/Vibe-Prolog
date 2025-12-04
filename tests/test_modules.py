@@ -561,3 +561,17 @@ class TestModuleQualifiedClauseHeads:
         assert "newmod" in prolog.modules
         # Predicate should be accessible (though not exported)
         assert ("new_pred", 1) in prolog.modules["newmod"].predicates
+
+    def test_module_qualified_head_with_variable_module(self):
+        """Using a variable for the module in a qualified head raises an error."""
+        prolog = PrologInterpreter()
+        with pytest.raises(PrologThrow) as excinfo:
+            prolog.consult_string("M:foo(a).")
+        assert "instantiation_error" in str(excinfo.value.term)
+
+    def test_module_qualified_head_with_non_atom_module(self):
+        """Using a non-atom for the module in a qualified head raises an error."""
+        prolog = PrologInterpreter()
+        with pytest.raises(PrologThrow) as excinfo:
+            prolog.consult_string("123:foo(a).")
+        assert "type_error" in str(excinfo.value.term)
