@@ -3,6 +3,7 @@
 import io
 import re
 import sys
+import warnings
 from pathlib import Path
 from typing import Any
 
@@ -34,6 +35,9 @@ LIBRARY_SEARCH_PATHS = [
     PROJECT_ROOT / "examples" / "modules",
 ]
 LOADED_MODULE_PREFIX = "loaded:"
+
+# Scryer-specific directives that are recognized but ignored with a warning
+IGNORED_DIRECTIVES = {"non_counted_backtracking", "meta_predicate"}
 
 
 class Module:
@@ -193,6 +197,22 @@ class PrologInterpreter:
     ):
         """Handle a directive."""
         goal = directive.goal
+
+        # Check for ignored directives (Scryer-specific directives we don't support)
+        directive_name = None
+        if isinstance(goal, Compound) and goal.functor in IGNORED_DIRECTIVES:
+            directive_name = goal.functor
+        elif isinstance(goal, Atom) and goal.name in IGNORED_DIRECTIVES:
+            directive_name = goal.name
+        
+        if directive_name is not None:
+            from vibeprolog.utils.term_utils import term_to_string
+            goal_str = term_to_string(goal)
+            warnings.warn(
+                f"Ignoring unsupported directive: {goal_str}",
+                stacklevel=2
+            )
+            return
 
         # Module declaration: :- module(Name, Exports).
         if isinstance(goal, Compound) and goal.functor == "module" and len(goal.args) == 2:

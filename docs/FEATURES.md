@@ -64,6 +64,15 @@ Status legend:
 | `:- op/3`              | ✅      | Full support - defines operators with validation |
 | `:- char_conversion/2` | ❌      | **ISO-required**                         |
 
+### Ignored Directives (Scryer-Prolog Specific)
+
+The following Scryer-Prolog specific directives are recognized but ignored (with a warning):
+
+| Directive | Purpose | Status |
+|-----------|---------|--------|
+| `:- non_counted_backtracking pred/N` | Inference counting hint | ⚠️ Ignored with warning |
+| `:- meta_predicate(...)` | Module expansion hints | ⚠️ Ignored with warning |
+
 ---
 
 ## §7.8 — Control Constructs
