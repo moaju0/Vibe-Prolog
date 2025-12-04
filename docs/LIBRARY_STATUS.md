@@ -582,8 +582,8 @@ File loading exceeded 30 seconds
 The following library files have issues that should be investigated and addressed:
 
 1. **library/arithmetic.pl** - ❌ Timeout
-1. **library/assoc.pl** - ❌ Timeout
-1. **library/between.pl** - ❌ Timeout
+2. **library/assoc.pl** - ❌ Timeout
+3. **library/between.pl** - ❌ Timeout
 1. **library/builtins.pl** - ❌ Timeout
 1. **library/charsio.pl** - ❌ Timeout
 1. **library/clpb.pl** - ❌ Timeout
