@@ -163,8 +163,8 @@ __OPERATOR_GRAMMAR__
 
     // Character codes: 0'X where X is any character (must come before NUMBER)
     // Patterns: 0'a (simple char), 0'\\ (backslash), 0'\' (quote), 0''' (doubled quote), 0'\xHH (hex)
-    // Allow broader alphanumerics after \\x so lexer does not reject malformed hex sequences that should become syntax errors
-    CHAR_CODE.5: /0'(\\x[0-9a-zA-Z]+\\?|\\\\\\\\|\\\\['tnr]|''|[^'\\])/ | /\d+'.'/
+    // Allow trailing quote (e.g., 0'\\') while keeping legacy forms without it; allow broader alphanumerics after \\x so lexer does not reject malformed hex sequences that should become syntax errors
+    CHAR_CODE.5: /0'(\\x[0-9a-zA-Z]+\\?|\\\\|\\\\['tnr]|''|[^'\\])'?/ | /\d+'.'/
 
     STRING: /"([^"\\]|\\.)*"/ | /'(\\.|''|[^'\\])*'/
     SPECIAL_ATOM: /'([^'\\]|\\.)+'/
@@ -680,6 +680,15 @@ class PrologTransformer(Transformer):
         # Standard 0'X format
         if code_str.startswith("0'"):
             char_part = code_str[2:]
+
+            # Strip a trailing quote used as a closing delimiter, but keep escapes that
+            # intentionally include a quote character ('' or \\').
+            if (
+                len(char_part) > 1
+                and char_part.endswith("'")
+                and char_part not in {"''", "\\'"}
+            ):
+                char_part = char_part[:-1]
 
             # Handle doubled quote escape ''
             if char_part == "''":
