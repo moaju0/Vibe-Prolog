@@ -817,7 +817,7 @@ def tokenize_prolog_statements(prolog_code: str) -> list[str]:
                 continue
 
         # Track nesting depth for parentheses, brackets, braces
-        if not in_single_quote and not in_double_quote and not in_line_comment and in_block_comment == 0:
+        if not in_single_quote and not in_double_quote:
             if char == '(':
                 paren_depth += 1
             elif char == ')' and paren_depth > 0:
