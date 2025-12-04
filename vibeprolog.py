@@ -181,10 +181,16 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
+  # Start interactive mode without loading a file
+  %(prog)s
+
   # Load a program and start interactive mode
   %(prog)s examples.pl
 
-  # Execute a specific query
+  # Execute a specific query without a file
+  %(prog)s -q "member(X, [1,2,3])"
+
+  # Execute a specific query with a loaded program
   %(prog)s examples.pl -q "member(X, [1,2,3])"
 
   # Get only the first solution
@@ -200,7 +206,8 @@ Examples:
 
     parser.add_argument(
         'file',
-        help='Prolog program file to load (.pl)'
+        nargs='?',
+        help='Prolog program file to load (.pl) - optional for interactive mode'
     )
 
     parser.add_argument(
@@ -256,9 +263,10 @@ Examples:
     # Create interpreter
     prolog = PrologInterpreter(argv=args.program_args, builtin_conflict=args.builtin_conflict)
 
-    # Load the program
-    if not load_program(prolog, args.file, args.verbose):
-        return 1
+    # Load the program if a file was provided
+    if args.file:
+        if not load_program(prolog, args.file, args.verbose):
+            return 1
 
     # Execute query or start interactive mode
     if args.query:

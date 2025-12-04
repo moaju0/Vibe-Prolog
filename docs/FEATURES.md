@@ -472,6 +472,36 @@ Common extensions frequently used in real-world Prolog programs:
 
 ---
 
+## Command-Line Interface
+
+The Vibe-Prolog CLI supports both interactive and batch modes, with optional program file loading.
+
+### Interactive Mode Without Files
+
+Unlike many Prolog systems that require a program file, Vibe-Prolog allows starting interactive mode without loading any files:
+
+```bash
+# Start interactive REPL without any loaded program
+uv run vibeprolog.py
+
+# Execute queries directly without file loading
+uv run vibeprolog.py -q "member(X, [1,2,3])"
+```
+
+This matches the behavior of standard Prolog systems like SWI-Prolog and Scryer-Prolog.
+
+### File Loading (Optional)
+
+Program files can still be loaded as before:
+
+```bash
+# Load and start interactive mode
+uv run vibeprolog.py examples.pl
+
+# Load and execute query
+uv run vibeprolog.py examples.pl -q "my_predicate(X)"
+```
+
 ## Command-Line Options
 
 ### `--builtin-conflict` Flag

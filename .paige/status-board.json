@@ -1,0 +1,35 @@
+{
+  "columns": [
+    {
+      "name": "Open Issues",
+      "cards": [
+        {
+          "content": "<p>#261 Complete Reflection System: Extend predicate_property/2 with dynamic/static/multifile Properties</p>\n",
+          "checked": false
+        }
+      ]
+    },
+    {
+      "name": "Open Pull Requests",
+      "cards": [
+        {
+          "content": "<table>\n<thead>\n<tr>\n<th>Pull request</th>\n<th>Reviewer Count</th>\n<th>Gemini Review Complete</th>\n<th>Kilocode Review Complete</th>\n<th>CI Status</th>\n<th>Status</th>\n</tr>\n</thead>\n<tbody><tr>\n<td><em>No open pull requests</em></td>\n<td>0</td>\n<td>False</td>\n<td>False</td>\n<td>unknown</td>\n<td>Ready to Merge</td>\n</tr>\n</tbody></table>\n",
+          "checked": false
+        }
+      ]
+    }
+  ],
+  "metadata": {
+    "type": "kanban",
+    "columns": [
+      "ToDo",
+      "In-Progress",
+      "PR-Raised",
+      "PR-WaitingOnReviews",
+      "PR-Conflict",
+      "PR-NeedsFix",
+      "PR-Ready",
+      "Done"
+    ]
+  }
+}
