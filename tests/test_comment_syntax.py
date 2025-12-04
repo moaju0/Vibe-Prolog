@@ -115,9 +115,9 @@ class TestBlockCommentSyntax:
         parser = PrologParser()
         with open("library/crypto.pl", "r") as f:
             content = f.read()
-        # Should not raise an exception when stripping comments
-        cleaned, _ = parser._strip_block_comments(content)
-        assert len(cleaned) > 0  # Should have content after stripping comments
+        # Should not raise an exception
+        clauses = parser.parse(content)
+        assert len(clauses) > 0  # Should have parsed some clauses
 
     def test_uuid_library_loads(self):
         """Test that library/uuid.pl loads without comment syntax errors."""
