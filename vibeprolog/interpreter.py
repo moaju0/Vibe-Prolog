@@ -1055,6 +1055,7 @@ class PrologInterpreter:
         """
 
         head = clause.head
+        is_cross_module_definition = False  # Track if this is a module-qualified head
 
         # Handle module-qualified clause heads (Module:Head :- Body)
         if isinstance(head, Compound) and head.functor == ":" and len(head.args) == 2:
@@ -1077,6 +1078,7 @@ class PrologInterpreter:
             head = actual_head
             clause.head = actual_head
             clause.module = module_term.name
+            is_cross_module_definition = True
 
         # Compute key from (possibly updated) head
         if isinstance(head, Compound):
@@ -1093,6 +1095,11 @@ class PrologInterpreter:
         # Register clause under module if present
         self.modules.setdefault(module_name, Module(module_name, set()))
         mod = self.modules[module_name]
+
+        # If this is a cross-module definition (Module:Head), export the predicate
+        # so it can be called via module-qualified syntax
+        if is_cross_module_definition:
+            mod.exports.add(key)
 
         # Check if it's a built-in (global check)
         global_properties = self.predicate_properties.get(key, set())
