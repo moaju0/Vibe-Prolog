@@ -799,6 +799,9 @@ def tokenize_prolog_statements(prolog_code: str) -> list[str]:
     in_block_comment = 0
     escape_next = False
     has_code = False
+    paren_depth = 0
+    bracket_depth = 0
+    brace_depth = 0
 
     while i < len(prolog_code):
         char = prolog_code[i]
@@ -875,8 +878,23 @@ def tokenize_prolog_statements(prolog_code: str) -> list[str]:
                 i += 2
                 continue
 
+        # Track nesting depth for parentheses, brackets, braces
+        if not in_single_quote and not in_double_quote:
+            if char == '(':
+                paren_depth += 1
+            elif char == ')' and paren_depth > 0:
+                paren_depth -= 1
+            elif char == '[':
+                bracket_depth += 1
+            elif char == ']' and bracket_depth > 0:
+                bracket_depth -= 1
+            elif char == '{':
+                brace_depth += 1
+            elif char == '}' and brace_depth > 0:
+                brace_depth -= 1
+
         # Handle period (end of clause)
-        if char == '.' and not in_single_quote and not in_double_quote:
+        if char == '.' and not in_single_quote and not in_double_quote and paren_depth == 0 and bracket_depth == 0 and brace_depth == 0:
             # Check for ... (ellipsis) or .. (range operator)
             if prolog_code[i:i+3] == '...':
                 current.append('.')
@@ -895,7 +913,7 @@ def tokenize_prolog_statements(prolog_code: str) -> list[str]:
             # Heuristic to check if this period is part of a number (e.g., 1.2 or 1.)
             # to avoid splitting clauses incorrectly.
             is_decimal_point = (i > 0 and prolog_code[i-1].isdigit()) or \
-                               (i + 1 < len(prolog_code) and prolog_code[i+1].isdigit())
+                                (i + 1 < len(prolog_code) and prolog_code[i+1].isdigit())
             if is_decimal_point:
                 i += 1
                 continue
