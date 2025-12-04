@@ -55,3 +55,17 @@ def test_tabled_predicate_with_variables():
     solutions = prolog.query("member(X, [a, b]).")
     values = {sol["X"] for sol in solutions}
     assert values == {"a", "b"}
+
+
+def test_tabled_variant_calls_produce_fresh_bindings():
+    prolog = PrologInterpreter()
+    prolog.consult_string(
+        ":- table(member/2). member(X, [X|_]). member(X, [_|T]) :- member(X, T)."
+    )
+
+    first_values = {sol["X"] for sol in prolog.query("member(X, [a, b]).")}
+    assert first_values == {"a", "b"}
+
+    # Re-query with a different variable name to ensure cached answers unify correctly
+    second_values = {sol["Y"] for sol in prolog.query("member(Y, [a, b]).")}
+    assert second_values == {"a", "b"}

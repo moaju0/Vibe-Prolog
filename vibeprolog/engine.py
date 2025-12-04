@@ -352,8 +352,10 @@ class PrologEngine:
         entry = predicate_cache.get(signature)
 
         if entry is not None:
-            for answer_subst in entry.get("answers", []):
-                yield from self._solve_goals(remaining_goals, answer_subst, current_module, depth)
+            for answer_goal in entry.get("answers", []):
+                new_subst = unify(goal, answer_goal, subst)
+                if new_subst is not None:
+                    yield from self._solve_goals(remaining_goals, new_subst, current_module, depth)
             # If another call is currently computing this signature, rely on it
             if entry.get("computing", False):
                 return
@@ -365,7 +367,8 @@ class PrologEngine:
             for answer_subst in self._solve_goals(
                 [goal], subst, current_module, depth, use_tabling=False
             ):
-                entry["answers"].append(answer_subst)
+                answer_goal = apply_substitution(goal, answer_subst)
+                entry["answers"].append(answer_goal)
                 yield from self._solve_goals(remaining_goals, answer_subst, current_module, depth)
         finally:
             entry["computing"] = False
