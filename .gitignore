@@ -27,5 +27,5 @@ website/dist/
 website/src/content/
 website/.astro/
 
-# Claude session IDs
-paige/
+
+.env

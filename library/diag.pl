@@ -58,13 +58,13 @@ set_local_value(x(2)).
 set_void(1).
 set_constant('$index_ptr'(115334)).
 get_variable(x(4),1).
-put_structure(:,2,x(1)).
+put_structure(':',2,x(1)).
 set_constant(user).
 set_local_value(x(3)).
 get_variable(x(5),2).
 put_value(x(4),2).
 execute(maplist,2).
-   Is = [put_structure('$aux',2,x(3)),set_local_value(x(2)),set_void(1),set_constant('$index_ptr'(115334)),get_variable(x(4),1),put_structure(:,2,x(1)),set_constant(user),set_local_value(x(3)),get_variable(x(5),2),put_value(x(4),2),execute(maplist,2)].
+   Is = [put_structure('$aux',2,x(3)),set_local_value(x(2)),set_void(1),set_constant('$index_ptr'(115334)),get_variable(x(4),1),put_structure(':',2,x(1)),set_constant(user),set_local_value(x(3)),get_variable(x(5),2),put_value(x(4),2),execute(maplist,2)].
 ```
 
   The `'$index_ptr(115334)` functor gives a code offset to an inlined

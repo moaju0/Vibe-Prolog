@@ -222,7 +222,7 @@ class PrologInterpreter:
             # Check if at least one solution exists
             next(solutions)
             return True
-        except (StopIteration, PrologThrow, CutException):
+        except (StopIteration, CutException):
             return False
 
     def _ensure_builtin_properties(self) -> None:
