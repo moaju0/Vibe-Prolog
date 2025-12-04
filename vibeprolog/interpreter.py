@@ -410,9 +410,9 @@ class PrologInterpreter:
                                 SyntaxWarning,
                                 stacklevel=2
                             )
-                        elif isinstance(normalized_name, Atom) and isinstance(arity_arg, Number):
+                        elif isinstance(normalized_name, Atom) and isinstance(arity_arg, Number) and int(arity_arg.value) + 2 >= 0:
                             # DCG predicates get +2 to their arity when expanded
-                            # Export both the DCG form and the expanded form
+                            # Export the expanded form
                             exports.add((normalized_name.name, int(arity_arg.value) + 2))
                         else:
                             # Skip invalid predicate indicators with a warning
@@ -1039,7 +1039,7 @@ class PrologInterpreter:
         if isinstance(term, Atom):
             return term
         # Handle parenthesized operators like (,) which are parsed as compounds with no args
-        if hasattr(term, "functor") and hasattr(term, "args") and len(term.args) == 0:
+        if isinstance(term, Compound) and not term.args:
             return Atom(term.functor)
         reconstructed = self._reconstruct_operator_name(term)
         if reconstructed is not None:
