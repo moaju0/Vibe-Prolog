@@ -188,7 +188,7 @@ __OPERATOR_GRAMMAR__
     // Special atom operators must have HIGHEST priority to prevent being parsed as prefix operators
     SPECIAL_ATOM_OPS.12: /-\$/ | /\$-/
 
-    // Scientific notation, hex, octal, binary, base'digits
+    // Scientific notation, hex, octal, binary, Edinburgh <radix>'<number>
     NUMBER.4: /-?0x[0-9a-fA-F]+/i
             | /-?0o[0-7]+/i
             | /-?0b[01]+/i
@@ -674,7 +674,14 @@ class PrologTransformer(Transformer):
         return Number(-num.value)
 
     def _parse_base_number(self, value):
-        """Parse base'digits syntax like 16'ff or -2'abcd."""
+        """Parse Edinburgh <radix>'<number> syntax like 16'ff or -2'abcd.
+
+        Edinburgh syntax: <radix>'<number> where:
+        - <radix> is the base (2-36)
+        - <number> is the digits in that base
+
+        Examples: 16'ff' (hex), 2'1010' (binary), 36'ZZZ' (base-36)
+        """
         # Handle negative sign
         negative = value.startswith('-')
         if negative:
@@ -700,7 +707,7 @@ class PrologTransformer(Transformer):
             # Convert single digit in base up to 36
             digit_val = int(digit, 36)
             if digit_val >= base:
-                raise ValueError(f"Invalid digit '{digit}' for base {base} in {value}")
+                raise ValueError(f"Invalid digit '{digit}' for radix {base} in Edinburgh syntax: {value}")
             result = result * base + digit_val
 
         if negative:
@@ -709,7 +716,10 @@ class PrologTransformer(Transformer):
         return Number(result)
 
     def char_code(self, items):
-        """Handle character code notation like 0'X or base'char."""
+        """Handle character code notation like 0'X.
+
+        Note: base'char'number syntax (e.g., 16'mod'2) is intentionally not implemented.
+        """
         code_str = str(items[0])
 
         # Check for base'char format (e.g., 16'mod'2)
