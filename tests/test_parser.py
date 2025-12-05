@@ -1112,6 +1112,42 @@ class TestDotAndRangeOperator:
         assert isinstance(range_term, Compound)
         assert range_term.functor == '..'
 
+    def test_range_with_trailing_float(self):
+        """Regression test: 1..2.3 should be parsed correctly without splitting clauses.
+        
+        The regex pattern for detecting clause terminators must not incorrectly
+        treat 1..2. (from 1..2.3) as a clause terminator when followed by a digit.
+        This test ensures the clause is not split into two tokens.
+        """
+        from vibeprolog.parser import tokenize_prolog_statements
+        
+        # Test tokenization first
+        code = 'test :- X = 1..2.3.'
+        statements = list(tokenize_prolog_statements(code))
+        assert len(statements) == 1, f"Expected 1 statement, got {len(statements)}: {statements}"
+        assert statements[0] == code
+        
+        # Now test parsing
+        parser = PrologParser()
+        clauses = parser.parse('test :- X = 1..2.3.')
+        assert len(clauses) == 1
+        clause = clauses[0]
+        # Head should be the atom 'test'
+        assert isinstance(clause.head, Atom)
+        assert clause.head.name == 'test'
+        assert len(clause.body) == 1
+        
+        # The body should be X = 1..2.3 where 1..2.3 is parsed as part of the expression
+        goal = clause.body[0]
+        assert isinstance(goal, Compound)
+        assert goal.functor == '='
+        # The RHS should be a range expression with a float: ..(1, 2.3)
+        rhs = goal.args[1]
+        assert isinstance(rhs, Compound)
+        assert rhs.functor == '..'
+        assert rhs.args[0] == Number(1)
+        assert rhs.args[1] == Number(2.3)
+
     def test_ellipsis_pattern(self):
         """Ellipsis ... pattern in DCG rules."""
         parser = PrologParser()
