@@ -192,11 +192,11 @@ __OPERATOR_GRAMMAR__
     NUMBER.4: /-?0x[0-9a-fA-F]+/i
             | /-?0o[0-7]+/i
             | /-?0b[01]+/i
-            | /-?\d+\.?\d*[eE][+-]?\d+/
-            | /-?\d+\.\d+/
-            | /-?\.\d+/
+            | /-?[\d_]+\.?[\d_]*[eE][+-]?[\d_]+/
+            | /-?[\d_]+\.[\d_]+/
+            | /-?\.[\d_]+/
             | /-?\d+'[a-zA-Z0-9_]+/
-            | /-?\d+/
+            | /-?[\d_]+/
 
     ATOM: /[a-z][a-zA-Z0-9_]*/ | /\{\}/ | /\$[a-zA-Z0-9_-]*/ | /[+\-*\/]/
 
@@ -661,9 +661,13 @@ class PrologTransformer(Transformer):
             return self._parse_base_number(value)
         elif "e" in value.lower() or "." in value:
             # Scientific notation or float
+            self._validate_underscore_placement(value)
+            value = value.replace('_', '')
             return Number(float(value))
         else:
             # Regular integer
+            self._validate_underscore_placement(value)
+            value = value.replace('_', '')
             return Number(int(value))
 
     def negative_number(self, items):
@@ -672,6 +676,21 @@ class PrologTransformer(Transformer):
         num = items[-1]
         assert isinstance(num, Number), f"Expected Number, got {type(num).__name__}"
         return Number(-num.value)
+
+    def _validate_underscore_placement(self, value: str) -> None:
+        """Validate underscore placement in decimal number strings."""
+        if '_' not in value:
+            return
+        # No leading or trailing underscores
+        if value.startswith('_') or value.endswith('_'):
+            raise PrologThrow(PrologError.syntax_error("invalid underscore placement", "number/1"))
+        # No double underscores
+        if '__' in value:
+            raise PrologThrow(PrologError.syntax_error("invalid underscore placement", "number/1"))
+        # No underscores adjacent to special characters
+        for char in '.eE+-':
+            if f'_{char}' in value or f'{char}_' in value:
+                raise PrologThrow(PrologError.syntax_error("invalid underscore placement", "number/1"))
 
     def _parse_base_number(self, value):
         """Parse Edinburgh <radix>'<number> syntax like 16'ff or -2'abcd.
