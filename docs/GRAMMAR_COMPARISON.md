@@ -40,16 +40,16 @@ All three implementations are largely ISO-compliant with minor differences in:
 | **Integers** | `42`, `-17` | `42`, `-17` | `42`, `-17` | ✅ Fully compatible |
 | **Floats** | `3.14`, `-0.5` | `3.14`, `-0.5` | `3.14`, `-0.5` | ✅ Fully compatible |
 | **Scientific** | `1.5e-3`, `2E10` | `1.5e-3`, `2E10` | `1.5e-3`, `2E10` | ✅ Fully compatible |
-| **Underscore grouping** | ❌ Not supported | ✅ `1_000_000` | ✅ `1_000_000` | ⚠️ SWI/Scryer only ([#304](https://github.com/nlothian/Vibe-Prolog/issues/304)) |
+| **Underscore grouping** | ✅ `1_000_000`| ✅ `1_000_000` | ✅ `1_000_000` | ✅ Fully compatible |
 | **Space grouping** | ❌ Not supported | ❌ Not supported | ✅ `1 000 000` (radix ≤10) | ⚠️ SWI-only |
 
-**Recommendation**: Avoid underscores and spaces in number literals for maximum portability.
+**Recommendation**: Avoid spaces in number literals for maximum portability.
 
-### 2.2 Base-Qualified Numbers (CRITICAL DIFFERENCES)
+### 2.2 Base-Qualified Numbers (SOME DIFFERENCES)
 
 | Format | Vibe-Prolog | Scryer-Prolog | SWI-Prolog | Status |
 |--------|-------------|---------------|------------|--------|
-| **Hexadecimal** | `0xff` (lowercase) | `0xABC` (any case) | `0xABC` (any case) | ⚠️ **Case incompatible** ([#302](https://github.com/nlothian/Vibe-Prolog/issues/302)) |
+| **Hexadecimal** | `0xff` (any case) | `0xABC` (any case) | `0xABC` (any case) |  ✅ Fully compatible |
 | **Octal** | `0o77` | `0o755` | `0o755` | ✅ Fully compatible |
 | **Binary** | `0b101` | `0b1010` | `0b1010` | ✅ Fully compatible |
 | **Edinburgh <radix>'<number>** | ✅ `16'FF`, `36'ZZZ` (2-36) | ❌ Not supported | ✅ `16'FF`, `36'ZZZ` (2-36) | ⚠️ Vibe/SWI only ([#303](https://github.com/nlothian/Vibe-Prolog/issues/303)) |
@@ -61,8 +61,8 @@ All three implementations are largely ISO-compliant with minor differences in:
 ```prolog
 % Hexadecimal literals - THREE DIFFERENT BEHAVIORS:
 % Vibe-Prolog:
-X = 0xff.        % Works: X = 255 (lowercase only)
-X = 0xFF.        % SYNTAX ERROR (uppercase not supported)
+X = 0xABC.       % Works: X = 2748 (any case)
+X = 0xff.        % Works: X = 255
 X = 16'ff'.      % Works: X = 255 (Edinburgh syntax)
 
 % Scryer-Prolog:
@@ -78,10 +78,8 @@ X = 1.0Inf.      % Works: X = +infinity
 ```
 
 **Recommendations for portability**:
-- **All three systems**: Use decimal numbers when possible
+- **All three systems**: Use decimal numbers or `0x` prefix with any case (`0xFF`) when possible
 - **Vibe + SWI**: Edinburgh `<radix>'<number>` syntax (`16'ff'`)
-- **Scryer + SWI**: `0x` prefix with any case (`0xFF`)
-- **Vibe only**: `0x` prefix with lowercase (`0xff`)
 
 ### 2.3 Character Code Syntax
 
@@ -90,7 +88,7 @@ X = 1.0Inf.      % Works: X = +infinity
 | **Basic** | `0'a` → 97 | `0'a` → 97 | `0'a` → 97 | ✅ Fully compatible |
 | **Backtick** | ❌ Not supported | ✅ `` `a` `` → 97 | ❌ Not supported | ⚠️ Scryer-only |
 | **Hex escape** | `0'\x41` (no terminator) | `0'\x41\` (needs `\`) | `0'\x41` (no terminator) | ⚠️ Termination differs |
-| **Empty** | `0''` → 0 | ❌ Error | ❌ Error | ⚠️ Vibe-only edge case ([#305](https://github.com/nlothian/Vibe-Prolog/issues/305)) |
+
 
 **Escape termination differences**:
 ```prolog

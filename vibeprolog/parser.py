@@ -192,11 +192,11 @@ __OPERATOR_GRAMMAR__
     NUMBER.4: /-?0x[0-9a-fA-F]+/i
             | /-?0o[0-7]+/i
             | /-?0b[01]+/i
-            | /-?\d+\.?\d*[eE][+-]?\d+/
-            | /-?\d+\.\d+/
-            | /-?\.\d+/
-            | /-?\d+'[a-zA-Z0-9_]+/
-            | /-?\d+/
+            | /-?[\d_]+\.?[\d_]*[eE][+-]?[\d_]+/
+            | /-?[\d_]+\.[\d_]+/
+            | /-?\.[\d_]+/
+            | /-?\d+['][a-zA-Z0-9_]+/
+            | /-?(?=[\d_]*\d)[\d_]+/
 
     ATOM: /[a-z][a-zA-Z0-9_]*/ | /\{\}/ | /\$[a-zA-Z0-9_-]*/ | /[+\-*\/]/
 
@@ -659,12 +659,15 @@ class PrologTransformer(Transformer):
         elif "'" in value:
             # Base'digits syntax
             return self._parse_base_number(value)
-        elif "e" in value.lower() or "." in value:
+        # Validate underscores and strip them for numeric conversion
+        self._validate_underscore_placement(value)
+        clean_value = value.replace('_', '')
+        if "e" in value.lower() or "." in value:
             # Scientific notation or float
-            return Number(float(value))
+            return Number(float(clean_value))
         else:
             # Regular integer
-            return Number(int(value))
+            return Number(int(clean_value))
 
     def negative_number(self, items):
         # The grammar rule `primary: "-" number -> negative_number` ensures
@@ -672,6 +675,21 @@ class PrologTransformer(Transformer):
         num = items[-1]
         assert isinstance(num, Number), f"Expected Number, got {type(num).__name__}"
         return Number(-num.value)
+
+    def _validate_underscore_placement(self, value: str, special_chars: str = ".eE+-") -> None:
+        """Validate underscore placement in number strings."""
+        if '_' not in value:
+            return
+        # No leading or trailing underscores
+        if value.startswith('_') or value.endswith('_'):
+            raise PrologThrow(PrologError.syntax_error("invalid underscore placement", "number/1"))
+        # No double underscores
+        if '__' in value:
+            raise PrologThrow(PrologError.syntax_error("invalid underscore placement", "number/1"))
+        # No underscores adjacent to special characters
+        for char in special_chars:
+            if f'_{char}' in value or f'{char}_' in value:
+                raise PrologThrow(PrologError.syntax_error("invalid underscore placement", "number/1"))
 
     def _parse_base_number(self, value):
         """Parse Edinburgh <radix>'<number> syntax like 16'ff or -2'abcd.
@@ -682,6 +700,8 @@ class PrologTransformer(Transformer):
 
         Examples: 16'ff' (hex), 2'1010' (binary), 36'ZZZ' (base-36)
         """
+        # Validate underscores in Edinburgh-style base numbers
+        self._validate_underscore_placement(value, special_chars="'")
         # Handle negative sign
         negative = value.startswith('-')
         if negative:

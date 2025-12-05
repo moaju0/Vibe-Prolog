@@ -6,27 +6,30 @@ This document provides detailed notes on Vibe-Prolog's syntax features, includin
 
 ### Decimal Numbers
 
-| Format | Example | Value | Status |
-|--------|---------|-------|--------|
-| Integer | `42`, `-17` | 42, -17 | ✅ Supported |
-| Float | `3.14`, `-0.5` | 3.14, -0.5 | ✅ Supported |
-| Scientific notation | `1.5e-3`, `2E10` | 0.0015, 20000000000 | ✅ Supported |
+| Format | Example | Value | Status | Notes |
+|--------|---------|-------|--------|-------|
+| Integer | `42`, `-17` | 42, -17 | ✅ Supported | Not applicable |
+| Float | `3.14`, `-0.5` | 3.14, -0.5 | ✅ Supported | - |
+| Scientific notation | `1.5e-3`, `2E10` | 0.0015, 20000000000 | ✅ Supported | - |
+| Underscore grouping | `1_000_000` | 1000000 | ✅ Supported | Same as Scryer & SWI |
+| Space grouping | `1 000 000` | — | ❌ Not supported | SWI-only extension |
+
+**Recommendation**: prefer digits (optionally with underscores) and avoid SWI-only spacing syntax so code runs on all three systems (see [docs/GRAMMAR_COMPARISON.md](./GRAMMAR_COMPARISON.md)).
 
 ### Hexadecimal Numbers
 
 | Format | Example | Value | Status | Notes |
 |--------|---------|-------|--------|-------|
-| `0x` prefix (lowercase) | `0xff` | 255 | ✅ Supported | Currently case-sensitive |
-| `0x` prefix (uppercase) | `0xFF` | N/A | ❌ Not supported | Syntax error (Issue needed) |
-| `0x` prefix (mixed case) | `0xFf` | N/A | ❌ Not supported | Syntax error (Issue needed) |
-| Edinburgh <radix>'<number> (lowercase) | `16'ff'` | 255 | ✅ Supported | Case-sensitive |
-| Edinburgh <radix>'<number> (uppercase) | `16'FF'` | 255 | ✅ Supported | Case-sensitive |
+| `0x` prefix (any case) | `0xff`, `0xFF`, `0xFf` | 255 | ✅ Supported | Mirrors Scryer & SWI |
+| Edinburgh `<radix>'<number>` | `16'ff'`, `16'FF'` | 255 | ✅ Supported | SWI-compatible; Scryer rejects |
 
-**Current Limitation**: The `0x` prefix format only accepts lowercase hex digits (`a-f`). This differs from Scryer-Prolog which accepts any case.
+**Compatibility notes**:
+- Hex digits are case-insensitive for the `0x` prefix syntax, matching the behavior documented in [GRAMMAR_COMPARISON.md](./GRAMMAR_COMPARISON.md).
+- Edinburgh-style literals remain case-sensitive to the digits supplied and are portable only between Vibe and SWI (Scryer treats them as syntax errors).
 
 **Recommendation**:
-- For portability with Scryer-Prolog, use the Edinburgh `<radix>'<number>` format: `16'ff'`
-- Or ensure `0x` literals use lowercase digits only: `0xabcdef`
+- For code shared across Vibe, Scryer, and SWI, prefer the `0x` notation, e.g., `0xFF`.
+- Use Edinburgh `<radix>'<number>` only when you explicitly target Vibe + SWI or need bases beyond hexadecimal.
 
 ### Octal Numbers
 
