@@ -24,7 +24,8 @@ Be explicit in outlining exactly what needs to be done so an inexperienced devel
 
 Be sure to include the following in each issue
 - include comprehensive test coverage
-- update FEATURES.md
+- update docs/FEATURES.md
+- update docs/SYNTAX_NOTES.md if needed
 
 Don't include estimates or line numbers
 
