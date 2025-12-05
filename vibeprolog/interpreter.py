@@ -501,6 +501,54 @@ class PrologInterpreter:
             return
 
         # Reject unsupported directives
+        if isinstance(goal, Compound) and goal.functor == "op" and len(goal.args) == 3:
+            prec_term, spec_term, name_term = goal.args
+            self.operator_table.define(prec_term, spec_term, name_term, "op/3")
+            return
+
+        # Handle char_conversion/2 directive
+        if isinstance(goal, Compound) and goal.functor == "char_conversion" and len(goal.args) == 2:
+            from_term, to_term = goal.args
+            # Validate both arguments are single-character atoms
+            if isinstance(from_term, Variable) or isinstance(to_term, Variable):
+                error_term = PrologError.instantiation_error("char_conversion/2")
+                raise PrologThrow(error_term)
+
+            # Extract characters
+            from_char = self._extract_character(from_term, "char_conversion/2")
+            to_char = self._extract_character(to_term, "char_conversion/2")
+
+            # Update the parser's conversion table
+            self.parser.set_char_conversion(from_char, to_char)
+            return
+
+        # Handle attribute/1 directive for attributed variables
+        if isinstance(goal, Compound) and goal.functor == "attribute" and len(goal.args) == 1:
+            self._handle_attribute_directive(goal.args[0])
+            return
+
+        # Handle supported directives
+        if isinstance(goal, Compound) and goal.functor == "initialization" and len(goal.args) == 1:
+            init_goal = goal.args[0]
+            # Validate the goal
+            if isinstance(init_goal, Variable):
+                error_term = PrologError.instantiation_error("initialization/1")
+                raise PrologThrow(error_term)
+            # Check if callable (not number, etc.)
+            if not isinstance(init_goal, (Compound, Atom)):
+                error_term = PrologError.type_error("callable", init_goal, "initialization/1")
+                raise PrologThrow(error_term)
+            self.initialization_goals.append(init_goal)
+            return
+
+        # Tabling directive: :- table Name/Arity[, Name2/Arity2].
+        if isinstance(goal, Compound) and goal.functor == "table" and len(goal.args) == 1:
+            indicators = self._parse_table_indicators(goal.args[0])
+            for indicator in indicators:
+                self._tabled_predicates.add(indicator)
+            return
+        # Other directives can be added here
+
     def _export_predicate_indicator(self, name_arg, arity_arg, is_dcg: bool, elt=None):
         """
         Normalize and validate a predicate indicator for module exports.
@@ -538,53 +586,6 @@ class PrologInterpreter:
                 stacklevel=2
             )
             return None
-        if isinstance(goal, Compound) and goal.functor == "op" and len(goal.args) == 3:
-            prec_term, spec_term, name_term = goal.args
-            self.operator_table.define(prec_term, spec_term, name_term, "op/3")
-            return
-
-        # Handle char_conversion/2 directive
-        if isinstance(goal, Compound) and goal.functor == "char_conversion" and len(goal.args) == 2:
-            from_term, to_term = goal.args
-            # Validate both arguments are single-character atoms
-            if isinstance(from_term, Variable) or isinstance(to_term, Variable):
-                error_term = PrologError.instantiation_error("char_conversion/2")
-                raise PrologThrow(error_term)
-            
-            # Extract characters
-            from_char = self._extract_character(from_term, "char_conversion/2")
-            to_char = self._extract_character(to_term, "char_conversion/2")
-            
-            # Update the parser's conversion table
-            self.parser.set_char_conversion(from_char, to_char)
-            return
-
-        # Handle attribute/1 directive for attributed variables
-        if isinstance(goal, Compound) and goal.functor == "attribute" and len(goal.args) == 1:
-            self._handle_attribute_directive(goal.args[0])
-            return
-
-        # Handle supported directives
-        if isinstance(goal, Compound) and goal.functor == "initialization" and len(goal.args) == 1:
-            init_goal = goal.args[0]
-            # Validate the goal
-            if isinstance(init_goal, Variable):
-                error_term = PrologError.instantiation_error("initialization/1")
-                raise PrologThrow(error_term)
-            # Check if callable (not number, etc.)
-            if not isinstance(init_goal, (Compound, Atom)):
-                error_term = PrologError.type_error("callable", init_goal, "initialization/1")
-                raise PrologThrow(error_term)
-            self.initialization_goals.append(init_goal)
-            return
-
-        # Tabling directive: :- table Name/Arity[, Name2/Arity2].
-        if isinstance(goal, Compound) and goal.functor == "table" and len(goal.args) == 1:
-            indicators = self._parse_table_indicators(goal.args[0])
-            for indicator in indicators:
-                self._tabled_predicates.add(indicator)
-            return
-        # Other directives can be added here
 
     def _parse_table_indicators(self, term: Any) -> list[tuple[str, int]]:
         """Parse the argument to a table/1 directive into predicate indicators."""
