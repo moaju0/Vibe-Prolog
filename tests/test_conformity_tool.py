@@ -55,8 +55,7 @@ class TestTestData:
         """Test that /**/ tests are marked as references_previous."""
         # Test 67 has /**/ marker
         test_67 = next(test for test in CONFORMITY_TESTS if test.num == 67)
-        assert "/**/" in test_67.query
-        # Note: references_previous is not automatically set in current implementation
+        assert test_67.references_previous
 
     def test_no_references_previous_marker(self):
         """Test that regular tests are not marked as references_previous."""

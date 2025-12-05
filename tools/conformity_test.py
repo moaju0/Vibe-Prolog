@@ -43,6 +43,11 @@ class ConformityTest:
     query: str
     references_previous: bool = False
 
+    def __post_init__(self):
+        """Set references_previous flag if the query contains the marker."""
+        if "/**/" in self.query:
+            self.references_previous = True
+
     @property
     def category(self) -> str:
         """Categorize the test based on its number."""
