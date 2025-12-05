@@ -17,6 +17,8 @@ const files = [
   { src: 'README.md', dest: 'README.md' },
   { src: 'docs/FEATURES.md', dest: 'FEATURES.md' },
   { src: 'docs/ARCHITECTURE.md', dest: 'ARCHITECTURE.md' },
+  { src: 'docs/GRAMMAR_COMPARISON.md', dest: 'GRAMMAR_COMPARISON.md' },
+  { src: 'docs/SYNTAX_NOTES.md', dest: 'SYNTAX_NOTES.md' },
   { src: 'AGENTS.md', dest: 'AGENTS.md' },
 ];
 

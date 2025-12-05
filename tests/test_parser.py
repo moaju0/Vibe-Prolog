@@ -650,6 +650,9 @@ class TestStandardPrefixes:
         ("0x10", 16),
         ("0xABC", 0xABC),
         ("-0x1A", -0x1A),
+        ("0xAbC", 0xABC),  # Mixed case
+        ("0xabcdef", 0xabcdef),  # Lowercase
+        ("0xABCDEF", 0xABCDEF),  # Uppercase
     ])
     def test_hexadecimal_numbers(self, literal, expected):
         parser = PrologParser()
