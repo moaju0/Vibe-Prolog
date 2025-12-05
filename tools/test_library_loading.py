@@ -163,6 +163,13 @@ def generate_report(results: Dict[str, Tuple[bool, str, str]]) -> str:
     
     return "\n".join(report)
 
+def write_report(results: Dict[str, Tuple[bool, str, str]]):
+    """Write report to file."""
+    report = generate_report(results)
+    report_path = Path(__file__).parent.parent / "docs" / "LIBRARY_STATUS.md"
+    report_path.write_text(report)
+    return report_path
+
 def main():
     """Main entry point."""
     print("Testing Vibe-Prolog library file loading...")
@@ -216,17 +223,13 @@ def main():
         
         print(short_msg)
         
-        # Save progress after each file
+        # Save progress and write report after each file
         save_progress(results)
+        report_path = write_report(results)
     
     print()
     print("=" * 80)
     print()
-    
-    # Generate and write report
-    report = generate_report(results)
-    report_path = Path(__file__).parent.parent / "docs" / "LIBRARY_STATUS.md"
-    report_path.write_text(report)
     
     print(f"Report written to: {report_path}")
     print()

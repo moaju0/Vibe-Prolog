@@ -472,8 +472,12 @@ class TestStrings:
         assert clause.head.args[0].name == ""
 
 
-class TestBaseDigits:
-    """Tests for parsing base'digits syntax."""
+class TestEdinburghRadixNumber:
+    """Tests for parsing Edinburgh <radix>'<number> syntax.
+
+    Edinburgh syntax allows arbitrary base numbers: <radix>'<number>
+    Examples: 16'ff' (hex), 2'1010' (binary), 36'ZZZ' (base-36)
+    """
 
     def test_parse_hex_base16(self):
         """Test parsing hexadecimal with base 16."""
@@ -507,8 +511,8 @@ class TestBaseDigits:
         assert isinstance(clause.head.args[0], Number)
         assert clause.head.args[0].value == 35
 
-    def test_parse_negative_base_digits(self):
-        """Test parsing negative base'digits."""
+    def test_parse_negative_edinburgh_syntax(self):
+        """Test parsing negative Edinburgh <radix>'<number> syntax."""
         parser = PrologParser()
         clauses = parser.parse("num(-16'ff).")
         clause = clauses[0]
@@ -555,13 +559,13 @@ class TestBaseDigits:
     def test_invalid_digit_for_base(self):
         """Test digit value >= base."""
         parser = PrologParser()
-        with pytest.raises(PrologThrow, match="Invalid digit '3' for base 2"):
+        with pytest.raises(PrologThrow, match="Invalid digit '3' for radix 2"):
             parser.parse("num(2'13).")
 
     def test_invalid_digit_letter_for_base(self):
         """Test letter digit >= base."""
         parser = PrologParser()
-        with pytest.raises(PrologThrow, match="Invalid digit 'g' for base 16"):
+        with pytest.raises(PrologThrow, match="Invalid digit 'g' for radix 16"):
             parser.parse("num(16'fg).")
 
     def test_empty_digits(self):

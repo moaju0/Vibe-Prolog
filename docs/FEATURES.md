@@ -17,7 +17,7 @@ Status legend:
 | -------------------------------- | ------ | ----------------------------------------- |
 | Atoms (quoted, unquoted)         | ✅      | Fully implemented                         |
 | Variables                        | ✅      | ISO semantics                             |
-| Numbers (int, float, scientific) | ✅      | Includes base-qualified (`16'ff`)         |
+| Numbers (int, float, scientific) | ✅      | Includes Edinburgh `<radix>'<number>` syntax (`16'ff`, `2'1010`, `36'ZZZ`) for bases 2-36 |
 | Lists (proper, improper)         | ✅      |                                           |
 | Compound terms                   | ✅      |                                           |
 | Strings (quoted)                 | ✅      | Consistent representation                 |
@@ -429,6 +429,7 @@ Basic variant tabling is available via the `:- table` directive.
 | **Module-scoped predicate namespaces** | ✅  | Each module can define predicates with the same name/arity without conflict. `library(a):foo/1` and `library(b):foo/1` are distinct |
 | **DCG predicate indicators**      | ✅📘    | SWI-Prolog extension: `Name//Arity` in module exports (expanded to `Name/Arity+2`) |
 | **Module-qualified clause heads** | ✅      | `Module:Head :- Body` syntax for cross-module predicate definitions (e.g., `user:goal_expansion/2`) |
+| **Invalid export indicators**     | ⚠️📘    | Scryer-Prolog extension: Invalid predicate indicators (e.g., control constructs like `!/0`) in export lists are skipped with a warning rather than causing a type error |
 | Cross-module dynamic semantics    | ⚠️     | Implemented; dynamic predicate isolation per module needs further work |
 
 ---
@@ -549,6 +550,39 @@ When importing a shadowed predicate:
 ```prolog
 :- use_module(my_lib, [length/2]).
 ?- length([a, b], L).  % Uses imported shadow: L = s(s(custom_zero))
+```
+
+### Operator Shadowing
+
+The `shadow` mode is particularly important for CLP (Constraint Logic Programming) libraries like `clpz` and `clpb` that need to redefine the `|` operator with extended semantics for constraint programming.
+
+**Protected Operators:**
+
+The following operators are protected and require `shadow` mode to redefine:
+- `,` (conjunction)
+- `;` (disjunction)
+- `->` (if-then)
+- `:-` (clause/directive)
+- `:` (module qualification)
+- `|` (list/constraint syntax)
+- `{}` (curly braces)
+
+**Key Characteristics:**
+- Module-scoped shadowing: Protected operators can be redefined within a module's scope without affecting global behavior
+- List syntax preservation: Shadowing `|` does not break standard list syntax `[H|T]`
+- Independent modules: Multiple modules can independently shadow the same operator
+- Global protection: Protected operators cannot be modified at global scope even in shadow mode
+
+**Example - Loading CLP libraries:**
+```bash
+# Load clpz with shadow mode to allow | operator redefinition
+uv run vibeprolog.py --builtin-conflict=shadow my_program.pl
+```
+
+```prolog
+:- use_module(library(clpz)).
+?- X in 1..10, X #> 5, label([X]).  % CLP constraint programming works
+?- Y = [a, b | [c]].                % Standard list syntax still works: Y = [a, b, c]
 ```
 
 ### `--run-slow-tests` Flag

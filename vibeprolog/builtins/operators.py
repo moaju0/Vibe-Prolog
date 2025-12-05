@@ -28,8 +28,13 @@ class OperatorBuiltins:
         spec_term = deref(spec_term, subst)
         name_term = deref(name_term, subst)
 
-        # OperatorTable handles validation and permission errors
-        engine.operator_table.define(precedence_term, spec_term, name_term, "op/3")
+        module_name = None
+        if hasattr(engine, "interpreter") and engine.interpreter:
+            module_name = engine.interpreter.current_module
+
+        engine.operator_table.define(
+            precedence_term, spec_term, name_term, "op/3", module_name=module_name
+        )
 
         return subst
 

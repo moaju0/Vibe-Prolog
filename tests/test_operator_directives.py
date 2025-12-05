@@ -14,7 +14,7 @@ class TestOperatorDirectives:
         assert result["P"] == 500
 
     def test_protected_operator_modify_raises_permission_error(self):
-        prolog = PrologInterpreter()
+        prolog = PrologInterpreter(builtin_conflict="error")
         with pytest.raises(PrologThrow):
             prolog.consult_string(":- op(500, xfy, ',').")
 

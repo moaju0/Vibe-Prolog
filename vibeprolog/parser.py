@@ -188,7 +188,7 @@ __OPERATOR_GRAMMAR__
     // Special atom operators must have HIGHEST priority to prevent being parsed as prefix operators
     SPECIAL_ATOM_OPS.12: /-\$/ | /\$-/
 
-    // Scientific notation, hex, octal, binary, base'digits
+    // Scientific notation, hex, octal, binary, Edinburgh <radix>'<number>
     NUMBER.4: /-?0x[0-9a-fA-F]+/i
             | /-?0o[0-7]+/i
             | /-?0b[01]+/i
@@ -674,7 +674,14 @@ class PrologTransformer(Transformer):
         return Number(-num.value)
 
     def _parse_base_number(self, value):
-        """Parse base'digits syntax like 16'ff or -2'abcd."""
+        """Parse Edinburgh <radix>'<number> syntax like 16'ff or -2'abcd.
+
+        Edinburgh syntax: <radix>'<number> where:
+        - <radix> is the base (2-36)
+        - <number> is the digits in that base
+
+        Examples: 16'ff' (hex), 2'1010' (binary), 36'ZZZ' (base-36)
+        """
         # Handle negative sign
         negative = value.startswith('-')
         if negative:
@@ -700,7 +707,7 @@ class PrologTransformer(Transformer):
             # Convert single digit in base up to 36
             digit_val = int(digit, 36)
             if digit_val >= base:
-                raise ValueError(f"Invalid digit '{digit}' for base {base} in {value}")
+                raise ValueError(f"Invalid digit '{digit}' for radix {base} in Edinburgh syntax: {value}")
             result = result * base + digit_val
 
         if negative:
@@ -709,7 +716,10 @@ class PrologTransformer(Transformer):
         return Number(result)
 
     def char_code(self, items):
-        """Handle character code notation like 0'X or base'char."""
+        """Handle character code notation like 0'X.
+
+        Note: base'char'number syntax (e.g., 16'mod'2) is intentionally not implemented.
+        """
         code_str = str(items[0])
 
         # Check for base'char format (e.g., 16'mod'2)
@@ -1423,12 +1433,15 @@ class PrologParser:
             grammar, parser="earley", propagate_positions=True, ambiguity='resolve'
         )
 
-    def _base_operator_definitions(self) -> list[tuple[int, str, str]]:
+    def _base_operator_definitions(
+        self, module_name: str | None = None
+    ) -> list[tuple[int, str, str]]:
         if self.operator_table is None:
             return list(DEFAULT_OPERATORS)
+        # Use module-aware operator iteration to include shadowed operators
         return [
             (info.precedence, info.spec, name)
-            for name, info in self.operator_table.iter_current_ops()
+            for name, info in self.operator_table.iter_operators_for_module(module_name)
         ]
 
     def _build_grammar(self, operators: list[tuple[int, str, str]]) -> str:
@@ -1436,14 +1449,19 @@ class PrologParser:
         return PROLOG_GRAMMAR.replace("__OPERATOR_GRAMMAR__", operator_rules)
 
     def _ensure_parser(
-        self, cleaned_text: str, directive_ops: list[tuple[int, str, str]] | None = None
+        self,
+        cleaned_text: str,
+        directive_ops: list[tuple[int, str, str]] | None = None,
+        module_name: str | None = None,
     ) -> None:
         if directive_ops is None:
             try:
                 directive_ops = extract_op_directives(cleaned_text)
             except ValueError:
                 directive_ops = []
-        operators = _merge_operators(self._base_operator_definitions(), directive_ops)
+        operators = _merge_operators(
+            self._base_operator_definitions(module_name), directive_ops
+        )
         key = tuple(operators)
         if key not in self._grammar_cache:
             grammar = self._build_grammar(operators)
@@ -1602,14 +1620,23 @@ class PrologParser:
         *,
         apply_char_conversions: bool = True,
         directive_ops: list[tuple[int, str, str]] | None = None,
+        module_name: str | None = None,
     ) -> list[Clause | Directive]:
-        """Parse Prolog source code and return list of clauses."""
+        """Parse Prolog source code and return list of clauses.
+
+        Args:
+            text: The Prolog source code to parse
+            context: Context string for error messages
+            apply_char_conversions: Whether to apply character conversions
+            directive_ops: Pre-extracted operator directives
+            module_name: Current module context for module-scoped operators
+        """
         try:
             # Apply character conversions before parsing
             if apply_char_conversions:
                 text = self._apply_char_conversions(text)
             cleaned_text, pldoc_comments = self._collect_pldoc_comments(text)
-            self._ensure_parser(cleaned_text, directive_ops)
+            self._ensure_parser(cleaned_text, directive_ops, module_name)
             tree = self.parser.parse(cleaned_text)
             transformer = PrologTransformer()
             parsed_items = [self._fold_numeric_unary_minus(item) for item in transformer.transform(tree)]

@@ -307,9 +307,9 @@ class TestOperatorErrorHandling:
     """Test error conditions in operator definitions."""
 
     def test_protected_operators_cannot_be_modified(self):
-        """Protected operators raise permission_error."""
-        prolog = PrologInterpreter()
-        
+        """Protected operators raise permission_error in error mode."""
+        prolog = PrologInterpreter(builtin_conflict="error")
+
         for protected in [',', ';', '->', ':-', '|', '{}']:
             with pytest.raises(PrologThrow):
                 prolog.consult_string(f":- op(500, xfx, {repr(protected)}).")

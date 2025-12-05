@@ -41,6 +41,9 @@ LOADED_MODULE_PREFIX = "loaded:"
 # Scryer-specific directives that are recognized but ignored with a warning
 IGNORED_DIRECTIVES = {"non_counted_backtracking", "meta_predicate"}
 
+# Control construct names that are invalid in predicate indicators (ISO §5.1.2.1)
+CONTROL_CONSTRUCT_NAMES = {"!", ",", ";", "->"}
+
 
 class Module:
     def __init__(self, name: str, exports: set[tuple[str, int]] | None):
@@ -65,9 +68,9 @@ class PrologInterpreter:
         max_recursion_depth: int = 10000,
         builtin_conflict: str = "skip",
     ) -> None:
-        self.operator_table = OperatorTable()
+        self.operator_table = OperatorTable(builtin_conflict=builtin_conflict)
         self.parser = PrologParser(self.operator_table)
-        self._import_scanner_parser = PrologParser(OperatorTable())
+        self._import_scanner_parser = PrologParser(OperatorTable(builtin_conflict=builtin_conflict))
         self.clauses = []
         # Module system
         self.modules: dict[str, "Module"] = {}
@@ -395,28 +398,27 @@ class PrologInterpreter:
                         names = self.operator_table._parse_operator_names(name_term, "module/2")
                         for name in names:
                             exported_operators.add((precedence, spec, name))
-                    # Handle DCG indicator Name//Arity (SWI-Prolog extension)
-                    # The "//" is parsed as a compound with functor "//" 
+                    # Refactor DCG (//) and predicate indicator handling into a shared path
+                    # Handle DCG indicator and / indicator using a common helper to reduce duplication
                     elif isinstance(elt, Compound) and elt.functor == "//" and len(elt.args) == 2:
                         name_arg, arity_arg = elt.args
-                        normalized_name = self._normalize_operator_in_indicator(name_arg)
-                        if not isinstance(normalized_name, Atom) or not isinstance(arity_arg, Number):
-                            error_term = PrologError.type_error("predicate_indicator", elt, "module/2")
-                            raise PrologThrow(error_term)
-                        # DCG predicates get +2 to their arity when expanded
-                        # Export both the DCG form and the expanded form
-                        exports.add((normalized_name.name, int(arity_arg.value) + 2))
+                        result = self._export_predicate_indicator(name_arg, arity_arg, is_dcg=True, elt=elt)
+                        if isinstance(result, tuple):
+                            exports.add(result)
                     # Each elt should be Name/Arity (Compound "/") or op/3
                     elif isinstance(elt, Compound) and elt.functor == "/" and len(elt.args) == 2:
                         name_arg, arity_arg = elt.args
-                        normalized_name = self._normalize_operator_in_indicator(name_arg)
-                        if not isinstance(normalized_name, Atom) or not isinstance(arity_arg, Number):
-                            error_term = PrologError.type_error("predicate_indicator", elt, "module/2")
-                            raise PrologThrow(error_term)
-                        exports.add((normalized_name.name, int(arity_arg.value)))
+                        result = self._export_predicate_indicator(name_arg, arity_arg, is_dcg=False, elt=elt)
+                        if isinstance(result, tuple):
+                            exports.add(result)
                     else:
-                        error_term = PrologError.type_error("predicate_indicator", elt, "module/2")
-                        raise PrologThrow(error_term)
+                        # Skip invalid predicate indicators (e.g., control constructs like !/0)
+                        # with a warning for Scryer compatibility
+                        warnings.warn(
+                            f"Skipping invalid predicate indicator in module export: {term_to_string(elt)}",
+                            SyntaxWarning,
+                            stacklevel=2
+                        )
             else:
                 error_term = PrologError.type_error("list", exports_term, "module/2")
                 raise PrologThrow(error_term)
@@ -481,7 +483,13 @@ class PrologInterpreter:
                 # Import all exported operators (full import only)
                 for op_def in source_mod.exported_operators:
                     precedence, spec, name = op_def
-                    self.operator_table.define(Number(precedence), Atom(spec), Atom(name), "use_module/1")
+                    self.operator_table.define(
+                        Number(precedence),
+                        Atom(spec),
+                        Atom(name),
+                        "use_module/1",
+                        module_name=self.current_module,
+                    )
             else:
                 # Import specific predicates (operators not imported in selective import)
                 for pred_key in imports:
@@ -501,7 +509,13 @@ class PrologInterpreter:
         # Reject unsupported directives
         if isinstance(goal, Compound) and goal.functor == "op" and len(goal.args) == 3:
             prec_term, spec_term, name_term = goal.args
-            self.operator_table.define(prec_term, spec_term, name_term, "op/3")
+            self.operator_table.define(
+                prec_term,
+                spec_term,
+                name_term,
+                "op/3",
+                module_name=self.current_module,
+            )
             return
 
         # Handle char_conversion/2 directive
@@ -511,11 +525,11 @@ class PrologInterpreter:
             if isinstance(from_term, Variable) or isinstance(to_term, Variable):
                 error_term = PrologError.instantiation_error("char_conversion/2")
                 raise PrologThrow(error_term)
-            
+
             # Extract characters
             from_char = self._extract_character(from_term, "char_conversion/2")
             to_char = self._extract_character(to_term, "char_conversion/2")
-            
+
             # Update the parser's conversion table
             self.parser.set_char_conversion(from_char, to_char)
             return
@@ -546,6 +560,44 @@ class PrologInterpreter:
                 self._tabled_predicates.add(indicator)
             return
         # Other directives can be added here
+
+    def _export_predicate_indicator(self, name_arg, arity_arg, is_dcg: bool, elt=None):
+        """
+        Normalize and validate a predicate indicator for module exports.
+        Returns a tuple (name, arity) to export or None if skipped.
+        Handles both DCG (//) and standard (/) forms via is_dcg flag.
+        """
+        normalized_name = self._normalize_operator_in_indicator(name_arg)
+        # Validate types: Name must be Atom, Arity must be Number
+        if isinstance(normalized_name, Atom) and isinstance(arity_arg, Number):
+            arity = int(arity_arg.value)
+            # Non-negative arity check (both DCG and standard)
+            if arity < 0:
+                warnings.warn(
+                    f"Skipping invalid predicate indicator with negative arity: {normalized_name.name}{'//' if is_dcg else '/'}{arity}",
+                    SyntaxWarning,
+                    stacklevel=2
+                )
+                return None
+            # Skip control constructs if present (ISO restriction)
+            if normalized_name.name in CONTROL_CONSTRUCT_NAMES:
+                warnings.warn(
+                    f"Skipping invalid predicate indicator in module export: {normalized_name.name}{'//' if is_dcg else '/'}{arity}",
+                    SyntaxWarning,
+                    stacklevel=2
+                )
+                return None
+            # Compute export arity: DCG adds 2 to arity
+            export_arity = arity + (2 if is_dcg else 0)
+            return (normalized_name.name, export_arity)
+        else:
+            # Invalid shape (Name/Arity not formed properly)
+            warnings.warn(
+                f"Skipping invalid predicate indicator in module export: {term_to_string(elt) if elt is not None else name_arg}",
+                SyntaxWarning,
+                stacklevel=2
+            )
+            return None
 
     def _parse_table_indicators(self, term: Any) -> list[tuple[str, int]]:
         """Parse the argument to a table/1 directive into predicate indicators."""
@@ -1006,10 +1058,14 @@ class PrologInterpreter:
         """Normalize operator applications in predicate indicators to atoms."""
         if isinstance(term, Atom):
             return term
+        # Handle parenthesized operators like (,) which are parsed as compounds with no args
+        if isinstance(term, Compound) and not term.args:
+            return Atom(term.functor)
         reconstructed = self._reconstruct_operator_name(term)
         if reconstructed is not None:
             return Atom(reconstructed)
         return term
+
 
     def _indicator_from_key(self, key: tuple[str, int]) -> Compound:
         name, arity = key
@@ -1254,6 +1310,7 @@ class PrologInterpreter:
                     "consult/1",
                     apply_char_conversions=not is_char_conversion,
                     directive_ops=directive_ops,
+                    module_name=self.current_module,
                 )
             except (ValueError, LarkError) as exc:
                 error_term = PrologError.syntax_error(str(exc), "consult/1")
@@ -1435,7 +1492,14 @@ class PrologInterpreter:
         prolog_code = f"dummy :- {query_str}"
         try:
             # Don't apply char conversions to interactive queries
-            clauses = self.parser.parse(prolog_code, "query/1", apply_char_conversions=False)
+            # Use "user" module context for top-level queries - module-scoped
+            # operators in other modules should not affect user queries
+            clauses = self.parser.parse(
+                prolog_code,
+                "query/1",
+                apply_char_conversions=False,
+                module_name="user",
+            )
         except (ValueError, LarkError) as exc:
             self._raise_syntax_error(exc, "query/1")
 
@@ -1447,7 +1511,13 @@ class PrologInterpreter:
         prolog_code = query_str
         try:
             # Don't apply char conversions to interactive queries
-            clauses = self.parser.parse(prolog_code, "query/1", apply_char_conversions=False)
+            # Use "user" module context for top-level queries
+            clauses = self.parser.parse(
+                prolog_code,
+                "query/1",
+                apply_char_conversions=False,
+                module_name="user",
+            )
         except (ValueError, LarkError) as exc:
             self._raise_syntax_error(exc, "query/1")
         if clauses:
