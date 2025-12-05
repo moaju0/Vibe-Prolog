@@ -23,6 +23,12 @@ from enum import Enum
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
+_CATEGORIES = {
+    "Character Escapes": [(1, 37), (150, 160), (184, 197), (264, 271), (300, 300), (309, 309)],
+    "Operators": [(38, 59), (84, 115), (129, 142), (198, 242), (276, 288), (304, 305), (318, 320)],
+    "Numeric Literals": [(60, 73), (181, 183), (247, 251), (303, 303), (306, 308)],
+}
+
 from vibeprolog import PrologInterpreter
 from vibeprolog.exceptions import PrologError, PrologThrow
 
@@ -50,15 +56,12 @@ class ConformityTest:
 
     @property
     def category(self) -> str:
-        """Categorize the test based on its number."""
-        if 1 <= self.num <= 37 or 150 <= self.num <= 160 or 184 <= self.num <= 197 or 264 <= self.num <= 271 or 300 == self.num or 309 == self.num:
-            return "Character Escapes"
-        elif 38 <= self.num <= 59 or 84 <= self.num <= 115 or 129 <= self.num <= 142 or 198 <= self.num <= 242 or 276 <= self.num <= 288 or 304 <= self.num <= 305 or 318 <= self.num <= 320:
-            return "Operators"
-        elif 60 <= self.num <= 73 or 181 <= self.num <= 183 or 247 <= self.num <= 251 or 303 == self.num or 306 <= self.num <= 308:
-            return "Numeric Literals"
-        else:
-            return "Special Syntax"
+        """Categorize the test based on its number (data-driven)."""
+        for category, ranges in _CATEGORIES.items():
+            for start, end in ranges:
+                if start <= self.num <= end:
+                    return category
+        return "Special Syntax"
 
 
 @dataclass
@@ -430,6 +433,36 @@ CONFORMITY_TESTS = [
     ConformityTest(355, "Finis ()."),
 ]
 
+# Map test numbers to index for O(1) lookup
+_TEST_INDEX: Dict[int, int] = {t.num: i for i, t in enumerate(CONFORMITY_TESTS)}
+
+
+def _categorize_prolog_error(error: Exception) -> TestResult:
+    """Infer a TestResult from a Prolog error exception or term."""
+    inner = None
+    # Try to inspect common shapes: error(iso_error_term) or error(syntax_error(...))
+    err_term = getattr(error, "term", None)
+    inner = None
+    try:
+        if err_term is not None:
+            # Some Prolog libraries expose a nested term structure
+            inner = getattr(err_term, "args", None)
+            if inner and isinstance(inner, tuple) and len(inner) > 0:
+                inner = inner[0]
+    except Exception:
+        inner = None
+    # Check inner functor first for ISO errors
+    inner_functor = getattr(inner, "functor", None) if inner is not None else None
+    if inner_functor == "syntax_error" or getattr(error, "functor", None) == "syntax_error" or (inner and getattr(inner, "name", None) == "syntax_error"):
+        return TestResult.SYNTAX_ERROR
+    if inner_functor == "type_error" or getattr(error, "functor", None) == "type_error" or (inner and getattr(inner, "name", None) == "type_error"):
+        return TestResult.TYPE_ERROR
+    if inner_functor == "exception" or (inner and getattr(inner, "name", None) == "iso_error" and getattr(inner, "args", None)):
+        return TestResult.EXCEPTION
+    if inner_functor == "timeout" or (inner and getattr(inner, "name", None) == "timeout"):
+        return TestResult.TIMEOUT
+    return TestResult.EXCEPTION
+
 
 def execute_test(prolog: PrologInterpreter, test: ConformityTest, verbose: bool = False) -> TestExecutionResult:
     """Execute a single conformity test and return the result."""
@@ -439,18 +472,26 @@ def execute_test(prolog: PrologInterpreter, test: ConformityTest, verbose: bool 
         # For tests that reference previous, we need to handle the /**/ marker
         # The /**/ tests reuse the op/3 declarations from the previous test
         if test.references_previous:
-            # Find the previous test (without /**/)
+            # Find the previous non-referenced test efficiently
+            idx = _TEST_INDEX.get(test.num, None)
             prev_test = None
-            for t in CONFORMITY_TESTS:
-                if t.num < test.num and not t.references_previous:
-                    prev_test = t
+            if idx is not None:
+                j = idx - 1
+                while j >= 0:
+                    candidate = CONFORMITY_TESTS[j]
+                    if not candidate.references_previous:
+                        prev_test = candidate
+                        break
+                    j -= 1
             if prev_test:
                 if verbose:
                     print(f"  Executing referenced test {prev_test.num}: {prev_test.query}")
                 # Execute the previous test first to set up operators
                 try:
                     prolog.query_once(prev_test.query)
-                except Exception:
+                except Exception as e:
+                    if verbose:
+                        print(f"  Warning: Referenced test {prev_test.num} failed during setup: {e}")
                     pass  # Ignore errors in setup
 
         if verbose:
@@ -469,35 +510,15 @@ def execute_test(prolog: PrologInterpreter, test: ConformityTest, verbose: bool 
 
     except PrologThrow as e:
         execution_time = time.time() - start_time
-        error_term = e.error_term
-
-        # Categorize the error
-        if isinstance(error_term, dict) and 'functor' in error_term:
-            functor = error_term['functor'][0] if isinstance(error_term['functor'], list) else error_term['functor']
-            if functor == 'syntax_error':
-                result = TestResult.SYNTAX_ERROR
-            elif functor == 'type_error':
-                result = TestResult.TYPE_ERROR
-            else:
-                result = TestResult.EXCEPTION
-        else:
-            result = TestResult.EXCEPTION
-
-        return TestExecutionResult(
-            test=test,
-            result=result,
-            error_message=str(e),
-            execution_time=execution_time
-        )
+        # Map the exception to a TestResult using ISO error analysis
+        error_result = _categorize_prolog_error(e)
+        return TestExecutionResult(test=test, result=error_result, error_message=str(e), execution_time=execution_time)
 
     except Exception as e:
         execution_time = time.time() - start_time
-        return TestExecutionResult(
-            test=test,
-            result=TestResult.EXCEPTION,
-            error_message=str(e),
-            execution_time=execution_time
-        )
+        # Map the exception to a TestResult using ISO error analysis
+        error_result = _categorize_prolog_error(e)
+        return TestExecutionResult(test=test, result=error_result, error_message=str(e), execution_time=execution_time)
 
 
 def run_conformity_tests(test_range: Optional[Tuple[int, int]] = None,

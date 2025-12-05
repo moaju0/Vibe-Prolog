@@ -3,6 +3,7 @@
 import pytest
 from pathlib import Path
 from unittest.mock import patch, MagicMock
+from vibeprolog import PrologInterpreter
 
 from tools.conformity_test import (
     ConformityTest,
@@ -68,7 +69,7 @@ class TestExecuteTest:
 
     def test_execute_ok_test(self):
         """Test executing a test that should pass."""
-        from vibeprolog import PrologInterpreter
+        # PrologInterpreter is imported at module scope now
 
         prolog = PrologInterpreter()
         test = ConformityTest(1, "writeq('\\n').")
@@ -82,7 +83,7 @@ class TestExecuteTest:
 
     def test_execute_syntax_error_test(self):
         """Test executing a test that should fail with syntax error."""
-        from vibeprolog import PrologInterpreter
+        # PrologInterpreter is imported at module scope now
 
         prolog = PrologInterpreter()
         test = ConformityTest(2, "'")
@@ -90,13 +91,13 @@ class TestExecuteTest:
         result = execute_test(prolog, test)
 
         assert result.test == test
-        assert result.result == TestResult.EXCEPTION  # Currently categorized as EXCEPTION
+        assert result.result == TestResult.SYNTAX_ERROR
         assert result.error_message is not None
         assert "syntax_error" in result.error_message
 
     def test_execute_references_previous(self):
         """Test executing a test that references a previous test."""
-        from vibeprolog import PrologInterpreter
+        # PrologInterpreter is imported at module scope now
 
         prolog = PrologInterpreter()
         # Test 67 references test 66
@@ -162,7 +163,7 @@ class TestGenerateMarkdownReport:
         assert output_path.exists()
         content = output_path.read_text()
         assert "# ISO Prolog Conformity Testing Results" in content
-        assert "Total Tests: 2" in content
+        assert "> **Total Tests**: 2" in content
 
     def test_generate_empty_report(self, tmp_path):
         """Test generating a report with no results."""
