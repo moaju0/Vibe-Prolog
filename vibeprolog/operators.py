@@ -199,12 +199,21 @@ class OperatorTable:
         key = (name, spec)
 
         if name in self._protected_ops:
-            if self._builtin_conflict == "error":
+            is_user_scope = module_name is None or module_name == "user"
+            if self._builtin_conflict == "error" or (
+                self._builtin_conflict == "skip" and is_user_scope
+            ):
                 error_term = PrologError.permission_error(
                     "modify", "operator", Atom(name), context
                 )
                 raise PrologThrow(error_term)
             elif self._builtin_conflict == "skip":
+                if module_name is not None and module_name != "user":
+                    module_ops = self._module_operators.setdefault(module_name, {})
+                    if precedence_value == 0:
+                        module_ops.pop(key, None)
+                    else:
+                        module_ops[key] = OperatorInfo(precedence_value, spec)
                 return
             elif self._builtin_conflict == "shadow":
                 if module_name is not None:
@@ -283,6 +292,10 @@ class OperatorTable:
             True if the operator is shadowed in this module
         """
         return (module_name, name, spec) in self._shadowed_operators
+
+    def is_protected(self, name: str) -> bool:
+        """Return True if the operator name is protected."""
+        return name in self._protected_ops
 
 
 __all__ = ["OperatorInfo", "OperatorTable"]

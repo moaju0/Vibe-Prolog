@@ -616,12 +616,6 @@ class PrologTransformer(Transformer):
 
     def atom(self, items):
         atom_str = str(items[0])
-        # Reject a bare dot as it's a special terminator token
-        if atom_str == ".":
-            raise PrologThrow(PrologError.syntax_error(
-                "Unexpected '.' - dot is a clause terminator and cannot be used as an atom",
-                "atom/1"
-            ))
         # Handle SPECIAL_ATOM (quoted atoms like ';', '|', etc.)
         if atom_str.startswith("'") and atom_str.endswith("'") and len(atom_str) >= 2:
             # Strip the quotes and handle escape sequences
