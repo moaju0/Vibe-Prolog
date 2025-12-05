@@ -145,7 +145,7 @@ __OPERATOR_GRAMMAR__
     // Allow operator symbols as functors: ;(a,b), |(a,b), ,(a,b), ->(a,b), etc.
     operator_compound: operator_functor "(" args ")" -> operator_compound
     // Operators that can be used as functors when followed by (
-    operator_functor: INFIX_OP_FUNCTOR | CONTROL_OP_FUNCTOR | COMPARISON_OP_FUNCTOR | ARITH_OP_FUNCTOR
+    operator_functor: INFIX_OP_FUNCTOR | CONTROL_OP_FUNCTOR | COMPARISON_OP_FUNCTOR | ARITH_OP_FUNCTOR | OP_SYMBOL
     // Infix operators like ;, |, ,, ->, etc.
     INFIX_OP_FUNCTOR.30: /;/ | /\|/ | /,/ | /->/ | /:/ | /=/ 
     // Control operators
