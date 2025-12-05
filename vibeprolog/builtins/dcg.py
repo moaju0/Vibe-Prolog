@@ -6,9 +6,17 @@ from typing import Iterator
 
 from vibeprolog.builtins import BuiltinRegistry, register_builtin
 from vibeprolog.builtins.common import BuiltinArgs, EngineContext, iter_empty
+from vibeprolog.exceptions import PrologError, PrologThrow
 from vibeprolog.parser import Compound, Cut, List
 from vibeprolog.terms import Atom
 from vibeprolog.unification import Substitution, deref
+
+
+def _validate_terminal_list(rule_set_deref, phrase_id):
+    # Ensure a List used as a rule-set terminal has no tail
+    if isinstance(rule_set_deref, List) and rule_set_deref.tail is not None:
+        error_term = PrologError.type_error("list", rule_set_deref, phrase_id)
+        raise PrologThrow(error_term)
 
 
 class DCGBuiltins:
@@ -41,10 +49,7 @@ class DCGBuiltins:
         if isinstance(rule_set_deref, List):
             # Terminal list: unify input_list with the terminal list
             # Validate that the list is proper
-            if rule_set_deref.tail is not None:
-                from vibeprolog.exceptions import PrologError, PrologThrow
-                error_term = PrologError.type_error("list", rule_set_deref, "phrase/2")
-                raise PrologThrow(error_term)
+            _validate_terminal_list(rule_set_deref, "phrase/2")
             # Unify the input list with the terminal list
             for new_subst in engine._unify_with_attvar_support(input_list, rule_set_deref, subst):
                 yield new_subst
@@ -91,10 +96,7 @@ class DCGBuiltins:
         if isinstance(rule_set_deref, List):
             # Terminal list: unify input_list with the terminal list, rest with []
             # Validate that the list is proper
-            if rule_set_deref.tail is not None:
-                from vibeprolog.exceptions import PrologError, PrologThrow
-                error_term = PrologError.type_error("list", rule_set_deref, "phrase/3")
-                raise PrologThrow(error_term)
+            _validate_terminal_list(rule_set_deref, "phrase/3")
             # Unify the input list with the terminal list, and rest with empty list
             empty_list = List(elements=(), tail=None)
             for new_subst in engine._unify_with_attvar_support(input_list, rule_set_deref, subst):
