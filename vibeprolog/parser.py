@@ -876,6 +876,12 @@ def tokenize_prolog_statements(prolog_code: str) -> list[str]:
         # Handle entering/exiting quotes
         if char == "'" and not in_double_quote:
             has_code = True
+            if not in_single_quote and i > 0 and prolog_code[i - 1] == "0":
+                # Character code literal (e.g., 0'a, 0'\x41\) uses a leading
+                # single quote but does not introduce a quoted atom scope.
+                current.append(char)
+                i += 1
+                continue
             # Check for doubled quote
             if in_single_quote and i + 1 < len(prolog_code) and prolog_code[i + 1] == "'":
                 current.append(char)
@@ -1673,7 +1679,9 @@ class PrologParser:
                 # PlDoc association via start_pos still works.
                 stmt_pos = cleaned_text.find(statement, search_pos)
                 if stmt_pos == -1:
-                    stmt_pos = search_pos
+                    raise RuntimeError(
+                        f"Could not re-locate tokenized statement in text: {statement!r}"
+                    )
                 search_pos = stmt_pos + len(statement)
 
                 stripped = statement.lstrip()
