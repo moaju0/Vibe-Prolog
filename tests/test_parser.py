@@ -1006,6 +1006,9 @@ class TestDotAndRangeOperator:
         # The list should contain dots as atoms
         assert isinstance(clause.body[0], Compound)
         assert clause.body[0].functor == '='
+        list_term = clause.body[0].args[1]
+        assert isinstance(list_term, List)
+        assert list_term.elements == (Atom('.'), Atom('a'), Atom('.'))
 
     def test_range_operator_basic(self):
         """Range operator 1..9 should parse correctly."""
@@ -1091,8 +1094,10 @@ class TestDotAndRangeOperator:
         clause = clauses[0]
         # The list should have two range terms
         list_term = clause.body[0].args[1]
-        # List is represented as nested '.' compounds or List dataclass
-        assert isinstance(list_term, (List, Compound))
+        assert isinstance(list_term, List)
+        assert len(list_term.elements) == 2
+        assert list_term.elements[0] == Compound('..', (Number(1), Number(5)))
+        assert list_term.elements[1] == Compound('..', (Number(6), Number(10)))
 
     def test_range_operator_as_predicate_argument(self):
         """Range operator as argument foo(1..3)."""

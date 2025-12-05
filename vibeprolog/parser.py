@@ -945,7 +945,7 @@ def tokenize_prolog_statements(prolog_code: str) -> list[str]:
             # Check for range pattern: ends with digits followed by "."
             # and contains ".." somewhere before those digits
             # Pattern: ...X..Y. where X and Y are digits
-            ends_with_range_and_dot = bool(re.search(r'\d\.\.\d+\.$', current_str))
+            ends_with_range_and_dot = bool(re.search(r'\d+\.\.\d+\.$', current_str))
             if ends_with_range_and_dot:
                 # This is definitely a terminator after a range expression
                 pass  # Fall through to clause ending logic below
