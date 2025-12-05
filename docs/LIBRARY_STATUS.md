@@ -12,9 +12,7 @@
 ## Successfully Loaded Files ✅
 
 - `library/$project_atts.pl`
-- `library/assoc.pl`
 - `library/atts.pl`
-- `library/between.pl`
 - `library/cont.pl`
 - `library/dcgs.pl`
 - `library/diag.pl`
@@ -50,7 +48,6 @@ PrologThrow: error(permission_error(modify, operator, |), context(use_module/1))
 
 ### library/builtins.pl
 
-**Status:** ❌ Prolog error
 
 **Details:**
 
@@ -94,7 +91,44 @@ File loading exceeded 30 seconds
 
 ### library/crypto.pl
 
-**Status:** ❌ Prolog error
+**Details:**
+
+```
+File loading exceeded 30 seconds
+```
+
+
+### library/builtins.pl
+
+**Status:** ❌ Timeout
+
+**Details:**
+
+```
+File loading exceeded 30 seconds
+```
+
+
+### library/charsio.pl
+
+**Status:** ❌ Timeout
+
+**Details:**
+
+```
+File loading exceeded 30 seconds
+```
+
+
+### library/clpb.pl
+
+**Status:** ❌ Timeout
+
+**Details:**
+
+```
+File loading exceeded 30 seconds
+```
 
 **Details:**
 
@@ -366,7 +400,7 @@ PrologThrow: error(permission_error(modify, operator, |), context(use_module/1))
 **Details:**
 
 ```
-PrologThrow: error(permission_error(modify, operator, |), context(use_module/1))
+PrologThrow: error(type_error(atom, /(tabling, global_worklist)), context(use_module/1,2))
 ```
 
 
