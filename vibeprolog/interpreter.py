@@ -483,6 +483,8 @@ class PrologInterpreter:
                 # Import all exported operators (full import only)
                 for op_def in source_mod.exported_operators:
                     precedence, spec, name = op_def
+                    if self.operator_table.is_protected(name):
+                        continue
                     self.operator_table.define(
                         Number(precedence),
                         Atom(spec),
@@ -636,6 +638,17 @@ class PrologInterpreter:
             raise PrologThrow(error_term)
         return imports
 
+    def _flatten_library_term(self, term, context: str) -> list[str]:
+        """Convert a library(Name/Sub) term into path components."""
+        if isinstance(term, Atom):
+            return [term.name]
+        if isinstance(term, Compound) and term.functor == "/" and len(term.args) == 2:
+            left = self._flatten_library_term(term.args[0], context)
+            right = self._flatten_library_term(term.args[1], context)
+            return left + right
+        error_term = PrologError.type_error("atom", term, context)
+        raise PrologThrow(error_term)
+
     def _resolve_module_file(self, file_term, context: str, base_path: Path | None = None) -> str:
         """Resolve module file path."""
         if isinstance(file_term, Atom):
@@ -657,15 +670,20 @@ class PrologInterpreter:
         elif isinstance(file_term, Compound) and file_term.functor == "library" and len(file_term.args) == 1:
             # library(Name) syntax
             lib_term = file_term.args[0]
-            if not isinstance(lib_term, Atom):
-                error_term = PrologError.type_error("atom", lib_term, context)
-                raise PrologThrow(error_term)
-            lib_name = lib_term.name
+            lib_parts = self._flatten_library_term(lib_term, context)
+            relative_path = Path(*lib_parts)
+            candidate_paths = []
+            if relative_path.suffix == ".pl":
+                candidate_paths.append(relative_path)
+            else:
+                candidate_paths.append(relative_path.with_suffix(".pl"))
+                candidate_paths.append(relative_path)
             # Look in predefined library search paths, ignoring the caller's base path
             for root in LIBRARY_SEARCH_PATHS:
-                candidate = root / f"{lib_name}.pl"
-                if candidate.exists():
-                    return str(candidate)
+                for candidate_rel in candidate_paths:
+                    candidate = root / candidate_rel
+                    if candidate.exists():
+                        return str(candidate)
             error_term = PrologError.existence_error("file", file_term, context)
             raise PrologThrow(error_term)
         else:
@@ -1354,13 +1372,26 @@ class PrologInterpreter:
         from vibeprolog.parser import tokenize_prolog_statements
         return tokenize_prolog_statements(prolog_code)
 
+    def _resolve_consult_target(self, target: str | Path) -> Path:
+        """Resolve consult/1 input which may be a filesystem path or library spec."""
+        if isinstance(target, Path):
+            return target
+        if isinstance(target, str):
+            trimmed = target.strip()
+            if trimmed.startswith("library(") and trimmed.endswith(")"):
+                term = self.parser.parse_term(trimmed, "consult/1")
+                resolved = self._resolve_module_file(term, "consult/1")
+                return Path(resolved)
+            return Path(trimmed)
+        return Path(target)
+
     def consult(self, filepath: str | Path):
         """Load Prolog clauses from a file."""
-        filepath = Path(filepath)
-        with open(filepath, "r") as f:
+        resolved_path = self._resolve_consult_target(filepath)
+        with open(resolved_path, "r") as f:
             content = f.read()
         self._consult_counter += 1
-        source_name = f"file:{filepath}#{self._consult_counter}"
+        source_name = f"file:{resolved_path}#{self._consult_counter}"
         self._consult_code(content, source_name)
 
     def consult_string(self, prolog_code: str):

@@ -113,6 +113,12 @@ Vibe-Prolog supports the Edinburgh `<radix>'<number>` notation for bases 2-36:
 - `\v` (vertical tab) - not supported in Vibe
 - `\f` (form feed) - not supported in Vibe
 
+### Special Atom Cases
+
+| Feature | Example | Status | Notes |
+|---------|---------|--------|-------|
+| Bare dot atom | `phrase(upto_what(Bs0, .), Cs0, Ds).` | ✅ Supported | Dots inside terms no longer trigger clause-terminator errors |
+
 ## Operator Syntax
 
 ### Standard ISO Operators
@@ -236,6 +242,7 @@ sentence(S0, S) :- noun_phrase(S0, S1), verb_phrase(S1, S).
 | DCG exports | `:- module(m, [rule//0]).` | ✅ Supported |
 | Import module | `:- use_module(library(lists)).` | ✅ Supported |
 | Selective import | `:- use_module(library(lists), [append/3]).` | ✅ Supported |
+| Consult library file | `consult(library(dcgs)).` | ✅ Supported |
 | Module-qualified call | `lists:append(X, Y, Z)` | ✅ Supported |
 | Module-qualified head | `user:term_expansion(X, Y) :- ...` | ✅ Supported |
 

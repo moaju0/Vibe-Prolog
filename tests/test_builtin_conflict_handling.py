@@ -13,6 +13,7 @@ from vibeprolog.exceptions import PrologThrow
 class TestLibraryLoadingSkipMode:
     """Tests for skip mode (default) - libraries with conflicts should load silently."""
 
+    @pytest.mark.performance
     def test_dcgs_library_loads_in_skip_mode(self):
         """library(dcgs) exports op(1105, xfy, |) which conflicts with protected | operator."""
         prolog = PrologInterpreter(builtin_conflict="skip")
@@ -21,6 +22,7 @@ class TestLibraryLoadingSkipMode:
         # Verify the library loaded by checking if phrase/2 is available
         assert prolog.has_solution("current_predicate(phrase/2)")
 
+    @pytest.mark.performance
     def test_clpb_library_loads_in_skip_mode(self):
         """library(clpb) defines operators ~ and # which may conflict."""
         prolog = PrologInterpreter(builtin_conflict="skip")
@@ -29,6 +31,7 @@ class TestLibraryLoadingSkipMode:
         # Verify the library loaded
         assert prolog.has_solution("current_predicate(sat/1)")
 
+    @pytest.mark.performance
     def test_clpz_library_loads_in_skip_mode(self):
         """library(clpz) may have operator conflicts."""
         prolog = PrologInterpreter(builtin_conflict="skip")
@@ -37,6 +40,7 @@ class TestLibraryLoadingSkipMode:
         # Verify the library loaded
         assert prolog.has_solution("current_predicate((#=)/2)")
 
+    @pytest.mark.performance
     def test_multiple_affected_libraries_load(self):
         """Test loading multiple libraries that were previously failing."""
         prolog = PrologInterpreter(builtin_conflict="skip")
@@ -74,6 +78,7 @@ class TestLibraryLoadingSkipMode:
             except Exception as e:
                 pytest.fail(f"Failed to load {lib}: {e}")
 
+    @pytest.mark.performance
     def test_skip_mode_preserves_builtin_operators(self):
         """In skip mode, built-in operators should still work even after loading conflicting libraries."""
         prolog = PrologInterpreter(builtin_conflict="skip")
@@ -84,6 +89,7 @@ class TestLibraryLoadingSkipMode:
         assert result is not None
         assert result["X"] == ["a", "b", "c"]
 
+    @pytest.mark.performance
     def test_skip_mode_preserves_builtin_predicates(self):
         """Built-in predicates should still work after loading libraries that redefine them."""
         prolog = PrologInterpreter(builtin_conflict="skip")
@@ -100,6 +106,7 @@ class TestLibraryLoadingSkipMode:
 class TestLibraryLoadingErrorMode:
     """Tests for error mode - libraries with conflicts should raise permission_error."""
 
+    @pytest.mark.performance
     def test_dcgs_library_fails_in_error_mode(self):
         """library(dcgs) should fail to load in error mode due to | operator conflict."""
         prolog = PrologInterpreter(builtin_conflict="error")
@@ -108,6 +115,7 @@ class TestLibraryLoadingErrorMode:
         error_str = str(exc_info.value)
         assert "permission_error" in error_str
 
+    @pytest.mark.performance
     def test_clpb_library_fails_in_error_mode(self):
         """library(clpb) should fail in error mode."""
         prolog = PrologInterpreter(builtin_conflict="error")
@@ -120,6 +128,7 @@ class TestLibraryLoadingErrorMode:
 class TestLibraryLoadingShadowMode:
     """Tests for shadow mode - libraries can define conflicting operators/predicates."""
 
+    @pytest.mark.performance
     def test_dcgs_library_loads_in_shadow_mode(self):
         """library(dcgs) should load successfully in shadow mode."""
         prolog = PrologInterpreter(builtin_conflict="shadow")
@@ -127,6 +136,7 @@ class TestLibraryLoadingShadowMode:
         prolog.consult_string(":- use_module(library(dcgs)).")
         assert prolog.has_solution("current_predicate(phrase/2)")
 
+    @pytest.mark.performance
     def test_shadow_mode_preserves_global_operators(self):
         """In shadow mode, global operators should still work."""
         prolog = PrologInterpreter(builtin_conflict="shadow")
@@ -137,6 +147,7 @@ class TestLibraryLoadingShadowMode:
         assert result is not None
         assert result["X"] == ["a", "b", "c"]
 
+    @pytest.mark.performance
     def test_shadow_mode_module_qualified_uses_shadow(self):
         """Module-qualified calls should use shadowed definitions."""
         prolog = PrologInterpreter(builtin_conflict="shadow")

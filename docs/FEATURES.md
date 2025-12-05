@@ -35,6 +35,7 @@ Status legend:
 | Operators as functor names (quoted) | ✅   | `';'(A, B)`, `'|'(X, Y)`, `':'(a, b)` work |
 | Operators as functor names (unquoted) | ✅ | `;(A, B)`, `|(X, Y)`, `:(a, b)` work |
 | Parenthesized operators as atoms | ✅      | `(;)`, `(|)`, `(,)`, `(->)` work |
+| Bare `.` atom inside terms        | ✅      | Supports constructs like `phrase(upto_what(Bs0, .), Cs0, Ds)` |
 
 ---
 
@@ -343,7 +344,7 @@ The following Scryer-Prolog specific directives are recognized but ignored (with
 
 | Predicate                             | Status | Notes                   |
 | ------------------------------------- | ------ | ----------------------- |
-| `current_predicate/1`                 | ✅      |                         |
+| `current_predicate/1`                 | ✅      | Module-qualified indicators (`module:Name/Arity`) supported |
 | `predicate_property/2`                | ⚠️     | Built-in detection only |
 | `dynamic/static/multifile` properties | ❌      | Needed for ISO tooling  |
 
@@ -424,6 +425,7 @@ Basic variant tabling is available via the `:- table` directive.
 | Built-ins visible in all modules  | ✅      |                                                                |
 | Clause body module resolution     | ✅      | Unqualified goals resolve via imports → defining module → user |
 | `use_module/1,2`                  | ✅      | Supports full and selective imports, including `library(Name)`; library/ preferred over examples/modules/ for module resolution |
+| `consult/1` with `library(Name)`  | ✅      | `consult("library(dcgs)")` resolves via library search paths just like `use_module/1` |
 | **Operator exports in module/2**  | ✅      | **SWI-Prolog compatible - operators can be exported**          |
 | Imported operator discovery       | ✅      | Two-pass parsing: operators from `use_module` targets are pre-scanned and registered before parsing dependent code. Handles block comments, line comments, and recursive imports |
 | **Module-scoped predicate namespaces** | ✅  | Each module can define predicates with the same name/arity without conflict. `library(a):foo/1` and `library(b):foo/1` are distinct |

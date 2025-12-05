@@ -119,6 +119,41 @@ class ReflectionBuiltins:
     ) -> Iterator[Substitution]:
         indicator = deref(args[0], subst)
 
+        interp = getattr(engine, "interpreter", None)
+
+        # Handle module-qualified indicators (Module:Name/Arity)
+        if (
+            isinstance(indicator, Compound)
+            and indicator.functor == ":"
+            and len(indicator.args) == 2
+            and interp is not None
+        ):
+            module_term, _ = indicator.args
+            if isinstance(module_term, Atom):
+                target_modules = [
+                    (module_term.name, interp.modules.get(module_term.name))
+                ]
+            else:
+                target_modules = list(interp.modules.items())
+
+            matched = False
+            for module_name, module in target_modules:
+                if module is None:
+                    continue
+                keys = set(module.predicates.keys())
+                keys.update(module.shadowed_builtins)
+                keys.update(module.imports.keys())
+                for name, arity in sorted(keys):
+                    pred_indicator = Compound("/", (Atom(name), Number(arity)))
+                    qualified = Compound(":", (Atom(module_name), pred_indicator))
+                    new_subst = unify(indicator, qualified, subst)
+                    if new_subst is not None:
+                        matched = True
+                        yield new_subst
+            if not matched:
+                return iter(())
+            return
+
         predicates = set(engine._builtin_registry.keys())
         predicates.add(("!", 0))
 
