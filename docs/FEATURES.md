@@ -232,6 +232,20 @@ The following Scryer-Prolog specific directives are recognized but ignored (with
 | `bagof/3`   | ✅      | Correct quantification |
 | `setof/3`   | ✅      | ISO semantics          |
 
+## §8.14 — Definite Clause Grammars (DCGs)
+
+| Predicate / Feature          | Status | Notes                                                                 |
+| ---------------------------- | ------ | --------------------------------------------------------------------- |
+| DCG syntax (`-->`)           | ✅      | **ISO-required** - Full DCG syntax support                           |
+| `phrase/2`                   | ✅      | **ISO-compliant** - Complete list consumption with error handling    |
+| `phrase/3`                   | ✅      | **ISO-compliant** - Remainder support with error handling            |
+| Terminal lists as rulesets   | ✅      | `phrase([a, b, c], L)` unifies L with [a, b, c]                       |
+| Cut (`!`) as ruleset         | ✅      | `phrase(!, L)` unifies L with []                                      |
+| DCG expansion                | ✅      | Automatic conversion to standard Prolog clauses                       |
+| Embedded Prolog goals `{G}`  | ✅      | Full support for embedded goals in DCG rules                         |
+| Alternatives (`;`)           | ✅      | Choice points in DCG rules                                           |
+| Error handling               | ✅      | **ISO-compliant** - Proper instantiation_error, type_error, existence_error |
+
 ---
 
 ## Meta-Predicates & Control Flow Extensions

@@ -226,6 +226,60 @@ class TestDCGIntegration:
         assert prolog.has_solution("phrase(s, [the, cat, chases, the, cat])")
 
 
+class TestPhraseISOErrors:
+    """Tests for ISO Prolog phrase/2 and phrase/3 error conditions."""
+
+    def test_phrase_instantiation_error_unbound_rule_set(self):
+        """Test instantiation_error for unbound RuleSet variable."""
+        prolog = PrologInterpreter()
+        with pytest.raises(Exception) as exc_info:
+            prolog.query_once("phrase(_Var, L)")
+        # Should raise instantiation_error
+        assert "instantiation_error" in str(exc_info.value)
+
+    def test_phrase_instantiation_error_unbound_rule_set_phrase3(self):
+        """Test instantiation_error for unbound RuleSet variable in phrase/3."""
+        prolog = PrologInterpreter()
+        with pytest.raises(Exception) as exc_info:
+            prolog.query_once("phrase(_Var, L, Rest)")
+        # Should raise instantiation_error
+        assert "instantiation_error" in str(exc_info.value)
+
+    def test_phrase_type_error_non_callable_number(self):
+        """Test type_error for non-callable terms (numbers)."""
+        prolog = PrologInterpreter()
+        with pytest.raises(Exception) as exc_info:
+            prolog.query_once("phrase(1, L)")
+        # Should raise type_error(callable, 1)
+        assert "type_error" in str(exc_info.value)
+        assert "callable" in str(exc_info.value)
+
+    def test_phrase_existence_error_non_callable_string(self):
+        """Test existence_error for non-callable terms (strings as atoms)."""
+        prolog = PrologInterpreter()
+        with pytest.raises(Exception) as exc_info:
+            prolog.query_once("phrase(\"string\", L)")
+        # Should raise existence_error for undefined predicate "string"
+        assert "existence_error" in str(exc_info.value)
+
+    def test_phrase_type_error_improper_list(self):
+        """Test type_error for improper lists."""
+        prolog = PrologInterpreter()
+        with pytest.raises(Exception) as exc_info:
+            prolog.query_once("phrase([a|b], L)")
+        # Should raise type_error(list, [a|b])
+        assert "type_error" in str(exc_info.value)
+        assert "list" in str(exc_info.value)
+
+    def test_phrase_existence_error_undefined_predicate(self):
+        """Test existence_error for undefined predicates."""
+        prolog = PrologInterpreter()
+        with pytest.raises(Exception) as exc_info:
+            prolog.query_once("phrase(undefined_pred, L)")
+        # Should raise existence_error
+        assert "existence_error" in str(exc_info.value)
+
+
 class TestDCGErrorCases:
     """Tests for error conditions in DCGs."""
 
@@ -241,6 +295,54 @@ class TestDCGErrorCases:
         # This should raise a syntax error
         with pytest.raises(Exception):
             prolog.consult_string("invalid --> [missing, dot]")
+
+
+class TestPhraseISOCompliance:
+    """Tests for ISO Prolog phrase/2 and phrase/3 compliance."""
+
+    def test_phrase_terminal_list_single_element(self):
+        """Test phrase([a], L) → L = [a]."""
+        prolog = PrologInterpreter()
+        result = prolog.query_once("phrase([a], L)")
+        assert result is not None
+        assert result["L"] == ["a"]
+
+    def test_phrase_terminal_list_empty(self):
+        """Test phrase([], L) → L = []."""
+        prolog = PrologInterpreter()
+        result = prolog.query_once("phrase([], L)")
+        assert result is not None
+        assert result["L"] == []
+
+    def test_phrase_terminal_list_multiple_elements(self):
+        """Test phrase([a, b, c], L) → L = [a, b, c]."""
+        prolog = PrologInterpreter()
+        result = prolog.query_once("phrase([a, b, c], L)")
+        assert result is not None
+        assert result["L"] == ["a", "b", "c"]
+
+    def test_phrase_cut_as_ruleset(self):
+        """Test phrase(!, L) → L = []."""
+        prolog = PrologInterpreter()
+        result = prolog.query_once("phrase(!, L)")
+        assert result is not None
+        assert result["L"] == []
+
+    def test_phrase_cut_as_ruleset_with_remainder(self):
+        """Test phrase(!, L, Rest) → L = [], Rest = []."""
+        prolog = PrologInterpreter()
+        result = prolog.query_once("phrase(!, L, Rest)")
+        assert result is not None
+        assert result["L"] == []
+        assert result["Rest"] == []
+
+    def test_phrase_predicate_with_remainder(self):
+        """Test phrase/3 with predicate and remainder."""
+        prolog = PrologInterpreter()
+        prolog.consult_string("word --> [hello].")
+        result = prolog.query_once("phrase(word, [hello, world], Rest)")
+        assert result is not None
+        assert result["Rest"] == ["world"]
 
 
 class TestDCGExpansion:
