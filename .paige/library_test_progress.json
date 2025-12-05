@@ -1,8 +1,5 @@
 {
-  "timestamp": "2025-12-04T08:00:00.000000",
-  "status": "Analysis complete - See docs/LIBRARY_STATUS.md for detailed report",
-  "analysis_notes": "28 files investigated and documented. Key issues identified: operator redefinition blocking multiple libraries, DCG library timeout, control construct in module exports, and unterminated block comment.",
-  "timestamp": "2025-12-04T20:03:41.061308",
+  "timestamp": "2025-12-05T17:57:22.502195",
   "results": {
     "library/$project_atts.pl": {
       "success": true,
@@ -11,8 +8,8 @@
     },
     "library/arithmetic.pl": {
       "success": false,
-      "short_msg": "\u274c Prolog error",
-      "detailed_msg": "PrologThrow: error(permission_error(modify, operator, |), context(use_module/1))"
+      "short_msg": "\u274c Timeout",
+      "detailed_msg": "File loading exceeded 30 seconds"
     },
     "library/assoc.pl": {
       "success": true,
@@ -31,13 +28,13 @@
     },
     "library/builtins.pl": {
       "success": false,
-      "short_msg": "\u274c Prolog error",
-      "detailed_msg": "PrologThrow: error(type_error(predicate_indicator, /(!, 0)), context(module/2))"
+      "short_msg": "\u274c Timeout",
+      "detailed_msg": "File loading exceeded 30 seconds"
     },
     "library/charsio.pl": {
       "success": false,
-      "short_msg": "\u274c Prolog error",
-      "detailed_msg": "PrologThrow: error(permission_error(modify, operator, |), context(use_module/1))"
+      "short_msg": "\u274c Timeout",
+      "detailed_msg": "File loading exceeded 30 seconds"
     },
     "library/clpb.pl": {
       "success": false,
@@ -56,13 +53,13 @@
     },
     "library/crypto.pl": {
       "success": false,
-      "short_msg": "\u274c Prolog error",
-      "detailed_msg": "PrologThrow: error(syntax_error(Unterminated block comment), context(consult/1))"
+      "short_msg": "\u274c Timeout",
+      "detailed_msg": "File loading exceeded 30 seconds"
     },
     "library/csv.pl": {
       "success": false,
-      "short_msg": "\u274c Prolog error",
-      "detailed_msg": "PrologThrow: error(permission_error(modify, operator, |), context(use_module/1))"
+      "short_msg": "\u274c Timeout",
+      "detailed_msg": "File loading exceeded 30 seconds"
     },
     "library/dcgs.pl": {
       "success": true,
@@ -71,253 +68,8 @@
     },
     "library/debug.pl": {
       "success": false,
-      "short_msg": "\u274c Prolog error",
-      "detailed_msg": "PrologThrow: error(permission_error(modify, operator, |), context(use_module/1))"
-    },
-    "library/diag.pl": {
-      "success": true,
-      "short_msg": "\u2705 Loaded successfully",
-      "detailed_msg": ""
-    },
-    "library/dif.pl": {
-      "success": false,
-      "short_msg": "\u274c Prolog error",
-      "detailed_msg": "PrologThrow: error(permission_error(modify, operator, |), context(use_module/1))"
-    },
-    "library/error.pl": {
-      "success": true,
-      "short_msg": "\u2705 Loaded successfully",
-      "detailed_msg": ""
-    },
-    "library/ffi.pl": {
-      "success": false,
-      "short_msg": "\u274c Prolog error",
-      "detailed_msg": "PrologThrow: error(permission_error(modify, operator, |), context(use_module/1))"
-    },
-    "library/files.pl": {
-      "success": false,
-      "short_msg": "\u274c Prolog error",
-      "detailed_msg": "PrologThrow: error(permission_error(modify, operator, |), context(use_module/1))"
-    },
-    "library/format.pl": {
-      "success": false,
-      "short_msg": "\u274c Prolog error",
-      "detailed_msg": "PrologThrow: error(permission_error(modify, operator, |), context(use_module/1))"
-    },
-    "library/freeze.pl": {
-      "success": false,
-      "short_msg": "\u274c Prolog error",
-      "detailed_msg": "PrologThrow: error(permission_error(modify, operator, |), context(use_module/1))"
-    },
-    "library/gensym.pl": {
-      "success": true,
-      "short_msg": "\u2705 Loaded successfully",
-      "detailed_msg": ""
-    },
-    "library/http/http_open.pl": {
-      "success": true,
-      "short_msg": "\u2705 Loaded successfully",
-      "detailed_msg": ""
-    },
-    "library/http/http_server.pl": {
-      "success": false,
-      "short_msg": "\u274c Prolog error",
-      "detailed_msg": "PrologThrow: error(permission_error(modify, operator, |), context(use_module/1))"
-    },
-    "library/iso_ext.pl": {
-      "success": true,
-      "short_msg": "\u2705 Loaded successfully",
-      "detailed_msg": ""
-    },
-    "library/lambda.pl": {
-      "success": true,
-      "short_msg": "\u2705 Loaded successfully",
-      "detailed_msg": ""
-    },
-    "library/lists.pl": {
-      "success": true,
-      "short_msg": "\u2705 Loaded successfully",
-      "detailed_msg": ""
-    },
-    "library/loader.pl": {
-      "success": true,
-      "short_msg": "\u2705 Loaded successfully",
-      "detailed_msg": ""
-    },
-    "library/numerics/quadtests.pl": {
-      "success": false,
-      "short_msg": "\u274c Prolog error",
-      "detailed_msg": "PrologThrow: error(permission_error(modify, operator, |), context(use_module/1))"
-    },
-    "library/numerics/special_functions.pl": {
-      "success": false,
-      "short_msg": "\u274c Prolog error",
-      "detailed_msg": "PrologThrow: error(type_error(atom, /(numerics, testutils)), context(use_module/1,2))"
-    },
-    "library/numerics/testutils.pl": {
-      "success": false,
-      "short_msg": "\u274c Prolog error",
-      "detailed_msg": "PrologThrow: error(syntax_error(No terminal matches '\u03b4' in the current parser context, at line 13 col 16\n\n              ,\u03b4_inverses_t/5\n               ^\nExpected one of: \n\t* CONTROL_OP_FUNCTOR\n\t* PREFIX_FX_1200_45\n\t* PREFIX_FX_700_35\n\t* OPERATOR_ATOM\n\t* PREFIX_FY_200_3\n\t* STRING\n\t* VARIABLE\n\t* PREFIX_FY_900_36\n\t* OP_SYMBOL\n\t* COMPARISON_OP_FUNCTOR\n\t* ATOM\n\t* INFIX_YFX_500_15\n\t* PREFIX_FY_200_4\n\t* NUMBER\n\t* LPAR\n\t* BANG\n\t* PREFIX_FX_1200_44\n\t* INFIX_OP_FUNCTOR\n\t* SPECIAL_ATOM\n\t* LBRACE\n\t* PREFIX_FX_1150_41\n\t* LSQB\n\t* ARITH_OP_FUNCTOR\n\t* SPECIAL_ATOM_OPS\n\t* CHAR_CODE\n), context(consult/1))"
-    },
-    "library/ops_and_meta_predicates.pl": {
-      "success": false,
       "short_msg": "\u274c Timeout",
       "detailed_msg": "File loading exceeded 30 seconds"
-    },
-    "library/ordsets.pl": {
-      "success": false,
-      "short_msg": "\u274c Prolog error",
-      "detailed_msg": "PrologThrow: error(syntax_error(No terminal matches 't' in the current parser context, at line 22 col 39\n\n        ;/* R2 = (=),   Item == X2 */ true\n                                      ^\nExpected one of: \n\t* INFIX_XFY_600_18\n\t* INFIX_XFY_1100_39\n\t* INFIX_XFY_1000_37\n\t* INFIX_XFX_1200_41\n\t* INFIX_XFY_1050_38\n\t* INFIX_YFX_400_9\n\t* INFIX_YFX_400_5\n\t* INFIX_YFX_500_15\n\t* RPAR\n\t* LPAR\n\t* INFIX_YFX_400_7\n\t* INFIX_YFX_400_8\n\t* INFIX_YFX_400_12\n\t* INFIX_YFX_400_10\n\t* INFIX_YFX_500_17\n\t* INFIX_XFY_200_2\n\t* INFIX_YFX_500_16\n\t* INFIX_XFY_200_1\n\t* INFIX_YFX_400_6\n\t* INFIX_YFX_400_11\n\t* INFIX_YFX_400_13\n\t* INFIX_YFX_500_14\n\t* INFIX_XFX_1200_42\n), context(consult/1))"
-    },
-    "library/os.pl": {
-      "success": false,
-      "short_msg": "\u274c Prolog error",
-      "detailed_msg": "PrologThrow: error(permission_error(modify, operator, |), context(use_module/1))"
-    },
-    "library/pairs.pl": {
-      "success": true,
-      "short_msg": "\u2705 Loaded successfully",
-      "detailed_msg": ""
-    },
-    "library/pio.pl": {
-      "success": false,
-      "short_msg": "\u274c Prolog error",
-      "detailed_msg": "PrologThrow: error(permission_error(modify, operator, |), context(use_module/1))"
-    },
-    "library/process.pl": {
-      "success": false,
-      "short_msg": "\u274c Prolog error",
-      "detailed_msg": "PrologThrow: error(permission_error(modify, operator, |), context(use_module/1))"
-    },
-    "library/queues.pl": {
-      "success": true,
-      "short_msg": "\u2705 Loaded successfully",
-      "detailed_msg": ""
-    },
-    "library/random.pl": {
-      "success": true,
-      "short_msg": "\u2705 Loaded successfully",
-      "detailed_msg": ""
-    },
-    "library/reif.pl": {
-      "success": false,
-      "short_msg": "\u274c Prolog error",
-      "detailed_msg": "PrologThrow: error(permission_error(modify, operator, |), context(use_module/1))"
-    },
-    "library/serialization/abnf.pl": {
-      "success": false,
-      "short_msg": "\u274c Prolog error",
-      "detailed_msg": "PrologThrow: error(permission_error(modify, operator, |), context(use_module/1))"
-    },
-    "library/serialization/json.pl": {
-      "success": false,
-      "short_msg": "\u274c Prolog error",
-      "detailed_msg": "PrologThrow: error(permission_error(modify, operator, |), context(use_module/1))"
-    },
-    "library/sgml.pl": {
-      "success": false,
-      "short_msg": "\u274c Prolog error",
-      "detailed_msg": "PrologThrow: error(permission_error(modify, operator, |), context(use_module/1))"
-    },
-    "library/si.pl": {
-      "success": true,
-      "short_msg": "\u2705 Loaded successfully",
-      "detailed_msg": ""
-    },
-    "library/simplex.pl": {
-      "success": false,
-      "short_msg": "\u274c Prolog error",
-      "detailed_msg": "PrologThrow: error(permission_error(modify, operator, |), context(use_module/1))"
-    },
-    "library/sockets.pl": {
-      "success": true,
-      "short_msg": "\u2705 Loaded successfully",
-      "detailed_msg": ""
-    },
-    "library/tabling/batched_worklist.pl": {
-      "success": false,
-      "short_msg": "\u274c Prolog error",
-      "detailed_msg": "PrologThrow: error(type_error(atom, /(tabling, global_worklist)), context(use_module/1,2))"
-    },
-    "library/tabling/double_linked_list.pl": {
-      "success": false,
-      "short_msg": "\u274c Prolog error",
-      "detailed_msg": "PrologThrow: error(permission_error(modify, operator, |), context(use_module/1))"
-    },
-    "library/tabling/global_worklist.pl": {
-      "success": false,
-      "short_msg": "\u274c Prolog error",
-      "detailed_msg": "PrologThrow: error(permission_error(modify, operator, |), context(use_module/1))"
-    },
-    "library/tabling/table_data_structure.pl": {
-      "success": false,
-      "short_msg": "\u274c Prolog error",
-      "detailed_msg": "PrologThrow: error(type_error(atom, /(tabling, table_link_manager)), context(use_module/1,2))"
-    },
-    "library/tabling/table_link_manager.pl": {
-      "success": false,
-      "short_msg": "\u274c Prolog error",
-      "detailed_msg": "PrologThrow: error(permission_error(modify, operator, |), context(use_module/1))"
-    },
-    "library/tabling/trie.pl": {
-      "success": false,
-      "short_msg": "\u274c Prolog error",
-      "detailed_msg": "PrologThrow: error(permission_error(modify, operator, |), context(use_module/1))"
-    },
-    "library/tabling/wrapper.pl": {
-      "success": false,
-      "short_msg": "\u274c Prolog error",
-      "detailed_msg": "PrologThrow: error(permission_error(modify, operator, |), context(use_module/1))"
-    },
-    "library/tabling.pl": {
-      "success": false,
-      "short_msg": "\u274c Prolog error",
-      "detailed_msg": "PrologThrow: error(type_error(atom, /(tabling, double_linked_list)), context(use_module/1,2))"
-    },
-    "library/terms.pl": {
-      "success": true,
-      "short_msg": "\u2705 Loaded successfully",
-      "detailed_msg": ""
-    },
-    "library/test_module.pl": {
-      "success": true,
-      "short_msg": "\u2705 Loaded successfully",
-      "detailed_msg": ""
-    },
-    "library/time.pl": {
-      "success": false,
-      "short_msg": "\u274c Prolog error",
-      "detailed_msg": "PrologThrow: error(permission_error(modify, operator, |), context(use_module/1))"
-    },
-    "library/tls.pl": {
-      "success": true,
-      "short_msg": "\u2705 Loaded successfully",
-      "detailed_msg": ""
-    },
-    "library/ugraphs.pl": {
-      "success": false,
-      "short_msg": "\u274c Prolog error",
-      "detailed_msg": "PrologThrow: error(syntax_error(No terminal matches 't' in the current parser context, at line 22 col 39\n\n        ;/* R2 = (=),   Item == X2 */ true\n                                      ^\nExpected one of: \n\t* INFIX_XFY_600_18\n\t* INFIX_XFY_1100_39\n\t* INFIX_XFY_1000_37\n\t* INFIX_XFX_1200_41\n\t* INFIX_XFY_1050_38\n\t* INFIX_YFX_400_9\n\t* INFIX_YFX_400_5\n\t* INFIX_YFX_500_15\n\t* RPAR\n\t* LPAR\n\t* INFIX_YFX_400_7\n\t* INFIX_YFX_400_8\n\t* INFIX_YFX_400_12\n\t* INFIX_YFX_400_10\n\t* INFIX_YFX_500_17\n\t* INFIX_XFY_200_2\n\t* INFIX_YFX_500_16\n\t* INFIX_XFY_200_1\n\t* INFIX_YFX_400_6\n\t* INFIX_YFX_400_11\n\t* INFIX_YFX_400_13\n\t* INFIX_YFX_500_14\n\t* INFIX_XFX_1200_42\n), context(consult/1))"
-    },
-    "library/uuid.pl": {
-      "success": false,
-      "short_msg": "\u274c Prolog error",
-      "detailed_msg": "PrologThrow: error(syntax_error(Unterminated block comment), context(consult/1))"
-    },
-    "library/wasm.pl": {
-      "success": true,
-      "short_msg": "\u2705 Loaded successfully",
-      "detailed_msg": ""
-    },
-    "library/when.pl": {
-      "success": false,
-      "short_msg": "\u274c Prolog error",
-      "detailed_msg": "PrologThrow: error(permission_error(modify, operator, |), context(use_module/1))"
-    },
-    "library/xpath.pl": {
-      "success": false,
-      "short_msg": "\u274c Prolog error",
-      "detailed_msg": "PrologThrow: error(permission_error(modify, operator, |), context(use_module/1))"
     }
   }
 }
