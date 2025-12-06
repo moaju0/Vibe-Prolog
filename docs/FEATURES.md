@@ -32,6 +32,9 @@ Status legend:
 | DCG rule operator `-->` (1200, xfx) | ✅    | **ISO-required** - DCG syntax |
 | `:- char_conversion/2`           | ✅      | **ISO-mandatory** - Character conversion during parsing |
 | Dot as clause terminator         | ✅      | Correctly ignores dots inside parentheses/brackets/braces |
+| Dot as atom in expressions       | ✅      | Single `.` valid as atom argument (e.g., `upto_what(X, .)`) |
+| Range operator `..`              | ✅      | `1..9` parses as `..(1, 9)` - used by CLP(Z) |
+| Ellipsis `...`                   | ✅      | Three dots as atom/operator for DCG patterns |
 | Operators as functor names (quoted) | ✅   | `';'(A, B)`, `'|'(X, Y)`, `':'(a, b)` work |
 | Operators as functor names (unquoted) | ✅ | `;(A, B)`, `|(X, Y)`, `:(a, b)` work |
 | Parenthesized operators as atoms | ✅      | `(;)`, `(|)`, `(,)`, `(->)` work |

@@ -969,3 +969,250 @@ class TestDotInParentheses:
         code = 'foo(a, b). bar(c, d).'
         statements = list(tokenize_prolog_statements(code))
         assert statements == ['foo(a, b).', ' bar(c, d).']
+
+
+class TestDotAndRangeOperator:
+    """Test parsing of single dot as atom and .. as range operator.
+    
+    These tests address the issue where:
+    1. A single '.' used as an atom argument (e.g., in DCG rules) was incorrectly rejected
+    2. The '..' range operator must be correctly parsed in expressions like '1..9'
+    """
+
+    def test_dot_as_atom_parses_correctly(self):
+        """Single dot should be valid as an atom in functor arguments."""
+        parser = PrologParser()
+        clauses = parser.parse('test :- phrase(upto_what(Bs0, .), Cs0, Ds).')
+        assert len(clauses) == 1
+        clause = clauses[0]
+        assert isinstance(clause.body[0], Compound)
+        assert clause.body[0].functor == 'phrase'
+
+    def test_quoted_dot_as_atom(self):
+        """Quoted dot should work as an atom."""
+        parser = PrologParser()
+        clauses = parser.parse("test :- foo('.').")
+        assert len(clauses) == 1
+        clause = clauses[0]
+        assert isinstance(clause.body[0].args[0], Atom)
+        assert clause.body[0].args[0].name == '.'
+
+    def test_dot_in_list(self):
+        """Dot should be valid as a list element."""
+        parser = PrologParser()
+        clauses = parser.parse('test :- X = [., a, .].')
+        assert len(clauses) == 1
+        clause = clauses[0]
+        # The list should contain dots as atoms
+        assert isinstance(clause.body[0], Compound)
+        assert clause.body[0].functor == '='
+        list_term = clause.body[0].args[1]
+        assert isinstance(list_term, List)
+        assert list_term.elements == (Atom('.'), Atom('a'), Atom('.'))
+
+    def test_range_operator_basic(self):
+        """Range operator 1..9 should parse correctly."""
+        parser = PrologParser()
+        clauses = parser.parse('test :- X in 1..9.')
+        assert len(clauses) == 1
+        clause = clauses[0]
+        # The body should be in(X, ..(1, 9))
+        assert isinstance(clause.body[0], Compound)
+        assert clause.body[0].functor == 'in'
+        range_term = clause.body[0].args[1]
+        assert isinstance(range_term, Compound)
+        assert range_term.functor == '..'
+        assert range_term.args[0] == Number(1)
+        assert range_term.args[1] == Number(9)
+
+    def test_range_operator_with_variables(self):
+        """Range operator with variables X..Y."""
+        parser = PrologParser()
+        clauses = parser.parse('test :- X in A..B.')
+        assert len(clauses) == 1
+        clause = clauses[0]
+        range_term = clause.body[0].args[1]
+        assert isinstance(range_term, Compound)
+        assert range_term.functor == '..'
+        assert isinstance(range_term.args[0], Variable)
+        assert isinstance(range_term.args[1], Variable)
+
+    def test_range_operator_with_spaces(self):
+        """Range operator with spaces around it."""
+        parser = PrologParser()
+        clauses = parser.parse('test :- X in 1 .. 9.')
+        assert len(clauses) == 1
+        clause = clauses[0]
+        range_term = clause.body[0].args[1]
+        assert isinstance(range_term, Compound)
+        assert range_term.functor == '..'
+        assert range_term.args[0] == Number(1)
+        assert range_term.args[1] == Number(9)
+
+    def test_range_operator_with_zero(self):
+        """Range operator 0..100."""
+        parser = PrologParser()
+        clauses = parser.parse('test :- X in 0..100.')
+        assert len(clauses) == 1
+        clause = clauses[0]
+        range_term = clause.body[0].args[1]
+        assert isinstance(range_term, Compound)
+        assert range_term.functor == '..'
+        assert range_term.args[0] == Number(0)
+        assert range_term.args[1] == Number(100)
+
+    def test_range_operator_negative_numbers(self):
+        """Range operator with negative numbers -5..5."""
+        parser = PrologParser()
+        clauses = parser.parse('test :- X in -5..5.')
+        assert len(clauses) == 1
+        clause = clauses[0]
+        range_term = clause.body[0].args[1]
+        assert isinstance(range_term, Compound)
+        assert range_term.functor == '..'
+        assert range_term.args[0] == Number(-5)
+        assert range_term.args[1] == Number(5)
+
+    def test_range_operator_in_parentheses(self):
+        """Range operator in parentheses (1..9)."""
+        parser = PrologParser()
+        clauses = parser.parse('test :- X = (1..9).')
+        assert len(clauses) == 1
+        clause = clauses[0]
+        # X = (1..9) -> =(X, ..(1, 9))
+        assert isinstance(clause.body[0], Compound)
+        assert clause.body[0].functor == '='
+        range_term = clause.body[0].args[1]
+        assert isinstance(range_term, Compound)
+        assert range_term.functor == '..'
+
+    def test_range_operator_in_list(self):
+        """Range operator inside a list [1..5, 6..10]."""
+        parser = PrologParser()
+        clauses = parser.parse('test :- X = [1..5, 6..10].')
+        assert len(clauses) == 1
+        clause = clauses[0]
+        # The list should have two range terms
+        list_term = clause.body[0].args[1]
+        assert isinstance(list_term, List)
+        assert len(list_term.elements) == 2
+        assert list_term.elements[0] == Compound('..', (Number(1), Number(5)))
+        assert list_term.elements[1] == Compound('..', (Number(6), Number(10)))
+
+    def test_range_operator_as_predicate_argument(self):
+        """Range operator as argument foo(1..3)."""
+        parser = PrologParser()
+        clauses = parser.parse('test :- foo(1..3).')
+        assert len(clauses) == 1
+        clause = clauses[0]
+        foo_call = clause.body[0]
+        assert isinstance(foo_call, Compound)
+        assert foo_call.functor == 'foo'
+        range_term = foo_call.args[0]
+        assert isinstance(range_term, Compound)
+        assert range_term.functor == '..'
+
+    def test_range_with_trailing_float(self):
+        """Regression test: 1..2.3 should be parsed correctly without splitting clauses.
+        
+        The regex pattern for detecting clause terminators must not incorrectly
+        treat 1..2. (from 1..2.3) as a clause terminator when followed by a digit.
+        This test ensures the clause is not split into two tokens.
+        """
+        from vibeprolog.parser import tokenize_prolog_statements
+        
+        # Test tokenization first
+        code = 'test :- X = 1..2.3.'
+        statements = list(tokenize_prolog_statements(code))
+        assert len(statements) == 1, f"Expected 1 statement, got {len(statements)}: {statements}"
+        assert statements[0] == code
+        
+        # Now test parsing
+        parser = PrologParser()
+        clauses = parser.parse('test :- X = 1..2.3.')
+        assert len(clauses) == 1
+        clause = clauses[0]
+        # Head should be the atom 'test'
+        assert isinstance(clause.head, Atom)
+        assert clause.head.name == 'test'
+        assert len(clause.body) == 1
+        
+        # The body should be X = 1..2.3 where 1..2.3 is parsed as part of the expression
+        goal = clause.body[0]
+        assert isinstance(goal, Compound)
+        assert goal.functor == '='
+        # The RHS should be a range expression with a float: ..(1, 2.3)
+        rhs = goal.args[1]
+        assert isinstance(rhs, Compound)
+        assert rhs.functor == '..'
+        assert rhs.args[0] == Number(1)
+        assert rhs.args[1] == Number(2.3)
+
+    def test_ellipsis_pattern(self):
+        """Ellipsis ... pattern in DCG rules."""
+        parser = PrologParser()
+        clauses = parser.parse('test :- phrase((...,[Last]), Ls).')
+        assert len(clauses) == 1
+        clause = clauses[0]
+        assert isinstance(clause.body[0], Compound)
+        assert clause.body[0].functor == 'phrase'
+
+    def test_float_parsing_not_affected(self):
+        """Float parsing should still work correctly."""
+        parser = PrologParser()
+        clauses = parser.parse('test :- X is 3.14.')
+        assert len(clauses) == 1
+        clause = clauses[0]
+        is_expr = clause.body[0]
+        assert isinstance(is_expr, Compound)
+        assert is_expr.functor == 'is'
+        assert is_expr.args[1] == Number(3.14)
+
+    def test_integer_with_terminator(self):
+        """Integer followed by clause terminator."""
+        parser = PrologParser()
+        clauses = parser.parse('test :- X = 1.')
+        assert len(clauses) == 1
+        clause = clauses[0]
+        eq_expr = clause.body[0]
+        assert eq_expr.args[1] == Number(1)
+
+    def test_full_clause_with_range_and_terminator(self):
+        """Complete clause with range and proper termination."""
+        parser = PrologParser()
+        clauses = parser.parse('sudoku :- Vars in 1..9, label(Vars).')
+        assert len(clauses) == 1
+        clause = clauses[0]
+        assert len(clause.body) == 2
+        # First goal: Vars in 1..9
+        in_goal = clause.body[0]
+        assert in_goal.functor == 'in'
+        # Second goal: label(Vars)
+        label_goal = clause.body[1]
+        assert label_goal.functor == 'label'
+
+    def test_clpz_style_constraint(self):
+        """CLP(Z) style constraint with range operator."""
+        parser = PrologParser()
+        clauses = parser.parse('test :- [X,Y] ins 0..9.')
+        assert len(clauses) == 1
+        clause = clauses[0]
+        ins_goal = clause.body[0]
+        assert ins_goal.functor == 'ins'
+        range_term = ins_goal.args[1]
+        assert range_term.functor == '..'
+
+    def test_tokenizer_range_operator(self):
+        """Tokenizer correctly handles range operator in clauses."""
+        code = 'test :- X in 1..9. test2 :- Y in 0..10.'
+        statements = list(tokenize_prolog_statements(code))
+        assert len(statements) == 2
+        assert '1..9' in statements[0]
+        assert '0..10' in statements[1]
+
+    def test_tokenizer_ellipsis(self):
+        """Tokenizer correctly handles ellipsis in clauses."""
+        code = 'test :- phrase((...,X), L). test2.'
+        statements = list(tokenize_prolog_statements(code))
+        assert len(statements) == 2
+        assert '...' in statements[0]
