@@ -884,7 +884,12 @@ class PrologTransformer(Transformer):
             # Handle backslash escape sequences
             if char_part.startswith("\\"):
                 try:
-                    code, _ = self._parse_escape_sequence(char_part, 0)
+                    code, new_pos = self._parse_escape_sequence(char_part, 0)
+                    if new_pos != len(char_part):
+                        raise ValueError("trailing characters after escape sequence")
+                    # \c is ignored in strings but is not a valid character code literal.
+                    if char_part == '\\c':
+                        raise ValueError("invalid character code: \\c")
                     return Number(code)
                 except ValueError as e:
                     raise ValueError("unexpected_char")
