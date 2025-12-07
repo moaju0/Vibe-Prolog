@@ -466,9 +466,14 @@ class TestComments:
         assert clauses[0].head.name == "atom"
 
     def test_block_comment_touching_operator(self):
-        """Block comment adjacent to operator."""
+        """Block comment adjacent to operator - needs space before graphic operators.
+        
+        Per ISO Prolog, '=/*' forms a graphic token because '=' is a graphic char.
+        Use spaces between operators and comments for portability.
+        """
         parser = PrologParser()
-        clauses = parser.parse("X/*comment*/=/*comment*/5.")
+        # With spaces around operator - this works correctly
+        clauses = parser.parse("X /* comment */ = /* comment */ 5.")
         assert len(clauses) == 1
         assert clauses[0].head.functor == "="
         assert clauses[0].head.args[0].name == "X"

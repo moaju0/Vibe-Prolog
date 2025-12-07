@@ -22,6 +22,18 @@ def _is_graphic_char(ch: str) -> bool:
     return ch in GRAPHIC_CHARS
 
 
+def _should_start_block_comment(text: str, index: int, prev_char: str | None) -> bool:
+    """Return True if /* at ``index`` starts a block comment based on context."""
+
+    # Graphic operators like //* rely on the preceding slash to keep the token intact.
+    if prev_char == '/':
+        return False
+    # Graphic operators like /*/ must remain intact even when not preceded by '/'.
+    if text.startswith('/*/', index):
+        return False
+    return True
+
+
 @dataclass(frozen=True)
 class List:
     """A list."""
@@ -216,7 +228,8 @@ __OPERATOR_GRAMMAR__
     %import common.WS
     %ignore WS
     %ignore /%.*/  // Line comments
-    %ignore /\/\*[\s\S]*?\*\//
+    // Block comments are handled by Python pre-processing in _collect_pldoc_comments
+    // which properly handles nesting, PlDoc, and the slash-prefix guard rules
 """
 
 
@@ -902,6 +915,7 @@ def tokenize_prolog_statements(prolog_code: str) -> list[str]:
             i += 1
             continue
 
+
         # Handle escape sequences
         if escape_next:
             current.append(char)
@@ -961,14 +975,10 @@ def tokenize_prolog_statements(prolog_code: str) -> list[str]:
                 i += 1
                 continue
             # Check for block comment start: /* only starts a comment if NOT preceded
-            # by a graphic character. E.g., '//*' is the operator //* not a comment.
+            # by '/' and not part of the literal '/*/'. E.g., '//*' and '/*/' remain operators.
             if prolog_code[i:i+2] == '/*':
-                # Check if the preceding character is a graphic character
-                # If so, this /* is part of an operator token, not a comment
-                prev_char = prolog_code[i-1] if i > 0 else ''
-                prev_is_graphic = _is_graphic_char(prev_char) if prev_char else False
-                
-                if not prev_is_graphic:
+                prev_char = prolog_code[i-1] if i > 0 else None
+                if _should_start_block_comment(prolog_code, i, prev_char):
                     if not has_code and not current:
                         # Skip standalone block comments before any code in this chunk.
                         depth = 1
@@ -1054,12 +1064,12 @@ def tokenize_prolog_statements(prolog_code: str) -> list[str]:
         i += 1
 
     # Check for unclosed comments or strings at end of code
-    if in_block_comment > 0:
-        raise ValueError("Unterminated block comment")
     if in_single_quote:
         raise ValueError("Unterminated quoted atom")
     if in_double_quote:
         raise ValueError("Unterminated string")
+    if in_block_comment > 0:
+        raise ValueError("Unterminated block comment")
     
     # Add any remaining content (should not happen in well-formed code)
     if current:
@@ -1207,13 +1217,10 @@ def _strip_comments(text: str) -> str:
         # Check for comment starts outside quoted strings
         if not in_single_quote and not in_double_quote:
             # Check for block comment start: /* only starts a comment if NOT preceded
-            # by a graphic character. E.g., '//*' is the operator //* not a comment.
+            # by '/' and not part of the literal '/*/'.
             if text[i:i+2] == '/*':
-                # Check if the preceding character is a graphic character
-                prev_char = result[-1] if result else ''
-                prev_is_graphic = _is_graphic_char(prev_char) if prev_char else False
-                
-                if not prev_is_graphic:
+                prev_char = result[-1] if result else None
+                if _should_start_block_comment(text, i, prev_char):
                     block_depth = 1
                     i += 2
                     # Insert a space to prevent token gluing after the comment
@@ -1265,9 +1272,12 @@ def extract_op_directives(source: str) -> list[tuple[int, str, str]]:
         for op_name in operator_names:
             operators.append((precedence, op_type, op_name))
 
-    for statement in tokenize_prolog_statements(source):
-        # Strip comments before matching to handle block comments at start of statement
-        stripped = _strip_comments(statement).strip()
+    # Strip comments once before tokenizing so the tokenizer never sees unterminated
+    # quoted atoms that only occur inside comments (e.g., documentation blocks).
+    cleaned_source = _strip_comments(source)
+
+    for statement in tokenize_prolog_statements(cleaned_source):
+        stripped = statement.strip()
         
         # Check for op/3 directives
         match = directive_pattern.match(stripped)
@@ -1620,10 +1630,8 @@ class PrologParser:
         escape_next = False
         while i < len(text):
             if not in_single_quote and not in_double_quote and text.startswith('/*', i):
-                # Check if the preceding character is a graphic character
-                # If so, this /* is part of an operator token, not a comment
-                prev_char = result[-1] if result else ''
-                if prev_char and _is_graphic_char(prev_char):
+                prev_char = result[-1] if result else None
+                if not _should_start_block_comment(text, i, prev_char):
                     # Not a comment, just part of an operator
                     result.append(text[i])
                     i += 1
@@ -1702,11 +1710,10 @@ class PrologParser:
                     i = end + 1 if end < len(text) else len(text)
                     continue
                 elif text.startswith('/*', i):
-                    # Block comment: /* only starts a comment if NOT preceded by graphic char
-                    prev_char = cleaned[-1] if cleaned else ''
-                    prev_is_graphic = _is_graphic_char(prev_char) if prev_char else False
-                    
-                    if not prev_is_graphic:
+                    # Block comment: /* only starts a comment if NOT preceded by '/'
+                    # and not part of the literal '/*/'.
+                    prev_char = cleaned[-1] if cleaned else None
+                    if _should_start_block_comment(text, i, prev_char):
                         # Block comment
                         pos = len(''.join(cleaned))
                         # PlDoc comments start with /** or /*! but NOT /**/ (which is empty block)
