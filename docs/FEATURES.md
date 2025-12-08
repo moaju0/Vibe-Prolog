@@ -20,10 +20,10 @@ Status legend:
 | Numbers (int, float, scientific) | ✅      | Includes Edinburgh `<radix>'<number>` syntax (`16'ff`, `2'1010`, `36'ZZZ`) for bases 2-36; `0x`/`0X` prefix accepts case-insensitive hex digits (`0xFF`, `0xff`, `0xAbC`, `0X1a`); underscore digit grouping (`1_000_000`, `3.1415_9265`, `1_0.0e-5`) |
 | Lists (proper, improper)         | ✅      |                                           |
 | Compound terms                   | ✅      |                                           |
-| Strings (quoted)                 | ✅      | Consistent representation with full ISO escape sequence support (\a \b \c \d \e \f \n \r \s \t \v \0...\777 \x... \uXXXX \' \" \\) |
+| Strings (quoted)                 | ✅      | ISO escapes (\a \b \c \d \e \f \n \r \s \t \v \0...\777 \x... \\x...\\ \uXXXX \' \" \\) with backslash-newline continuation and \c suppressed in quoted text |
 | `%` line comments                | ✅      |                                           |
 | `/* … */` block comments         | ✅      | Treated as whitespace; nested supported; `/**` starts PlDoc comments; `/*` after graphic char is part of operator (e.g., `//*`) |
-| Character code syntax (`0'X`)    | ✅      | ISO-compliant - rejects empty literals    |
+| Character code syntax (`0'X`)    | ✅      | ISO-compliant escapes (\x...\\, \uXXXX, octal, named), rejects \c and trailing characters, rejects empty literals |
 | Built-in operator syntax         | ✅      |                                           |
 | `:- op/3` declaration            | ✅      | Full support - defines operators dynamically |
 | Directive prefix operator `:-` (1200, fx) | ✅ | **ISO-required** - Prefix form for directives |

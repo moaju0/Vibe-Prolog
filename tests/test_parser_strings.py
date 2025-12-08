@@ -314,7 +314,7 @@ class TestRealWorldExamples:
     def test_file_paths(self):
         """Test file path strings with backslashes."""
         parser = PrologParser()
-        test_code = r"path('C:\Users\Name\file.txt')."
+        test_code = r"path('C:\\Users\\Name\\file.txt')."
         result = parser.parse(test_code)
         # Note: doubled backslashes in the string
         assert result[0].head.args[0].name == r"C:\Users\Name\file.txt"

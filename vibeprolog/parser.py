@@ -201,12 +201,14 @@ __OPERATOR_GRAMMAR__
     cut: "!"
 
     // Character codes: 0'X where X is any character (must come before NUMBER)
-    // Patterns: 0'a (simple char), 0'\\ (backslash), 0'\' (quote), 0''' (doubled quote), 0'\xHH (hex), etc.
-    // Allow trailing quote (e.g., 0'\\') while keeping legacy forms without it
-    CHAR_CODE.5: /0'([^'\\]|\\[^']*|'')*'?/ | /[1-9]\d*'.'/
+    // Allow ISO escapes (hex, unicode, octal, and named escapes), doubled quotes,
+    // or a single literal character. Optional trailing quote is accepted for
+    // compatibility but limited to a single character/escape so we don't consume
+    // following tokens like the clause terminator.
+    CHAR_CODE.5: /0'(?:''|\\x[0-9A-Fa-f]+\\?|\\u[0-9A-Fa-f]{4}|\\[0-7]{1,3}|\\[abdefnrstvs\\\"']|[^'\\])'?/ | /[1-9]\d*'.'/
 
-    STRING: /"([^"\\]|\\.)*"/ | /'(\\.|''|[^'\\])*'/
-    SPECIAL_ATOM: /'([^'\\]|\\.)+'/
+    STRING: /(?s)"(\\.|[^"])*"/
+    SPECIAL_ATOM: /(?s)'(\\.|''|[^'])*'/
 
     // Special atom operators must have HIGHEST priority to prevent being parsed as prefix operators
     SPECIAL_ATOM_OPS.12: /-\$/ | /\$-/
@@ -613,7 +615,7 @@ class PrologTransformer(Transformer):
             s = self._unescape_string(s)
         return Atom(s, quoted=True)
 
-    def _parse_escape_sequence(self, s, pos):
+    def _parse_escape_sequence(self, s, pos, *, allow_control_escape: bool = True):
         """Parse a single escape sequence starting at pos in string s.
 
         Returns (char_code, new_pos) where char_code is the Unicode code point,
@@ -632,67 +634,68 @@ class PrologTransformer(Transformer):
         ch = s[pos]
         pos += 1
 
+        def _is_hex_digit(char: str) -> bool:
+            return char.isdigit() or "a" <= char.lower() <= "f"
+
         # Octal escapes: up to 3 octal digits (0-7) following backslash
         if ch in "01234567":
             digits = ch
-            # collect up to 2 more octal digits
-            for _ in range(2):
-                if pos < len(s) and s[pos] in "01234567":
-                    digits += s[pos]
-                    pos += 1
-                else:
-                    break
-            code = int(digits, 8)
-            return code, pos
+            while pos < len(s) and s[pos] in "01234567":
+                digits += s[pos]
+                pos += 1
+            return int(digits, 8), pos
 
-        # Hex escapes: \x followed by one or more hex digits
-        if ch == 'x':
-            if pos >= len(s) or not (s[pos].isdigit() or 'a' <= s[pos].lower() <= 'f'):
-                raise ValueError("Invalid hex escape")
-            digits = ''
-            while pos < len(s):
-                if s[pos].isdigit() or 'a' <= s[pos].lower() <= 'f':
-                    digits += s[pos]
-                    pos += 1
-                elif s[pos] == '\\':
-                    pos += 1  # Skip the closing backslash
-                    break
-                else:
-                    break
-            code = int(digits, 16)
-            return code, pos
+        # Hex escapes: \x followed by one or more hex digits, optionally closed
+        # with a trailing backslash.
+        if ch == "x":
+            if pos >= len(s) or not _is_hex_digit(s[pos]):
+                raise ValueError("hex_digit_missing")
+            digits = ""
+            while pos < len(s) and _is_hex_digit(s[pos]):
+                digits += s[pos]
+                pos += 1
+            if len(digits) < 2:
+                terminator = s[pos] if pos < len(s) else None
+                if terminator is None or terminator == "\\":
+                    raise ValueError("hex_digits_too_short")
+                raise ValueError("invalid_hex_digit")
+            if pos < len(s) and s[pos] == "\\":
+                pos += 1
+            return int(digits, 16), pos
 
         # Unicode escapes: \uXXXX (exactly 4 hex digits)
-        if ch == 'u':
+        if ch.lower() == "u":
             if pos + 4 > len(s):
                 raise ValueError("Incomplete Unicode escape")
-            digits = s[pos:pos+4]
-            if not all(c in "0123456789abcdefABCDEF" for c in digits):
+            digits = s[pos : pos + 4]
+            if not all(_is_hex_digit(c) for c in digits):
                 raise ValueError("Invalid Unicode escape")
-            code = int(digits, 16)
             pos += 4
-            return code, pos
+            return int(digits, 16), pos
+
+        if ch == "c":
+            if not allow_control_escape:
+                raise ValueError("invalid_escape")
+            return None, pos
 
         # Single character escapes
         single_char_escapes = {
-            'a': 7,   # alert (bell)
-            'b': 8,   # backspace
-            'c': -1,  # no output (used in writeq)
-            'd': 127, # delete
-            'e': 27,  # escape
-            'f': 12,  # form feed
-            'n': 10,  # newline
-            'r': 13,  # carriage return
-            's': 32,  # space
-            't': 9,   # tab
-            'v': 11,  # vertical tab
+            "a": 7,  # alert (bell)
+            "b": 8,  # backspace
+            "d": 127,  # delete
+            "e": 27,  # escape
+            "f": 12,  # form feed
+            "n": 10,  # newline
+            "r": 13,  # carriage return
+            "s": 32,  # space
+            "t": 9,  # tab
+            "v": 11,  # vertical tab
             "'": ord("'"),  # escaped single quote
             '"': ord('"'),  # escaped double quote
-            '\\': ord('\\'), # escaped backslash
+            "\\": ord("\\"),  # escaped backslash
         }
         if ch in single_char_escapes:
-            code = single_char_escapes[ch]
-            return code, pos
+            return single_char_escapes[ch], pos
 
         raise ValueError(f"Unknown escape: \\{ch}")
 
@@ -702,8 +705,17 @@ class PrologTransformer(Transformer):
         i = 0
         while i < len(s):
             if s[i] == '\\':
+                if i + 1 < len(s) and s[i + 1] in "\r\n":
+                    # Line continuation - skip backslash, newline, and following
+                    # indentation whitespace.
+                    i += 2
+                    if s[i - 1] == "\r" and i < len(s) and s[i] == "\n":
+                        i += 1
+                    while i < len(s) and s[i] in " \t":
+                        i += 1
+                    continue
                 code, i = self._parse_escape_sequence(s, i)
-                if code != -1:  # \c produces no output
+                if code is not None:  # \c produces no output
                     res.append(chr(code))
             else:
                 res.append(s[i])
@@ -866,14 +878,18 @@ class PrologTransformer(Transformer):
             # Handle backslash escape sequences
             if char_part.startswith("\\"):
                 try:
-                    code, new_pos = self._parse_escape_sequence(char_part, 0)
+                    code, new_pos = self._parse_escape_sequence(
+                        char_part, 0, allow_control_escape=False
+                    )
                     if new_pos != len(char_part):
                         raise ValueError("trailing characters after escape sequence")
-                    # \c is invalid in a char code literal
-                    if char_part == '\\c':
+                    if code is None or char_part == "\\c":
                         raise ValueError("invalid_escape")
                     return Number(code)
-                except ValueError:
+                except ValueError as exc:
+                    error_msg = str(exc)
+                    if error_msg == "hex_digits_too_short":
+                        raise ValueError("incomplete_reduction")
                     raise ValueError("unexpected_char")
 
             # Regular character
@@ -904,11 +920,60 @@ def tokenize_prolog_statements(prolog_code: str) -> list[str]:
     in_line_comment = False
     in_block_comment = 0
     in_char_code = False
-    escape_next = False
     has_code = False
     paren_depth = 0
     bracket_depth = 0
     brace_depth = 0
+
+    def _consume_escape_sequence(start: int) -> int:
+        """Advance index past an escape sequence in quoted text."""
+        next_idx = start + 1
+        if next_idx >= len(prolog_code):
+            return start + 1
+
+        ch = prolog_code[next_idx]
+
+        # Line continuation: backslash + newline + optional indentation
+        if ch in "\r\n":
+            idx = next_idx + 1
+            if ch == "\r" and idx < len(prolog_code) and prolog_code[idx] == "\n":
+                idx += 1
+            while idx < len(prolog_code) and prolog_code[idx] in " \t":
+                idx += 1
+            current.extend(prolog_code[start:idx])
+            return idx
+
+        # Hex escape: \xHHH\ (optional terminator)
+        if ch == "x":
+            idx = next_idx + 1
+            while (
+                idx < len(prolog_code)
+                and prolog_code[idx].lower() in "0123456789abcdef"
+            ):
+                idx += 1
+            if idx < len(prolog_code) and prolog_code[idx] == "\\":
+                idx += 1
+            current.extend(prolog_code[start:idx])
+            return idx
+
+        # Unicode escape: \uXXXX
+        if ch in {"u", "U"}:
+            idx = min(len(prolog_code), next_idx + 5)
+            current.extend(prolog_code[start:idx])
+            return idx
+
+        # Octal escape: \[0-7]{1,3}
+        if ch in "01234567":
+            idx = next_idx + 1
+            while idx < len(prolog_code) and prolog_code[idx] in "01234567":
+                idx += 1
+            current.extend(prolog_code[start:idx])
+            return idx
+
+        # Single-character escape (including escaped quotes/backslashes)
+        idx = next_idx + 1
+        current.extend(prolog_code[start:idx])
+        return idx
 
     def _is_edinburgh_radix_quote(index: int) -> bool:
         """Return True if apostrophe at ``index`` starts an Edinburgh radix literal.
@@ -971,18 +1036,9 @@ def tokenize_prolog_statements(prolog_code: str) -> list[str]:
             i += 1
             continue
 
-
-        # Handle escape sequences
-        if escape_next:
-            current.append(char)
-            escape_next = False
-            i += 1
-            continue
-
-        if char == '\\' and (in_single_quote or in_double_quote):
-            current.append(char)
-            escape_next = True
-            i += 1
+        # Handle escape sequences inside quoted text
+        if char == '\\' and (in_single_quote or in_double_quote or in_char_code):
+            i = _consume_escape_sequence(i)
             continue
 
         # Handle entering/exiting quotes

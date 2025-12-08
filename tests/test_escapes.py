@@ -79,6 +79,7 @@ class TestEscapeSequences:
             ('"\\x41"', 'A'),
             ('"\\xFF"', '\xff'),
             ('"\\x100"', '\u0100'),  # 256 = 0x100
+            ('"\\x41\\"', 'A'),      # Explicit closing backslash
         ]
 
         for prolog_str, expected in test_cases:
@@ -94,6 +95,7 @@ class TestEscapeSequences:
             ('"\\u0020"', '\u0020'),
             ('"\\u0041"', 'A'),
             ('"\\uFFFF"', '\uffff'),
+            ("'\\u0021'", "!"),
         ]
 
         for prolog_str, expected in test_cases:
@@ -136,6 +138,7 @@ class TestEscapeSequences:
             ("0'\\177'", 127),   # del
             ("0'\\x41'", 65),    # 'A'
             ("0'\\u0041'", 65),  # 'A' unicode
+            ("0'\\x41\\'", 65),  # 'A' with trailing backslash terminator
         ]
 
         for prolog_str, expected in test_cases:
@@ -180,6 +183,27 @@ class TestEscapeSequences:
         assert len(clause.head.args) == 2
         # First arg should be the escaped atom
         assert str(clause.head.args[0]) == '\n'
+
+    def test_line_continuation_in_strings(self):
+        """Backslash-newline should continue strings without embedding newline."""
+        prolog = PrologInterpreter()
+        result = prolog.query_once("X = \"line\\\n  more\".")
+        assert result is not None
+        assert result['X'] == "linemore"
+
+    def test_line_continuation_in_atoms(self):
+        """Backslash-newline should continue quoted atoms."""
+        parser = PrologParser()
+        clauses = parser.parse("value('path\\\n    segment').")
+        assert clauses[0].head.args[0].name == "pathsegment"
+
+    def test_writeq_preserves_escapes(self, capsys: pytest.CaptureFixture[str]):
+        """writeq/1 should output escape sequences, not raw control characters."""
+        prolog = PrologInterpreter()
+        prolog.query_once("writeq('a\\\\nb').", capture_output=True)
+        output = capsys.readouterr().out
+        assert "\\n" in output
+        assert "a" in output and "b" in output
 
     def test_invalid_escapes(self):
         """Test that invalid escape sequences raise syntax errors."""

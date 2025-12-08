@@ -63,11 +63,14 @@ Vibe-Prolog supports the Edinburgh `<radix>'<number>` notation for bases 2-36:
 |--------|---------|-------|--------|-------|
 | Basic | `0'a`, `0'Z` | 97, 90 | ✅ Supported | Single character |
 | Escape sequences | `0'\n`, `0'\t`, `0'\r` | 10, 9, 13 | ✅ Supported | Standard escapes |
-| Hex escape | `0'\x41` | 65 | ✅ Supported | No terminator needed |
+| Hex escape | `0'\\x41`, `0'\\x41\\` | 65 | ✅ Supported | Optional trailing backslash terminator |
+| Unicode escape | `0'\\u0041` | 65 | ✅ Supported | Exactly 4 hex digits |
 | Backslash | `0'\\` | 92 | ✅ Supported | Escaped backslash |
 | Single quote | `0'\'` | 39 | ✅ Supported | Escaped quote |
 | Double quote | `0'\"` | 34 | ✅ Supported | Escaped quote |
 | Empty | `0''` | N/A | ❌ Rejected | Syntax error as per ISO |
+
+**Validation rules**: Escapes must consume the entire literal (e.g., `0'\na'` raises a syntax error), and `\c` is rejected in character code notation even though it is permitted in quoted atoms/strings.
 
 **Difference from Scryer-Prolog**: Vibe does not require a trailing backslash for hex/octal escapes.
 
@@ -106,7 +109,7 @@ Vibe-Prolog supports all ISO/IEC 13211-1 escape sequences:
 | `\\` | Backslash | `'\\'` | ✅ Supported |
 | `\a` | Alert/bell (7) | `'\a'` | ✅ Supported |
 | `\b` | Backspace (8) | `'\b'` | ✅ Supported |
-| `\c` | No output (used in writeq) | `'\c'` | ✅ Supported |
+| `\c` | No output (used in writeq) | `'\c'` | ✅ Supported in quoted atoms/strings; rejected in `0'...` |
 | `\d` | Delete (127) | `'\d'` | ✅ Supported |
 | `\e` | Escape (27) | `'\e'` | ✅ Supported |
 | `\f` | Form feed (12) | `'\f'` | ✅ Supported |
@@ -116,8 +119,10 @@ Vibe-Prolog supports all ISO/IEC 13211-1 escape sequences:
 | `\t` | Tab (9) | `'\t'` | ✅ Supported |
 | `\v` | Vertical tab (11) | `'\v'` | ✅ Supported |
 | `\0...\777` | Octal character code | `'\141'` (a) | ✅ Supported |
-| `\xHH...` | Hex character code | `'\x41'` (A) | ✅ Supported |
-| `\uXXXX` | Unicode character code | `'\u0041'` (A) | ✅ Supported |
+| `\xHH...` | Hex character code | `'\x41'` (A) | ✅ Supported; accepts optional trailing `\` |
+| `\uXXXX` | Unicode character code | `'\u0041'` (A) | ✅ Supported; exactly four hex digits |
+
+**Line continuations**: A backslash followed by a newline is removed (along with subsequent indentation whitespace), allowing long quoted atoms/strings to span lines without embedding a newline.
 
 ### Special Atom Cases
 
