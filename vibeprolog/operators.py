@@ -199,7 +199,7 @@ class OperatorTable:
         key = (name, spec)
 
         if name in self._protected_ops:
-            is_user_scope = module_name is None or module_name == "user"
+            is_user_scope = module_name is not None and module_name == "user"
             if self._builtin_conflict == "error" or (
                 self._builtin_conflict == "skip" and is_user_scope
             ):

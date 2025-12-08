@@ -871,6 +871,19 @@ class TestOperatorIntegration:
         expected = {'><': ['a', {'++': ['b', {'^^': ['c', 'd']}]}]}
         assert result['X'] == expected
 
+    def test_mid_stream_operator_declaration(self):
+        """Operators declared mid-file affect subsequent parsing."""
+        prolog = PrologInterpreter()
+        prolog.consult_string("""
+            :- op(500, xfx, loves).
+            alice loves chocolate.
+            :- op(300, fy, not_).
+            test :- not_ false.
+        """)
+
+        assert prolog.has_solution("alice loves chocolate")
+        assert prolog.has_solution("test")
+
     def test_operator_removal_via_zero_precedence(self):
         """op(0, _, Op) removes operator and affects parsing."""
         prolog = PrologInterpreter()
