@@ -1408,6 +1408,9 @@ def extract_op_directives(source: str) -> list[tuple[int, str, str]]:
     # quoted atoms that only occur inside comments (e.g., documentation blocks).
     cleaned_source = _strip_comments(source)
 
+    # Pre-compile op/3 facts pattern once for performance
+    fact_pattern = re.compile(r"^\s*op\s*\((.*)\)\s*\.$", re.DOTALL)
+
     for statement in tokenize_prolog_statements(cleaned_source):
         stripped = statement.strip()
 
@@ -1418,7 +1421,7 @@ def extract_op_directives(source: str) -> list[tuple[int, str, str]]:
             continue
 
         # Check for op/3 facts (for tests that use op as fact)
-        fact_pattern = re.compile(r"^\s*op\s*\((.*)\)\s*\.$", re.DOTALL)
+        # fact_pattern is defined outside the loop for efficiency
         match = fact_pattern.match(stripped)
         if match:
             _try_parse_op(match.group(1))
@@ -1625,7 +1628,7 @@ class PrologParser:
         # Character conversion table: maps single chars to single chars
         # Initially identity (no conversions active)
         self._char_conversions: dict[str, str] = {}
-        self._grammar_cache = {}  # Cache compiled grammars by operator set
+        # self._grammar_cache removed: grammar cache is no longer used
         self.parser = None
 
     def set_char_conversion(self, from_char: str, to_char: str) -> None:
