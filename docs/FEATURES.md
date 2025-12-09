@@ -98,6 +98,8 @@ The following Scryer-Prolog specific directives are recognized but ignored (with
 | `;/2`                  | ✅      |           |
 | `->/2`                 | ✅      |           |
 | `\\+/1`                | ✅      |           |
+| `not/1`                | ✅📘    | Alias for `\\+/1` (negation-as-failure) |
+| `not_/1`               | ✅📘    | Alias for `\\+/1` to support custom operator names |
 | `!/0`                  | ✅      |           |
 | `call/1`               | ✅      |           |
 | `once/1`               | ✅      |           |

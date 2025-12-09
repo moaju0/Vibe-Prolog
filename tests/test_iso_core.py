@@ -607,6 +607,15 @@ class TestNegationAsFailure:
         # \+(p(X), q(X)) should succeed because no X satisfies both
         assert prolog.has_solution("\\+(p(X), q(X))")
 
+    def test_not_aliases(self):
+        """`not/1` and `not_/1` behave like \+/1."""
+        prolog = PrologInterpreter()
+        prolog.consult_string("p(1).")
+        assert prolog.has_solution("not(1 = 2)")
+        assert not prolog.has_solution("not(p(1))")
+        assert prolog.has_solution("not_(1 = 2)")
+        assert not prolog.has_solution("not_(p(1))")
+
 
 class TestISOLists:
     """List operations (common in ISO implementations)

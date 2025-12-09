@@ -27,6 +27,8 @@ class ControlBuiltins:
         register_builtin(registry, r"\=", 2, ControlBuiltins._builtin_not_unifiable)
         register_builtin(registry, r"\+", 1, ControlBuiltins._negation_as_failure)
         register_builtin(registry, r"\+", 2, ControlBuiltins._negation_as_failure)
+        register_builtin(registry, "not", 1, ControlBuiltins._negation_as_failure)
+        register_builtin(registry, "not_", 1, ControlBuiltins._negation_as_failure)
         register_builtin(registry, ";", 2, ControlBuiltins._builtin_disjunction)
         register_builtin(registry, "->", 2, ControlBuiltins._builtin_if_then)
         register_builtin(registry, ",", 2, ControlBuiltins._builtin_conjunction)

@@ -108,6 +108,17 @@ class PredicatePropertyDirective:
 
 # Lark grammar for Prolog
 PROLOG_GRAMMAR = r"""
+    _DOT: "."
+    _LPAR: "("
+    _RPAR: ")"
+    _LBRA: "["
+    _RBRA: "]"
+    _LBRACE: "{"
+    _RBRACE: "}"
+    _COMMA: ","
+    _PIPE: "|"
+    _COLON_DASH: ":-"
+
     start: (clause | directive)+
 
     clause: rule | dcg_rule | fact
@@ -1397,11 +1408,21 @@ def extract_op_directives(source: str) -> list[tuple[int, str, str]]:
     # quoted atoms that only occur inside comments (e.g., documentation blocks).
     cleaned_source = _strip_comments(source)
 
+    # Pre-compile op/3 facts pattern once for performance
+    fact_pattern = re.compile(r"^\s*op\s*\((.*)\)\s*\.$", re.DOTALL)
+
     for statement in tokenize_prolog_statements(cleaned_source):
         stripped = statement.strip()
-        
+
         # Check for op/3 directives
         match = directive_pattern.match(stripped)
+        if match:
+            _try_parse_op(match.group(1))
+            continue
+
+        # Check for op/3 facts (for tests that use op as fact)
+        # fact_pattern is defined outside the loop for efficiency
+        match = fact_pattern.match(stripped)
         if match:
             _try_parse_op(match.group(1))
             continue
@@ -1443,27 +1464,35 @@ def _format_operator_literals(ops: Iterable[str]) -> str:
     # shorter prefixes such as "\\".
     formatted: list[str] = []
     for op in sorted(set(ops), key=lambda value: (-len(value), value)):
-        if re.match(r"^[A-Za-z0-9_]+$", op):
-            formatted.append(f"/(?<![A-Za-z0-9_]){re.escape(op)}(?![A-Za-z0-9_])/")
-        else:
-            formatted.append(f'"{escape_for_lark(op)}"')
+        formatted.append(f'"{escape_for_lark(op)}"')
     return " | ".join(formatted)
 
 
 def _operator_token_priority(name: str) -> int:
-    """Choose a token priority that beats the generic OP_SYMBOL lexer rule.
+    r"""Choose a token priority that favors the most specific punctuation ops.
 
-    OP_SYMBOL has priority 25 and eagerly matches runs of operator punctuation,
-    which would swallow custom operators like +++ or ***, preventing the
-    operator-specific tokens from ever being seen by the parser. By giving
-    punctuation-heavy operators a priority above 25 we ensure the generated
-    operator tokens win when they are valid in the current parse context.
+    Without a longest-match preference the lexer can split ``++`` into two ``+``
+    tokens (or ``=\=`` into ``=`` followed by ``\=``) whenever doing so still
+    yields a valid parse. That breaks precedence accounting for dynamic
+    operators. We therefore boost the priority of non-alphanumeric operators so
+    the lexer consumes the full operator before letting shorter prefixes try to
+    match. Alphabetic operator names (``mod``, ``in``) should continue to lex as
+    regular atoms so they participate in predicate indicators like ``dynamic
+    foo/1`` without being split apart.
     """
-    if re.match(r"^[A-Za-z0-9_]+$", name):
-        return max(len(name), 1)
-    if len(name) > 1:
-        return 30 + len(name)
-    return 1
+
+    if any(ch.isalnum() or ch == "_" for ch in name):
+        return 0
+
+    if len(name) == 1:
+        return 0
+
+    if name in {":-", "-->", "?-"}:
+        return 0
+
+    # Punctuation-only operators should outrank OP_SYMBOL (priority 25) and use
+    # longest match to beat their own prefixes.
+    return 30 + len(name)
 
 
 def _merge_operators(
@@ -1614,7 +1643,7 @@ class PrologParser:
         # Character conversion table: maps single chars to single chars
         # Initially identity (no conversions active)
         self._char_conversions: dict[str, str] = {}
-        self._grammar_cache = {}  # Cache compiled grammars by operator set
+        # self._grammar_cache removed: grammar cache is no longer used
         self.parser = None
 
     def set_char_conversion(self, from_char: str, to_char: str) -> None:
@@ -1734,11 +1763,8 @@ class PrologParser:
         operators = _merge_operators(
             self._base_operator_definitions(module_name), directive_ops
         )
-        key = tuple(operators)
-        if key not in self._grammar_cache:
-            grammar = self._build_grammar(operators)
-            self._grammar_cache[key] = self._create_parser(grammar)
-        self.parser = self._grammar_cache[key]
+        grammar = self._build_grammar(operators)
+        self.parser = self._create_parser(grammar)
 
     def _strip_block_comments(self, text: str) -> tuple[str, list[tuple[int, str]]]:
         """Strip block comments from text, handling nesting and quoted strings.
