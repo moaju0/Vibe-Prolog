@@ -150,6 +150,11 @@ class DCGExpander:
             # Non-terminal atom: add difference list arguments
             return [self._expand_nonterminal(goal, s0, s)]
 
+        elif isinstance(goal, Variable):
+            # Variable as goal: consume the characters in the variable
+            # Expands to: append(Var, S, S0)
+            return [Compound("append", (goal, s, s0))]
+
         else:
             # Other terms (shouldn't happen in valid DCG)
             raise ValueError(f"Unsupported DCG goal: {goal}")
