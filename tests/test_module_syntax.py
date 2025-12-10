@@ -8,6 +8,7 @@ from vibeprolog.exceptions import PrologThrow
 class TestModuleSyntax:
     """Tests for corrected module syntax in library files."""
 
+    @pytest.mark.performance
     def test_library_builtins_loads_successfully(self):
         """Test that library/builtins.pl loads successfully after removing !/0 from exports."""
         prolog = PrologInterpreter()
@@ -20,6 +21,7 @@ class TestModuleSyntax:
         assert ("true", 0) in prolog.modules["builtins"].exports
         assert ("=", 2) in prolog.modules["builtins"].exports
 
+    @pytest.mark.performance
     def test_library_numerics_special_functions_loads_successfully(self):
         """Test that library/numerics/special_functions.pl loads successfully."""
         prolog = PrologInterpreter()
@@ -31,6 +33,7 @@ class TestModuleSyntax:
         # The test should run without error (may fail due to falsification, but should not crash)
         assert isinstance(result, dict) or result is False
 
+    @pytest.mark.performance
     def test_library_tabling_loads_successfully(self):
         """Test that library/tabling.pl loads successfully."""
         prolog = PrologInterpreter()
@@ -40,6 +43,7 @@ class TestModuleSyntax:
         # Test that exported predicates exist
         assert ("start_tabling", 2) in prolog.modules["tabling"].exports
 
+    @pytest.mark.performance
     def test_library_tabling_batched_worklist_loads_successfully(self):
         """Test that library/tabling/batched_worklist.pl loads successfully."""
         prolog = PrologInterpreter()
@@ -47,6 +51,7 @@ class TestModuleSyntax:
         prolog.consult("library/tabling/batched_worklist.pl")
         assert "batched_worklist" in prolog.modules
 
+    @pytest.mark.performance
     def test_library_tabling_table_data_structure_loads_successfully(self):
         """Test that library/tabling/table_data_structure.pl loads successfully."""
         prolog = PrologInterpreter()
@@ -54,6 +59,7 @@ class TestModuleSyntax:
         prolog.consult("library/tabling/table_data_structure.pl")
         assert "table_datastructure" in prolog.modules
 
+    @pytest.mark.performance
     def test_module_qualified_calls_work(self):
         """Test that module-qualified calls work for the fixed modules."""
         prolog = PrologInterpreter()
