@@ -2,7 +2,8 @@
 
 from typing import Any
 
-from vibeprolog.parser import Atom, Compound, Cut, List, Variable
+from vibeprolog.parser import Atom, Compound, Cut, List
+from vibeprolog.terms import Variable
 
 
 class DCGExpander:
