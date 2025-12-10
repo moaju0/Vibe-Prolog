@@ -188,7 +188,8 @@ class PrologEngine:
             # Builtins are always accessible
             is_builtin = key in self._builtin_registry if key is not None else False
             if module_name != "user" and not is_builtin:
-                if key not in module_obj.exports:
+                is_imported = key in module_obj.imports if key is not None else False
+                if key not in module_obj.exports and not is_imported:
                     indicator = self._indicator_from_key(key[0], key[1]) if key is not None else inner_goal
                     error_term = PrologError.permission_error(
                         "access", "private_procedure", indicator, "module:goal"
@@ -420,6 +421,23 @@ class PrologEngine:
                 return iter(())
         # Prefer indexed predicates if available
         preds = getattr(module, "predicates", {}).get(key, [])
+
+        # If the module only imports the predicate, delegate to the source module
+        if not preds and key in getattr(module, "imports", {}):
+            source_module = module.imports.get(key)
+            if source_module is not None:
+                yield from self._solve_module_predicate(
+                    source_module,
+                    key,
+                    inner_goal,
+                    subst,
+                    remaining_goals,
+                    current_module,
+                    depth,
+                    use_tabling,
+                )
+            return
+
         cut_executed = False
         for clause in preds:
             if cut_executed:
