@@ -191,6 +191,7 @@ def main():
             )
     
     results = existing_results.copy()
+    report_path = None
     
     # Test files not yet processed
     total_to_test = 0
@@ -225,6 +226,9 @@ def main():
         
         # Save progress and write report after each file
         save_progress(results)
+        report_path = write_report(results)
+    
+    if report_path is None:
         report_path = write_report(results)
     
     print()
