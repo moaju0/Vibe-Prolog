@@ -451,7 +451,6 @@ Basic variant tabling is available via the `:- table` directive.
 | **DCG predicate indicators**      | ✅📘    | SWI-Prolog extension: `Name//Arity` in module exports (expanded to `Name/Arity+2`) |
 | **Module-qualified clause heads** | ✅      | `Module:Head :- Body` syntax for cross-module predicate definitions (e.g., `user:goal_expansion/2`) |
 | **Invalid export indicators**     | ⚠️📘    | Scryer-Prolog extension: Invalid predicate indicators (e.g., control constructs like `!/0`) in export lists are skipped with a warning rather than causing a type error |
-| **Module path syntax**            | ✅      | Nested module paths use forward slash separator: `library(parent/child)`. Invalid syntax like `library(parent, child)` raises `type_error(atom, /(parent, child))` |
 | Cross-module dynamic semantics    | ⚠️     | Implemented; dynamic predicate isolation per module needs further work |
 
 ---
