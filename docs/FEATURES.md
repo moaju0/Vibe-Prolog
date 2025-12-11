@@ -15,7 +15,7 @@ Status legend:
 
 | Feature                          | Status | Notes                                     |
 | -------------------------------- | ------ | ----------------------------------------- |
-| Atoms (quoted, unquoted)         | ✅      | Fully implemented                         |
+| Atoms (quoted, unquoted)         | ✅      | Fully implemented; Unicode letters (Greek, Cyrillic, Arabic, CJK, etc.) supported in unquoted atoms |
 | Variables                        | ✅      | ISO semantics                             |
 | Numbers (int, float, scientific) | ✅      | Includes Edinburgh `<radix>'<number>` syntax (`16'ff`, `2'1010`, `36'ZZZ`) for bases 2-36; `0x`/`0X` prefix accepts case-insensitive hex digits (`0xFF`, `0xff`, `0xAbC`, `0X1a`); underscore digit grouping (`1_000_000`, `3.1415_9265`, `1_0.0e-5`) |
 | Lists (proper, improper)         | ✅      |                                           |

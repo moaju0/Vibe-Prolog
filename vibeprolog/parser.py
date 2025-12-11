@@ -106,8 +106,11 @@ class PredicatePropertyDirective:
     indicators: tuple[PredicateIndicator, ...]
 
 
+# Centralized Unicode letter ranges for atoms
+UNICODE_LETTER_RANGES = r"\u00C0-\u017F\u0370-\u03FF\u0400-\u04FF\u0600-\u06FF\u0900-\u097F\u4E00-\u9FFF\u3040-\u309F\uAC00-\uD7AF"
+
 # Lark grammar for Prolog
-PROLOG_GRAMMAR = r"""
+PROLOG_GRAMMAR_TEMPLATE = r"""
     _DOT: "."
     _LPAR: "("
     _RPAR: ")"
@@ -234,8 +237,18 @@ __OPERATOR_GRAMMAR__
             | /-?\d+['][a-zA-Z0-9_]+/
             | /-?(?=[\d_]*\d)[\d_]+/
 
-    ATOM: /[a-z][a-zA-Z0-9_]*/ | /\{\}/ | /\$[a-zA-Z0-9_-]*/ | /[+\-*\/]/
+    // ATOM: unquoted atoms can start with lowercase ASCII letter or Unicode letter.
+    // Subsequent characters can be ASCII letters, digits, underscores, or Unicode letters.
+    // Unicode letters include: Latin Extended (00C0-017F), Greek (0370-03FF), Cyrillic (0400-04FF),
+    // Arabic (0600-06FF), Devanagari (0900-097F), CJK Unified (4E00-9FFF), Hiragana (3040-309F),
+    // Hangul (AC00-D7AF), and other scripts. Priority 3 ensures NUMBER matches before single-char atoms.
+    ATOM.3: /[a-z{UNICODE_LETTER_RANGES}][a-z0-9_{UNICODE_LETTER_RANGES}]*/
+        | /\{\}/
+        | /\$[a-z{UNICODE_LETTER_RANGES}][a-z0-9_{UNICODE_LETTER_RANGES}-]*/
 
+    // VARIABLE: unquoted variables must start with uppercase ASCII letter or underscore,
+    // then can contain ASCII letters, digits, and underscores.
+    // Unicode letters are not allowed in variable names per ISO Prolog semantics.
     VARIABLE: /[A-Z_][a-zA-Z0-9_]*/
 
     %import common.WS
@@ -270,7 +283,29 @@ class PrologTransformer(Transformer):
 
     @v_args(meta=True)
     def directive(self, meta, items):
-        return Directive(goal=items[0], meta=meta)
+        goal = items[0]
+        # Don't wrap PredicatePropertyDirective in Directive
+        if isinstance(goal, PredicatePropertyDirective):
+            return goal
+        
+        # Convert Compound goals like dynamic(X), multifile(X), discontiguous(X)
+        # to PredicatePropertyDirective if they aren't wrapped in parentheses
+        if isinstance(goal, Compound) and goal.functor in ("dynamic", "multifile", "discontiguous"):
+            if len(goal.args) == 1:
+                arg = goal.args[0]
+                # Handle both single indicator and comma-separated list
+                if isinstance(arg, Compound) and arg.functor == "/":
+                    # Single indicator like dynamic(p/1)
+                    indicators = [arg]
+                elif isinstance(arg, ParenthesizedComma):
+                    # Comma-separated like dynamic((p/1, q/2))
+                    indicators = self._flatten_comma_separated(arg)
+                else:
+                    # Try to flatten in case it's a comma expression
+                    indicators = self._flatten_comma_separated(arg)
+                return PredicatePropertyDirective(goal.functor, tuple(indicators))
+        
+        return Directive(goal=goal, meta=meta)
 
     def predicate_indicators(self, items):
         return items
@@ -1459,12 +1494,22 @@ def escape_for_lark(s: str) -> str:
 VALID_OPERATOR_SPECS = {"xfx", "xfy", "yfx", "yfy", "fx", "fy", "xf", "yf"}
 
 
+def _is_alphabetic_operator(name: str) -> bool:
+    """Check if an operator name is purely alphabetic (like 'in', 'mod', 'is')."""
+    return name.isalpha() or (name.replace("_", "").isalnum() and name[0].isalpha())
+
+
 def _format_operator_literals(ops: Iterable[str]) -> str:
     # Sort longest operators first so sequences like "\\+" take precedence over
     # shorter prefixes such as "\\".
     formatted: list[str] = []
     for op in sorted(set(ops), key=lambda value: (-len(value), value)):
-        formatted.append(f'"{escape_for_lark(op)}"')
+        if _is_alphabetic_operator(op):
+            # Alphabetic operators need word boundaries to prevent matching
+            # inside atoms like 'indexed' matching 'in' + 'dexed'
+            formatted.append(f'/(?<![a-zA-Z0-9_]){escape_for_lark(op)}(?![a-zA-Z0-9_])/')
+        else:
+            formatted.append(f'"{escape_for_lark(op)}"')
     return " | ".join(formatted)
 
 
@@ -1749,7 +1794,7 @@ class PrologParser:
 
     def _build_grammar(self, operators: list[tuple[int, str, str]]) -> str:
         operator_rules = generate_operator_rules(operators)
-        return PROLOG_GRAMMAR.replace("__OPERATOR_GRAMMAR__", operator_rules)
+        return PROLOG_GRAMMAR_TEMPLATE.replace("{UNICODE_LETTER_RANGES}", UNICODE_LETTER_RANGES).replace("__OPERATOR_GRAMMAR__", operator_rules)
 
     def _parser_cache_key(
         self, operators: list[tuple[int, str, str]], module_name: str | None
@@ -2041,6 +2086,10 @@ class PrologParser:
             if term.body is not None:
                 body = [self._fold_numeric_unary_minus(goal) for goal in term.body]
             return Clause(head, body, term.doc, term.meta, term.dcg)
+
+        # PredicatePropertyDirective doesn't have numeric minus to fold, return as-is
+        if isinstance(term, PredicatePropertyDirective):
+            return term
 
         if isinstance(term, Directive):
             goal = self._fold_numeric_unary_minus(term.goal)

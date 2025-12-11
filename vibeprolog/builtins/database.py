@@ -96,7 +96,7 @@ class DatabaseBuiltins:
             return None
 
         context = "asserta/1" if position == "front" else "assertz/1"
-        engine._ensure_dynamic_permission(key, context)
+        engine._ensure_dynamic_permission(key, context, module_name='user')
 
         if position == "front":
             engine.clauses.insert(0, new_clause)
