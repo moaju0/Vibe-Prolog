@@ -43,11 +43,13 @@ class TestDCGVariableGoals:
         assert prolog.has_solution("phrase(qux(1), [d])")
         assert prolog.has_solution("phrase(qux(42), ['4', '2'])")
 
+    @pytest.mark.performance
     def test_json_library_loads(self):
         """library/serialization/json.pl should load successfully."""
         prolog = PrologInterpreter()
         prolog.consult('library/serialization/json.pl')
 
+    @pytest.mark.performance
     def test_json_parsing_works(self):
         """JSON parsing should work after library loads."""
         prolog = PrologInterpreter()
