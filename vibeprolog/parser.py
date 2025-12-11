@@ -237,14 +237,14 @@ __OPERATOR_GRAMMAR__
             | /-?\d+['][a-zA-Z0-9_]+/
             | /-?(?=[\d_]*\d)[\d_]+/
 
-    // ATOM: unquoted atoms can start with lowercase ASCII letter, underscore, or Unicode letter.
+    // ATOM: unquoted atoms can start with lowercase ASCII letter or Unicode letter.
     // Subsequent characters can be ASCII letters, digits, underscores, or Unicode letters.
     // Unicode letters include: Latin Extended (00C0-017F), Greek (0370-03FF), Cyrillic (0400-04FF),
     // Arabic (0600-06FF), Devanagari (0900-097F), CJK Unified (4E00-9FFF), Hiragana (3040-309F),
     // Hangul (AC00-D7AF), and other scripts. Priority 3 ensures NUMBER matches before single-char atoms.
-    ATOM.3: /[a-z_{UNICODE_LETTER_RANGES}][a-z0-9_{UNICODE_LETTER_RANGES}]*/
+    ATOM.3: /[a-z{UNICODE_LETTER_RANGES}][a-z0-9_{UNICODE_LETTER_RANGES}]*/
         | /\{\}/
-        | /\$[a-z_{UNICODE_LETTER_RANGES}][a-z0-9_{UNICODE_LETTER_RANGES}-]*/
+        | /\$[a-z{UNICODE_LETTER_RANGES}][a-z0-9_{UNICODE_LETTER_RANGES}-]*/
 
     // VARIABLE: unquoted variables must start with uppercase ASCII letter or underscore,
     // then can contain ASCII letters, digits, and underscores.
