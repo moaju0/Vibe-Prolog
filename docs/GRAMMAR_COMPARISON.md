@@ -125,11 +125,11 @@ X = 0'\x41\.    % X = 65 (hex escape MUST end with backslash)
 ```prolog
 % Vibe-Prolog:
 Atom = '\x48ello'.    % 'Hello' (hex escape for 'H')
-Atom = '\101ello'.    % 'Hello' (octal escape for 'H')
+Atom = '\110ello'.    % 'Hello' (octal escape for 'H')
 
 % Scryer-Prolog:
 Atom = '\x48\ello'.   % 'Hello' (backslash terminates hex)
-Atom = '\101\ello'.   % 'Hello' (backslash terminates octal)
+Atom = '\110\ello'.   % 'Hello' (backslash terminates octal)
 ```
 
 ### 3.2 Double-Quoted Strings
