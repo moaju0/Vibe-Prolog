@@ -28,6 +28,7 @@ Status legend:
 | `:- op/3` declaration            | ✅      | Full support - defines operators dynamically |
 | Directive prefix operator `:-` (1200, fx) | ✅ | **ISO-required** - Prefix form for directives |
 | Custom operator syntax in source | ✅      | Parser dynamically generates grammar for custom operators (infix/prefix/postfix) |
+| Parser/operator grammar cache | ✅📘 | Grammar + Earley parser cached per module/operator set; repeated directives/clauses reuse the cached parser instead of rebuilding the grammar |
 | Query prefix operator `?-` (1200, fx) | ✅ | **ISO-required** - Parsed via operator table |
 | DCG rule operator `-->` (1200, xfx) | ✅    | **ISO-required** - DCG syntax |
 | `:- char_conversion/2`           | ✅      | **ISO-mandatory** - Character conversion during parsing |
@@ -57,7 +58,7 @@ Status legend:
 | First-argument indexing         | ✅      | O(1) clause lookup for large DBs   |
 | Occurs check                    | ⚠️     | Always enabled (stricter than ISO) |
 | Recursion handling with depth limits | ✅      | Configurable recursion depth limit (default: 10,000); supports deep tail recursion |
-| Operator import caching         | ✅📘    | Operator directives cached by path + mtime to avoid re-scanning transitive imports across consults/interpreters |
+| Operator import caching         | ✅📘    | Operator directives cached by path + mtime to avoid re-scanning transitive imports across consults/interpreters; import scanning uses a lightweight directive parser |
 | Python recursion limit management | ✅      | Automatically increases Python's recursion limit to support Prolog depth |
 
 ---
