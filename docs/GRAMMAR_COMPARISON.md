@@ -113,7 +113,7 @@ X = 0'\x41\.    % X = 65 (hex escape MUST end with backslash)
 | Escape sequences | `\'`, `\"`, `\\`, `\n`, `\t`, `\r` | `\a`, `\b`, `\v`, `\f`, `\t`, `\n`, `\r` | ⚠️ Scryer has more |
 | Doubled quotes | `'it''s'` → `it's` | `'it''s'` → `it's` | ✅ Yes |
 | Hex escapes | `'\x41'` (no terminator) | `'\x41\'` (backslash required) | ⚠️ Different |
-| Octal escapes | Not clear | `'\101\'` (backslash required) | ⚠️ Different ([#306](https://github.com/nlothian/Vibe-Prolog/issues/306)) |
+| Octal escapes | `'\\101'` (up to three digits, no trailing backslash) | `'\\101\\'` (backslash required) | ⚠️ Vibe/SWI compatible; Scryer requires terminator ([#306](https://github.com/nlothian/Vibe-Prolog/issues/306)) |
 
 **Scryer additional escape sequences**:
 - `\a` - alert (bell)
@@ -125,9 +125,11 @@ X = 0'\x41\.    % X = 65 (hex escape MUST end with backslash)
 ```prolog
 % Vibe-Prolog:
 Atom = '\x48ello'.    % 'Hello' (hex escape for 'H')
+Atom = '\110ello'.    % 'Hello' (octal escape for 'H')
 
 % Scryer-Prolog:
 Atom = '\x48\ello'.   % 'Hello' (backslash terminates hex)
+Atom = '\110\ello'.   % 'Hello' (backslash terminates octal)
 ```
 
 ### 3.2 Double-Quoted Strings

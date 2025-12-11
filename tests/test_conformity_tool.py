@@ -122,13 +122,13 @@ class TestRunConformityTests:
         assert {r.test.num for r in results} == {1, 2, 3}
 
     def test_run_by_category(self):
-        """Test running tests by category."""
+        """Test running tests by category. This is a long test but worth running"""
         results = run_conformity_tests(category="Character Escapes")
 
         assert len(results) > 0
         assert all(r.test.category == "Character Escapes" for r in results)
 
-    def test_run_all_tests(self):
+    def test_run_first_10_tests(self):
         """Test running all tests (but limit to avoid slow tests)."""
         # Only run first 10 tests for speed
         results = run_conformity_tests(test_range=(1, 10))

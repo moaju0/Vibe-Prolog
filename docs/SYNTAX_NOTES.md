@@ -118,7 +118,7 @@ Vibe-Prolog supports all ISO/IEC 13211-1 escape sequences:
 | `\s` | Space (32) | `'\s'` | ✅ Supported |
 | `\t` | Tab (9) | `'\t'` | ✅ Supported |
 | `\v` | Vertical tab (11) | `'\v'` | ✅ Supported |
-| `\0...\777` | Octal character code | `'\141'` (a) | ✅ Supported |
+| `\0...\777` | Octal character code | `'\141'` (a) | ✅ Supported; up to three digits, no trailing backslash required (matches SWI; Scryer requires `\\` terminator) |
 | `\xHH...` | Hex character code | `'\x41'` (A) | ✅ Supported; accepts optional trailing `\` |
 | `\uXXXX` | Unicode character code | `'\u0041'` (A) | ✅ Supported; exactly four hex digits |
 

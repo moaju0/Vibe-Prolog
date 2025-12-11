@@ -441,6 +441,10 @@ class PrologInterpreter:
             mod.file = filepath
             mod.exported_operators = exported_operators
             self.modules[module_name] = mod
+            # Register a short alias for path-like module names (e.g., library(foo/bar) -> bar)
+            alias = self._extract_module_alias(module_name)
+            if alias and alias not in self.modules:
+                self.modules[alias] = mod
             self.current_module = module_name
             # Reset closed predicates when entering a new module
             closed_predicates.clear()
@@ -1090,6 +1094,23 @@ class PrologInterpreter:
         if reconstructed is not None:
             return Atom(reconstructed)
         return term
+
+    def _extract_module_alias(self, module_name: str) -> str | None:
+        """Derive a short alias from a path-like module name.
+
+        Examples:
+            "library(math/utils)" -> "utils"
+            "library(test/sub)" -> "sub"
+        """
+        if "/" not in module_name:
+            return None
+
+        candidate = module_name.rsplit("/", maxsplit=1)[-1]
+        candidate = candidate.rstrip(")")
+
+        if candidate and candidate != module_name:
+            return candidate
+        return None
 
 
     def _indicator_from_key(self, key: tuple[str, int]) -> Compound:
