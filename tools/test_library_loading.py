@@ -47,7 +47,7 @@ def test_load_file(file_path: Path) -> Tuple[bool, str, str]:
             signal.alarm(FILE_TIMEOUT)
         
         try:
-            prolog = PrologInterpreter()
+            prolog = PrologInterpreter(builtin_conflict="skip")
             prolog.consult(str(file_path))
             return True, f"✅ Loaded successfully", ""
         finally:

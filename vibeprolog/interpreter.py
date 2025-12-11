@@ -5,12 +5,11 @@ import re
 import sys
 import warnings
 from pathlib import Path
-from typing import Any
-
-from vibeprolog.utils.term_utils import term_to_string
+from typing import Any, TypedDict
 
 from lark.exceptions import LarkError
 
+from vibeprolog.utils.term_utils import term_to_string
 from vibeprolog.exceptions import PrologError, PrologThrow
 from vibeprolog.engine import CutException, PrologEngine
 from vibeprolog.parser import (
@@ -43,6 +42,15 @@ IGNORED_DIRECTIVES = {"non_counted_backtracking", "meta_predicate"}
 
 # Control construct names that are invalid in predicate indicators (ISO §5.1.2.1)
 CONTROL_CONSTRUCT_NAMES = {"!", ",", ";", "->"}
+
+# Cached operator info shared across interpreter instances. Entries are keyed by
+# resolved file path and validated via mtimes before reuse.
+class OperatorCacheEntry(TypedDict):
+    operators: list[tuple[int, str, str]]
+    mtimes: dict[str, float]
+
+
+_GLOBAL_OPERATOR_CACHE: dict[str, OperatorCacheEntry] = {}
 
 
 class Module:
@@ -94,11 +102,10 @@ class PrologInterpreter:
         self._builtins_seeded = False
         self._tabled_predicates: set[tuple[str, int]] = set()
         # Cache of imported operator directives by resolved file path.
-        # Maps file paths to lists of (precedence, associativity, name) tuples.
-        # Grows unbounded with the number of unique modules consulted, but memory
-        # footprint is small (~1-2KB per module). Naturally bounded by project size.
-        # Cleared when the interpreter instance is destroyed.
-        self._import_operator_cache: dict[str, list[tuple[int, str, str]]] = {}
+        # Entries also record mtimes for validation and are mirrored in a
+        # process-wide cache to avoid re-tokenizing common library modules
+        # across interpreter instances.
+        self._import_operator_cache: dict[str, OperatorCacheEntry] = {}
         self._current_source_path: Path | None = None
         # Stack for conditional compilation directives (if/else/endif)
         # Each entry is (is_active, has_seen_else, any_branch_taken) where:
@@ -717,6 +724,58 @@ class PrologInterpreter:
             return Path(raw_path)
         return None
 
+    def _operator_cache_key(self, path: Path) -> str:
+        """Return a stable cache key for an operator-bearing file."""
+        try:
+            if path.exists():
+                return str(path.resolve())
+        except OSError:
+            return str(path)
+        return str(path)
+
+    def _safe_mtime(self, path: Path) -> float | None:
+        """Best-effort mtime fetch that tolerates missing files."""
+        try:
+            return path.stat().st_mtime
+        except OSError:
+            return None
+
+    def _is_operator_cache_valid(self, entry: OperatorCacheEntry) -> bool:
+        """Validate a cache entry by comparing mtimes."""
+        for path_str, cached_mtime in entry["mtimes"].items():
+            path_obj = Path(path_str)
+            current_mtime = self._safe_mtime(path_obj)
+            if current_mtime is None or current_mtime != cached_mtime:
+                return False
+        return True
+
+    def _get_operator_cache_entry(self, cache_key: str) -> OperatorCacheEntry | None:
+        """Return a valid operator cache entry from local or global cache."""
+        local_entry = self._import_operator_cache.get(cache_key)
+        if local_entry is not None:
+            if self._is_operator_cache_valid(local_entry):
+                return local_entry
+            self._import_operator_cache.pop(cache_key, None)
+
+        global_entry = _GLOBAL_OPERATOR_CACHE.get(cache_key)
+        if global_entry is not None:
+            if self._is_operator_cache_valid(global_entry):
+                self._import_operator_cache[cache_key] = global_entry
+                return global_entry
+            _GLOBAL_OPERATOR_CACHE.pop(cache_key, None)
+        return None
+
+    def _store_operator_cache_entry(
+        self, cache_key: str, operators: list[tuple[int, str, str]], mtime_map: dict[str, float]
+    ) -> None:
+        """Store operator metadata in both local and global caches."""
+        entry: OperatorCacheEntry = {
+            "operators": list(operators),
+            "mtimes": dict(mtime_map),
+        }
+        self._import_operator_cache[cache_key] = entry
+        _GLOBAL_OPERATOR_CACHE[cache_key] = entry
+
     def _resolve_import_for_operators(
         self, import_term: Any, base_path: Path | None
     ) -> tuple[str | None, Module | None]:
@@ -818,9 +877,11 @@ class PrologInterpreter:
         """
         raw_path = str(filepath)
         path_exists = filepath.exists()
-        cache_key = str(filepath.resolve()) if path_exists else raw_path
-        if cache_key in self._import_operator_cache:
-            return list(self._import_operator_cache[cache_key])
+        cache_key = self._operator_cache_key(filepath)
+
+        cached_entry = self._get_operator_cache_entry(cache_key)
+        if cached_entry is not None:
+            return list(cached_entry["operators"])
         if cache_key in visited:
             return []
 
@@ -834,7 +895,12 @@ class PrologInterpreter:
                 )
                 if module_match is not None:
                     exported = list(module_match.exported_operators)
-                    self._import_operator_cache[cache_key] = exported
+                    mtime_map: dict[str, float] = {}
+                    if module_match.file:
+                        file_mtime = self._safe_mtime(Path(module_match.file))
+                        if file_mtime is not None:
+                            mtime_map[self._operator_cache_key(Path(module_match.file))] = file_mtime
+                    self._store_operator_cache_entry(cache_key, exported, mtime_map)
                     return exported
                 return []
 
@@ -844,11 +910,18 @@ class PrologInterpreter:
             try:
                 local_ops = extract_op_directives(module_source)
             except ValueError:
-                self._import_operator_cache[cache_key] = []
+                file_mtime = self._safe_mtime(filepath)
+                mtime_map = {cache_key: file_mtime} if file_mtime is not None else {}
+                self._store_operator_cache_entry(cache_key, [], mtime_map)
                 return []
             imports = self._extract_import_terms(module_source, local_ops)
 
             collected_ops: list[tuple[int, str, str]] = []
+            mtime_map: dict[str, float] = {}
+            file_mtime = self._safe_mtime(filepath)
+            if file_mtime is not None:
+                mtime_map[cache_key] = file_mtime
+
             for import_term, include_ops in imports:
                 if not include_ops:
                     continue
@@ -860,9 +933,14 @@ class PrologInterpreter:
                 collected_ops.extend(
                     self._collect_module_operators_from_file(Path(file_path), visited)
                 )
+                dep_path = Path(file_path)
+                dep_key = self._operator_cache_key(dep_path)
+                dep_entry = self._get_operator_cache_entry(dep_key)
+                if dep_entry is not None:
+                    mtime_map.update(dep_entry["mtimes"])
 
             collected_ops.extend(local_ops)
-            self._import_operator_cache[cache_key] = list(collected_ops)
+            self._store_operator_cache_entry(cache_key, collected_ops, mtime_map)
             return collected_ops
         finally:
             visited.remove(cache_key)

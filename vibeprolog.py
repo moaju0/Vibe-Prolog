@@ -251,9 +251,9 @@ Examples:
         choices=['skip', 'error', 'shadow'],
         default='skip',
         help='How to handle library definitions that conflict with built-in predicates: '
-             'skip (default) silently uses the built-in, '
+             'skip (default) silently keeps the built-in, '
              'error raises permission_error, '
-             'shadow is reserved for future use'
+             'shadow lets modules override built-ins within their namespace while user scope keeps the built-in'
     )
 
     args = parser.parse_args()

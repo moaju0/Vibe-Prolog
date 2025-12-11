@@ -4,8 +4,11 @@ This test suite verifies that operators from imported modules are correctly
 collected and made available to the parser before parsing the importing file.
 """
 
-import pytest
+import builtins
+import inspect
 from pathlib import Path
+
+import pytest
 
 from vibeprolog import PrologInterpreter
 from vibeprolog.parser import (
@@ -374,6 +377,50 @@ class TestRecursiveModuleLoading:
         
         # Check that we got a reasonable number of operators
         assert len(imported_ops) > 10  # clpz and its deps define many operators
+
+
+class TestOperatorCaching:
+    """Tests for caching operator scans across consultations."""
+
+    def test_reuses_cached_operator_scans_across_interpreters(self, tmp_path, monkeypatch):
+        """Consulting the same nested modules twice should avoid re-scanning imports."""
+        # Build a small module tree: top -> mid -> leaf (defines an operator)
+        leaf = tmp_path / "leaf.pl"
+        leaf.write_text(
+            ":- module(leaf, [op(500, xfx, leaf_op), leaf_op/2]).\n"
+            "leaf_op(X, Y) :- X = Y.\n"
+        )
+        mid = tmp_path / "mid.pl"
+        mid.write_text(f":- module(mid, []).\n:- use_module('{leaf.as_posix()}').\n")
+        top = tmp_path / "top.pl"
+        top.write_text(
+            f":- use_module('{mid.as_posix()}').\n"
+            f":- use_module('{leaf.as_posix()}', [leaf_op/2]).\n"
+            "top_ok :- leaf_op(1, 1).\n"
+        )
+
+        scan_reads: list[str] = []
+        real_open = builtins.open
+
+        def tracing_open(file, mode="r", *args, **kwargs):
+            if any(frame.function == "_collect_module_operators_from_file" for frame in inspect.stack()):
+                scan_reads.append(Path(file).name)
+            return real_open(file, mode, *args, **kwargs)
+
+        monkeypatch.setattr(builtins, "open", tracing_open)
+
+        # First interpreter populates the cache by consulting the top module.
+        prolog = PrologInterpreter()
+        prolog.consult(str(top))
+        assert set(scan_reads) >= {mid.name, leaf.name}
+
+        # Second interpreter should reuse cached operator metadata and avoid re-reading imports.
+        scan_reads.clear()
+        prolog_again = PrologInterpreter()
+        prolog_again.consult(str(top))
+
+        assert mid.name not in scan_reads
+        assert leaf.name not in scan_reads
 
 
 class TestIntegration:

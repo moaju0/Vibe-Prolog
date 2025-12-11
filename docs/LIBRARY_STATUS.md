@@ -1,27 +1,13 @@
 # Vibe-Prolog Library Loading Status
 
-**Test Date:** 2025-12-06 18:10:56 UTC
+**Test Date:** 2025-12-11 18:26:14 UTC
 
 ## Summary
 
 - **Total Files:** 63
-- **Loaded Successfully:** 30
-- **Failed to Load:** 33
-- **Success Rate:** 30/63 (48%)
-
-## Failure Type Breakdown
-
-| Failure Type | Count | Representative Files | Notes |
-| --- | --- | --- | --- |
-| Timeout (30s limit hit) | 29 | `library/arithmetic.pl`, `library/builtins.pl`, `library/tabling.pl` | Likely waiting on unsupported predicates or cyclic `use_module/1` chains; affects most I/O, numeric, and tabling libraries. |
-| Prolog error (syntax) | 4 | `library/numerics/special_functions.pl`, `library/ordsets.pl` | Parser currently rejects Unicode atoms such as `δ_*` and specific layouts where block comments touch code, blocking numerics and data-structure libs. |
-
-## Priority Recommendations
-
-1. **Unblock Unicode-heavy numerics modules.** Extend the tokenizer/parser so atoms like `δ_inverses_t/5` and `δ_successors_t/5` are accepted (ideally by treating all valid UTF-8 letters as atom constituents). This immediately enables both `library/numerics/special_functions.pl` and `library/numerics/testutils.pl` and removes an entire failure category.
-2. **Fix comment-adjacent syntax handling.** Files such as `library/ordsets.pl` and `library/ugraphs.pl` place `true` or operators directly after `/* ... */` comments; today that raises `No terminal matches 't'`. Adjust the lexer to automatically insert whitespace after closing block comments (or forbid comment/term concatenation during tokenization) so these widely used data structure libraries load.
-3. **Instrument 30s timeouts on foundational libs first.** Start with `library/builtins.pl`, `library/arithmetic.pl`, and `library/tabling.pl` because their failure cascades to many others. Add tracing around `consult/1` (e.g., predicate-level logging or a max-depth watchdog) to spot the missing predicate or infinite recursion that causes the stall before tackling lower-priority timeout files.
-4. **Implement the `NumberChars/4` DCG helper.** `library/serialization/json.pl` only fails because `NumberChars` is unimplemented. Adding this DCG primitive (or a compatibility wrapper) restores JSON parsing and is self-contained compared with the systemic timeout issues.
+- **Loaded Successfully:** 27
+- **Failed to Load:** 36
+- **Success Rate:** 27/63 (42%)
 
 ## Successfully Loaded Files ✅
 
@@ -32,7 +18,6 @@
 - `library/cont.pl`
 - `library/dcgs.pl`
 - `library/diag.pl`
-- `library/dif.pl`
 - `library/error.pl`
 - `library/freeze.pl`
 - `library/gensym.pl`
@@ -44,8 +29,6 @@
 - `library/pairs.pl`
 - `library/queues.pl`
 - `library/random.pl`
-- `library/reif.pl`
-- `library/serialization/json.pl`
 - `library/si.pl`
 - `library/sockets.pl`
 - `library/tabling/double_linked_list.pl`
@@ -71,12 +54,12 @@ File loading exceeded 30 seconds
 
 ### library/builtins.pl
 
-**Status:** ❌ Timeout
+**Status:** ❌ Prolog error
 
 **Details:**
 
 ```
-File loading exceeded 30 seconds
+PrologThrow: error(permission_error(modify, static_procedure, /(:-, 1)), context(consult/1))
 ```
 
 
@@ -136,6 +119,17 @@ File loading exceeded 30 seconds
 
 
 ### library/debug.pl
+
+**Status:** ❌ Timeout
+
+**Details:**
+
+```
+File loading exceeded 30 seconds
+```
+
+
+### library/dif.pl
 
 **Status:** ❌ Timeout
 
@@ -213,30 +207,30 @@ PrologThrow: error(syntax_error(No terminal matches 'δ' in the current parser c
               ,δ_inverses_t/5
                ^
 Expected one of: 
-	* SPECIAL_ATOM
-	* OP_SYMBOL
-	* PREFIX_FY_900_45
-	* STRING
-	* CHAR_CODE
-	* NUMBER
-	* VARIABLE
-	* PREFIX_FX_700_44
-	* ARITH_OP_FUNCTOR
-	* INFIX_OP_FUNCTOR
-	* LBRACE
-	* INFIX_YFX_500_16
-	* PREFIX_FY_200_4
-	* PREFIX_FX_1150_50
-	* LPAR
-	* SPECIAL_ATOM_OPS
-	* PREFIX_FX_1200_53
-	* CONTROL_OP_FUNCTOR
 	* OPERATOR_ATOM
-	* PREFIX_FX_1200_54
-	* ATOM
-	* BANG
-	* LSQB
+	* VARIABLE
 	* PREFIX_FY_200_3
+	* CHAR_CODE
+	* CONTROL_OP_FUNCTOR
+	* ARITH_OP_FUNCTOR
+	* PREFIX_FY_200_4
+	* PREFIX_FX_700_44
+	* _LBRACE
+	* PREFIX_FX_1150_50
+	* PREFIX_FX_1200_53
+	* _LPAR
+	* STRING
+	* INFIX_OP_FUNCTOR
+	* BANG
+	* PREFIX_FX_1200_54
+	* SPECIAL_ATOM_OPS
+	* INFIX_YFX_500_16
+	* PREFIX_FY_900_45
+	* SPECIAL_ATOM
+	* _LBRA
+	* OP_SYMBOL
+	* ATOM
+	* NUMBER
 	* COMPARISON_OP_FUNCTOR
 ), context(consult/1))
 ```
@@ -254,30 +248,30 @@ PrologThrow: error(syntax_error(No terminal matches 'δ' in the current parser c
               ,δ_inverses_t/5
                ^
 Expected one of: 
-	* SPECIAL_ATOM
-	* OP_SYMBOL
-	* PREFIX_FY_900_45
-	* STRING
-	* CHAR_CODE
-	* NUMBER
-	* VARIABLE
-	* PREFIX_FX_700_44
-	* ARITH_OP_FUNCTOR
-	* INFIX_OP_FUNCTOR
-	* LBRACE
-	* INFIX_YFX_500_16
-	* PREFIX_FY_200_4
-	* PREFIX_FX_1150_50
-	* LPAR
-	* SPECIAL_ATOM_OPS
-	* PREFIX_FX_1200_53
-	* CONTROL_OP_FUNCTOR
 	* OPERATOR_ATOM
-	* PREFIX_FX_1200_54
-	* ATOM
-	* BANG
-	* LSQB
+	* VARIABLE
 	* PREFIX_FY_200_3
+	* CHAR_CODE
+	* CONTROL_OP_FUNCTOR
+	* ARITH_OP_FUNCTOR
+	* PREFIX_FY_200_4
+	* PREFIX_FX_700_44
+	* _LBRACE
+	* PREFIX_FX_1150_50
+	* PREFIX_FX_1200_53
+	* _LPAR
+	* STRING
+	* INFIX_OP_FUNCTOR
+	* BANG
+	* PREFIX_FX_1200_54
+	* SPECIAL_ATOM_OPS
+	* INFIX_YFX_500_16
+	* PREFIX_FY_900_45
+	* SPECIAL_ATOM
+	* _LBRA
+	* OP_SYMBOL
+	* ATOM
+	* NUMBER
 	* COMPARISON_OP_FUNCTOR
 ), context(consult/1))
 ```
@@ -306,30 +300,30 @@ PrologThrow: error(syntax_error(No terminal matches 't' in the current parser co
         ;/* R2 = (=),   Item == X2 */ true
                                       ^
 Expected one of: 
-	* INFIX_YFX_400_6
 	* INFIX_XFY_1000_46
-	* INFIX_YFX_400_9
 	* INFIX_YFX_400_12
-	* INFIX_YFX_500_18
-	* INFIX_YFX_500_15
-	* INFIX_XFX_450_14
-	* INFIX_XFX_1200_50
+	* INFIX_XFY_200_2
+	* INFIX_YFX_400_6
+	* INFIX_YFX_400_10
+	* INFIX_YFX_400_13
+	* INFIX_YFX_400_8
 	* INFIX_YFX_500_17
 	* INFIX_XFY_200_1
-	* INFIX_XFY_200_2
-	* INFIX_YFX_500_16
-	* INFIX_YFX_400_8
-	* INFIX_XFX_1200_51
-	* INFIX_YFX_400_13
 	* INFIX_XFY_1100_48
-	* LPAR
-	* INFIX_XFY_600_19
-	* INFIX_XFY_1050_47
-	* INFIX_YFX_400_10
-	* INFIX_YFX_400_11
-	* INFIX_YFX_400_7
-	* RPAR
+	* INFIX_YFX_400_9
+	* _LPAR
+	* INFIX_XFX_1200_50
+	* _RPAR
 	* INFIX_YFX_400_5
+	* INFIX_YFX_500_18
+	* INFIX_YFX_400_11
+	* INFIX_XFY_600_19
+	* INFIX_YFX_500_16
+	* INFIX_YFX_500_15
+	* INFIX_XFY_1050_47
+	* INFIX_XFX_1200_51
+	* INFIX_XFX_450_14
+	* INFIX_YFX_400_7
 ), context(consult/1))
 ```
 
@@ -367,7 +361,29 @@ File loading exceeded 30 seconds
 ```
 
 
+### library/reif.pl
+
+**Status:** ❌ Timeout
+
+**Details:**
+
+```
+File loading exceeded 30 seconds
+```
+
+
 ### library/serialization/abnf.pl
+
+**Status:** ❌ Timeout
+
+**Details:**
+
+```
+File loading exceeded 30 seconds
+```
+
+
+### library/serialization/json.pl
 
 **Status:** ❌ Timeout
 
@@ -478,30 +494,30 @@ PrologThrow: error(syntax_error(No terminal matches 't' in the current parser co
         ;/* R2 = (=),   Item == X2 */ true
                                       ^
 Expected one of: 
-	* INFIX_YFX_400_6
 	* INFIX_XFY_1000_46
-	* INFIX_YFX_400_9
 	* INFIX_YFX_400_12
-	* INFIX_YFX_500_18
-	* INFIX_YFX_500_15
-	* INFIX_XFX_450_14
-	* INFIX_XFX_1200_50
+	* INFIX_XFY_200_2
+	* INFIX_YFX_400_6
+	* INFIX_YFX_400_10
+	* INFIX_YFX_400_13
+	* INFIX_YFX_400_8
 	* INFIX_YFX_500_17
 	* INFIX_XFY_200_1
-	* INFIX_XFY_200_2
-	* INFIX_YFX_500_16
-	* INFIX_YFX_400_8
-	* INFIX_XFX_1200_51
-	* INFIX_YFX_400_13
 	* INFIX_XFY_1100_48
-	* LPAR
-	* INFIX_XFY_600_19
-	* INFIX_XFY_1050_47
-	* INFIX_YFX_400_10
-	* INFIX_YFX_400_11
-	* INFIX_YFX_400_7
-	* RPAR
+	* INFIX_YFX_400_9
+	* _LPAR
+	* INFIX_XFX_1200_50
+	* _RPAR
 	* INFIX_YFX_400_5
+	* INFIX_YFX_500_18
+	* INFIX_YFX_400_11
+	* INFIX_XFY_600_19
+	* INFIX_YFX_500_16
+	* INFIX_YFX_500_15
+	* INFIX_XFY_1050_47
+	* INFIX_XFX_1200_51
+	* INFIX_XFX_450_14
+	* INFIX_YFX_400_7
 ), context(consult/1))
 ```
 
@@ -539,45 +555,45 @@ File loading exceeded 30 seconds
 ```
 
 
-## Failures
+## Next Steps
 
-### Timeout (29 files)
+The following library files have issues that should be investigated and addressed:
 
-- **library/arithmetic.pl** - ❌ Timeout
-- **library/builtins.pl** - ❌ Timeout
-- **library/charsio.pl** - ❌ Timeout
-- **library/clpb.pl** - ❌ Timeout
-- **library/clpz.pl** - ❌ Timeout
-- **library/crypto.pl** - ❌ Timeout
-- **library/csv.pl** - ❌ Timeout
-- **library/debug.pl** - ❌ Timeout
-- **library/ffi.pl** - ❌ Timeout
-- **library/files.pl** - ❌ Timeout
-- **library/format.pl** - ❌ Timeout
-- **library/http/http_server.pl** - ❌ Timeout
-- **library/numerics/quadtests.pl** - ❌ Timeout
-- **library/ops_and_meta_predicates.pl** - ❌ Timeout
-- **library/os.pl** - ❌ Timeout
-- **library/pio.pl** - ❌ Timeout
-- **library/process.pl** - ❌ Timeout
-- **library/serialization/abnf.pl** - ❌ Timeout
-- **library/sgml.pl** - ❌ Timeout
-- **library/simplex.pl** - ❌ Timeout
-- **library/tabling.pl** - ❌ Timeout
-- **library/tabling/batched_worklist.pl** - ❌ Timeout
-- **library/tabling/table_data_structure.pl** - ❌ Timeout
-- **library/tabling/table_link_manager.pl** - ❌ Timeout
-- **library/tabling/trie.pl** - ❌ Timeout
-- **library/time.pl** - ❌ Timeout
-- **library/uuid.pl** - ❌ Timeout
-- **library/when.pl** - ❌ Timeout
-- **library/xpath.pl** - ❌ Timeout
+1. **library/arithmetic.pl** - ❌ Timeout
+1. **library/builtins.pl** - ❌ Prolog error
+1. **library/charsio.pl** - ❌ Timeout
+1. **library/clpb.pl** - ❌ Timeout
+1. **library/clpz.pl** - ❌ Timeout
+1. **library/crypto.pl** - ❌ Timeout
+1. **library/csv.pl** - ❌ Timeout
+1. **library/debug.pl** - ❌ Timeout
+1. **library/dif.pl** - ❌ Timeout
+1. **library/ffi.pl** - ❌ Timeout
+1. **library/files.pl** - ❌ Timeout
+1. **library/format.pl** - ❌ Timeout
+1. **library/http/http_server.pl** - ❌ Timeout
+1. **library/numerics/quadtests.pl** - ❌ Timeout
+1. **library/numerics/special_functions.pl** - ❌ Prolog error
+1. **library/numerics/testutils.pl** - ❌ Prolog error
+1. **library/ops_and_meta_predicates.pl** - ❌ Timeout
+1. **library/ordsets.pl** - ❌ Prolog error
+1. **library/os.pl** - ❌ Timeout
+1. **library/pio.pl** - ❌ Timeout
+1. **library/process.pl** - ❌ Timeout
+1. **library/reif.pl** - ❌ Timeout
+1. **library/serialization/abnf.pl** - ❌ Timeout
+1. **library/serialization/json.pl** - ❌ Timeout
+1. **library/sgml.pl** - ❌ Timeout
+1. **library/simplex.pl** - ❌ Timeout
+1. **library/tabling.pl** - ❌ Timeout
+1. **library/tabling/batched_worklist.pl** - ❌ Timeout
+1. **library/tabling/table_data_structure.pl** - ❌ Timeout
+1. **library/tabling/table_link_manager.pl** - ❌ Timeout
+1. **library/tabling/trie.pl** - ❌ Timeout
+1. **library/time.pl** - ❌ Timeout
+1. **library/ugraphs.pl** - ❌ Prolog error
+1. **library/uuid.pl** - ❌ Timeout
+1. **library/when.pl** - ❌ Timeout
+1. **library/xpath.pl** - ❌ Timeout
 
-### Prolog Errors (4 files)
-
-- **library/numerics/special_functions.pl** - ❌ Prolog error
-- **library/numerics/testutils.pl** - ❌ Prolog error
-- **library/ordsets.pl** - ❌ Prolog error
-- **library/ugraphs.pl** - ❌ Prolog error
-
-### Parse Errors (0 files)
+These issues should be converted into GitHub issues with the details provided above.

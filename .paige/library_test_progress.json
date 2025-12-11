@@ -1,5 +1,5 @@
 {
-  "timestamp": "2025-12-06T18:10:56.775090",
+  "timestamp": "2025-12-11T18:26:14.415645",
   "results": {
     "library/$project_atts.pl": {
       "success": true,
@@ -28,8 +28,8 @@
     },
     "library/builtins.pl": {
       "success": false,
-      "short_msg": "\u274c Timeout",
-      "detailed_msg": "File loading exceeded 30 seconds"
+      "short_msg": "\u274c Prolog error",
+      "detailed_msg": "PrologThrow: error(permission_error(modify, static_procedure, /(:-, 1)), context(consult/1))"
     },
     "library/charsio.pl": {
       "success": false,
@@ -77,9 +77,9 @@
       "detailed_msg": ""
     },
     "library/dif.pl": {
-      "success": true,
-      "short_msg": "\u2705 Loaded successfully",
-      "detailed_msg": ""
+      "success": false,
+      "short_msg": "\u274c Timeout",
+      "detailed_msg": "File loading exceeded 30 seconds"
     },
     "library/error.pl": {
       "success": true,
@@ -149,12 +149,12 @@
     "library/numerics/special_functions.pl": {
       "success": false,
       "short_msg": "\u274c Prolog error",
-      "detailed_msg": "PrologThrow: error(syntax_error(No terminal matches '\u03b4' in the current parser context, at line 11 col 16\n\n              ,\u03b4_inverses_t/5\n               ^\nExpected one of: \n\t* SPECIAL_ATOM\n\t* OP_SYMBOL\n\t* PREFIX_FY_900_45\n\t* STRING\n\t* CHAR_CODE\n\t* NUMBER\n\t* VARIABLE\n\t* PREFIX_FX_700_44\n\t* ARITH_OP_FUNCTOR\n\t* INFIX_OP_FUNCTOR\n\t* LBRACE\n\t* INFIX_YFX_500_16\n\t* PREFIX_FY_200_4\n\t* PREFIX_FX_1150_50\n\t* LPAR\n\t* SPECIAL_ATOM_OPS\n\t* PREFIX_FX_1200_53\n\t* CONTROL_OP_FUNCTOR\n\t* OPERATOR_ATOM\n\t* PREFIX_FX_1200_54\n\t* ATOM\n\t* BANG\n\t* LSQB\n\t* PREFIX_FY_200_3\n\t* COMPARISON_OP_FUNCTOR\n), context(consult/1))"
+      "detailed_msg": "PrologThrow: error(syntax_error(No terminal matches '\u03b4' in the current parser context, at line 11 col 16\n\n              ,\u03b4_inverses_t/5\n               ^\nExpected one of: \n\t* OPERATOR_ATOM\n\t* VARIABLE\n\t* PREFIX_FY_200_3\n\t* CHAR_CODE\n\t* CONTROL_OP_FUNCTOR\n\t* ARITH_OP_FUNCTOR\n\t* PREFIX_FY_200_4\n\t* PREFIX_FX_700_44\n\t* _LBRACE\n\t* PREFIX_FX_1150_50\n\t* PREFIX_FX_1200_53\n\t* _LPAR\n\t* STRING\n\t* INFIX_OP_FUNCTOR\n\t* BANG\n\t* PREFIX_FX_1200_54\n\t* SPECIAL_ATOM_OPS\n\t* INFIX_YFX_500_16\n\t* PREFIX_FY_900_45\n\t* SPECIAL_ATOM\n\t* _LBRA\n\t* OP_SYMBOL\n\t* ATOM\n\t* NUMBER\n\t* COMPARISON_OP_FUNCTOR\n), context(consult/1))"
     },
     "library/numerics/testutils.pl": {
       "success": false,
       "short_msg": "\u274c Prolog error",
-      "detailed_msg": "PrologThrow: error(syntax_error(No terminal matches '\u03b4' in the current parser context, at line 11 col 16\n\n              ,\u03b4_inverses_t/5\n               ^\nExpected one of: \n\t* SPECIAL_ATOM\n\t* OP_SYMBOL\n\t* PREFIX_FY_900_45\n\t* STRING\n\t* CHAR_CODE\n\t* NUMBER\n\t* VARIABLE\n\t* PREFIX_FX_700_44\n\t* ARITH_OP_FUNCTOR\n\t* INFIX_OP_FUNCTOR\n\t* LBRACE\n\t* INFIX_YFX_500_16\n\t* PREFIX_FY_200_4\n\t* PREFIX_FX_1150_50\n\t* LPAR\n\t* SPECIAL_ATOM_OPS\n\t* PREFIX_FX_1200_53\n\t* CONTROL_OP_FUNCTOR\n\t* OPERATOR_ATOM\n\t* PREFIX_FX_1200_54\n\t* ATOM\n\t* BANG\n\t* LSQB\n\t* PREFIX_FY_200_3\n\t* COMPARISON_OP_FUNCTOR\n), context(consult/1))"
+      "detailed_msg": "PrologThrow: error(syntax_error(No terminal matches '\u03b4' in the current parser context, at line 11 col 16\n\n              ,\u03b4_inverses_t/5\n               ^\nExpected one of: \n\t* OPERATOR_ATOM\n\t* VARIABLE\n\t* PREFIX_FY_200_3\n\t* CHAR_CODE\n\t* CONTROL_OP_FUNCTOR\n\t* ARITH_OP_FUNCTOR\n\t* PREFIX_FY_200_4\n\t* PREFIX_FX_700_44\n\t* _LBRACE\n\t* PREFIX_FX_1150_50\n\t* PREFIX_FX_1200_53\n\t* _LPAR\n\t* STRING\n\t* INFIX_OP_FUNCTOR\n\t* BANG\n\t* PREFIX_FX_1200_54\n\t* SPECIAL_ATOM_OPS\n\t* INFIX_YFX_500_16\n\t* PREFIX_FY_900_45\n\t* SPECIAL_ATOM\n\t* _LBRA\n\t* OP_SYMBOL\n\t* ATOM\n\t* NUMBER\n\t* COMPARISON_OP_FUNCTOR\n), context(consult/1))"
     },
     "library/ops_and_meta_predicates.pl": {
       "success": false,
@@ -164,7 +164,7 @@
     "library/ordsets.pl": {
       "success": false,
       "short_msg": "\u274c Prolog error",
-      "detailed_msg": "PrologThrow: error(syntax_error(No terminal matches 't' in the current parser context, at line 22 col 39\n\n        ;/* R2 = (=),   Item == X2 */ true\n                                      ^\nExpected one of: \n\t* INFIX_YFX_400_6\n\t* INFIX_XFY_1000_46\n\t* INFIX_YFX_400_9\n\t* INFIX_YFX_400_12\n\t* INFIX_YFX_500_18\n\t* INFIX_YFX_500_15\n\t* INFIX_XFX_450_14\n\t* INFIX_XFX_1200_50\n\t* INFIX_YFX_500_17\n\t* INFIX_XFY_200_1\n\t* INFIX_XFY_200_2\n\t* INFIX_YFX_500_16\n\t* INFIX_YFX_400_8\n\t* INFIX_XFX_1200_51\n\t* INFIX_YFX_400_13\n\t* INFIX_XFY_1100_48\n\t* LPAR\n\t* INFIX_XFY_600_19\n\t* INFIX_XFY_1050_47\n\t* INFIX_YFX_400_10\n\t* INFIX_YFX_400_11\n\t* INFIX_YFX_400_7\n\t* RPAR\n\t* INFIX_YFX_400_5\n), context(consult/1))"
+      "detailed_msg": "PrologThrow: error(syntax_error(No terminal matches 't' in the current parser context, at line 22 col 39\n\n        ;/* R2 = (=),   Item == X2 */ true\n                                      ^\nExpected one of: \n\t* INFIX_XFY_1000_46\n\t* INFIX_YFX_400_12\n\t* INFIX_XFY_200_2\n\t* INFIX_YFX_400_6\n\t* INFIX_YFX_400_10\n\t* INFIX_YFX_400_13\n\t* INFIX_YFX_400_8\n\t* INFIX_YFX_500_17\n\t* INFIX_XFY_200_1\n\t* INFIX_XFY_1100_48\n\t* INFIX_YFX_400_9\n\t* _LPAR\n\t* INFIX_XFX_1200_50\n\t* _RPAR\n\t* INFIX_YFX_400_5\n\t* INFIX_YFX_500_18\n\t* INFIX_YFX_400_11\n\t* INFIX_XFY_600_19\n\t* INFIX_YFX_500_16\n\t* INFIX_YFX_500_15\n\t* INFIX_XFY_1050_47\n\t* INFIX_XFX_1200_51\n\t* INFIX_XFX_450_14\n\t* INFIX_YFX_400_7\n), context(consult/1))"
     },
     "library/os.pl": {
       "success": false,
@@ -197,9 +197,9 @@
       "detailed_msg": ""
     },
     "library/reif.pl": {
-      "success": true,
-      "short_msg": "\u2705 Loaded successfully",
-      "detailed_msg": ""
+      "success": false,
+      "short_msg": "\u274c Timeout",
+      "detailed_msg": "File loading exceeded 30 seconds"
     },
     "library/serialization/abnf.pl": {
       "success": false,
@@ -208,8 +208,8 @@
     },
     "library/serialization/json.pl": {
       "success": false,
-      "short_msg": "\u274c Parse error",
-      "detailed_msg": "ValueError: Unsupported DCG goal: NumberChars"
+      "short_msg": "\u274c Timeout",
+      "detailed_msg": "File loading exceeded 30 seconds"
     },
     "library/sgml.pl": {
       "success": false,
@@ -294,7 +294,7 @@
     "library/ugraphs.pl": {
       "success": false,
       "short_msg": "\u274c Prolog error",
-      "detailed_msg": "PrologThrow: error(syntax_error(No terminal matches 't' in the current parser context, at line 22 col 39\n\n        ;/* R2 = (=),   Item == X2 */ true\n                                      ^\nExpected one of: \n\t* INFIX_YFX_400_6\n\t* INFIX_XFY_1000_46\n\t* INFIX_YFX_400_9\n\t* INFIX_YFX_400_12\n\t* INFIX_YFX_500_18\n\t* INFIX_YFX_500_15\n\t* INFIX_XFX_450_14\n\t* INFIX_XFX_1200_50\n\t* INFIX_YFX_500_17\n\t* INFIX_XFY_200_1\n\t* INFIX_XFY_200_2\n\t* INFIX_YFX_500_16\n\t* INFIX_YFX_400_8\n\t* INFIX_XFX_1200_51\n\t* INFIX_YFX_400_13\n\t* INFIX_XFY_1100_48\n\t* LPAR\n\t* INFIX_XFY_600_19\n\t* INFIX_XFY_1050_47\n\t* INFIX_YFX_400_10\n\t* INFIX_YFX_400_11\n\t* INFIX_YFX_400_7\n\t* RPAR\n\t* INFIX_YFX_400_5\n), context(consult/1))"
+      "detailed_msg": "PrologThrow: error(syntax_error(No terminal matches 't' in the current parser context, at line 22 col 39\n\n        ;/* R2 = (=),   Item == X2 */ true\n                                      ^\nExpected one of: \n\t* INFIX_XFY_1000_46\n\t* INFIX_YFX_400_12\n\t* INFIX_XFY_200_2\n\t* INFIX_YFX_400_6\n\t* INFIX_YFX_400_10\n\t* INFIX_YFX_400_13\n\t* INFIX_YFX_400_8\n\t* INFIX_YFX_500_17\n\t* INFIX_XFY_200_1\n\t* INFIX_XFY_1100_48\n\t* INFIX_YFX_400_9\n\t* _LPAR\n\t* INFIX_XFX_1200_50\n\t* _RPAR\n\t* INFIX_YFX_400_5\n\t* INFIX_YFX_500_18\n\t* INFIX_YFX_400_11\n\t* INFIX_XFY_600_19\n\t* INFIX_YFX_500_16\n\t* INFIX_YFX_500_15\n\t* INFIX_XFY_1050_47\n\t* INFIX_XFX_1200_51\n\t* INFIX_XFX_450_14\n\t* INFIX_YFX_400_7\n), context(consult/1))"
     },
     "library/uuid.pl": {
       "success": false,

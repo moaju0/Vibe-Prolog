@@ -201,6 +201,10 @@ Operators can be used as regular functors by:
    |(a, b)        % Valid: pipe as functor
    ```
 
+### Operator import caching
+
+Operator directives discovered in imported files are cached by resolved path and mtime. Re-consulting the same module (even in a new interpreter instance) reuses that metadata and skips re-reading transitive imports. Selective imports via `use_module(File, [Preds])` still withhold operators; caches only apply to full imports.
+
 ## List Syntax
 
 | Feature | Example | Status |
