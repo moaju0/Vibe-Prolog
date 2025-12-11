@@ -248,6 +248,7 @@ The following Scryer-Prolog specific directives are recognized but ignored (with
 | Terminal lists as rulesets   | ✅      | `phrase([a, b, c], L)` unifies L with [a, b, c]                       |
 | Cut (`!`) as ruleset         | ✅      | `phrase(!, L)` unifies L with []                                      |
 | DCG expansion                | ✅      | Automatic conversion to standard Prolog clauses                       |
+| DCG variable goals           | ✅      | Variables can be used as terminal sequences: `foo --> { X = [a,b] }, X.` |
 | Embedded Prolog goals `{G}`  | ✅      | Full support for embedded goals in DCG rules                         |
 | Alternatives (`;`)           | ✅      | Choice points in DCG rules                                           |
 | Error handling               | ✅      | **ISO-compliant** - Proper instantiation_error, type_error, existence_error |

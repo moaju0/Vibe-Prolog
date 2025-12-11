@@ -2,7 +2,8 @@
 
 from typing import Any
 
-from vibeprolog.parser import Atom, Compound, Cut, List, Variable
+from vibeprolog.parser import Atom, Compound, Cut, List
+from vibeprolog.terms import Variable
 
 
 class DCGExpander:
@@ -149,6 +150,11 @@ class DCGExpander:
         elif isinstance(goal, Atom):
             # Non-terminal atom: add difference list arguments
             return [self._expand_nonterminal(goal, s0, s)]
+
+        elif isinstance(goal, Variable):
+            # Variable as goal: consume the characters in the variable
+            # Expands to: append(Var, S, S0)
+            return [Compound("append", (goal, s, s0))]
 
         else:
             # Other terms (shouldn't happen in valid DCG)

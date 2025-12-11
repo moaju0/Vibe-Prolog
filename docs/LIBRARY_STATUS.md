@@ -5,9 +5,9 @@
 ## Summary
 
 - **Total Files:** 63
-- **Loaded Successfully:** 29
-- **Failed to Load:** 34
-- **Success Rate:** 29/63 (46%)
+- **Loaded Successfully:** 30
+- **Failed to Load:** 33
+- **Success Rate:** 30/63 (48%)
 
 ## Failure Type Breakdown
 
@@ -15,7 +15,6 @@
 | --- | --- | --- | --- |
 | Timeout (30s limit hit) | 29 | `library/arithmetic.pl`, `library/builtins.pl`, `library/tabling.pl` | Likely waiting on unsupported predicates or cyclic `use_module/1` chains; affects most I/O, numeric, and tabling libraries. |
 | Prolog error (syntax) | 4 | `library/numerics/special_functions.pl`, `library/ordsets.pl` | Parser currently rejects Unicode atoms such as `δ_*` and specific layouts where block comments touch code, blocking numerics and data-structure libs. |
-| Parse error (unsupported DCG) | 1 | `library/serialization/json.pl` | DCG rule calls `NumberChars/4`, which Vibe-Prolog does not yet translate, preventing JSON support. |
 
 ## Priority Recommendations
 
@@ -46,6 +45,7 @@
 - `library/queues.pl`
 - `library/random.pl`
 - `library/reif.pl`
+- `library/serialization/json.pl`
 - `library/si.pl`
 - `library/sockets.pl`
 - `library/tabling/double_linked_list.pl`
@@ -378,17 +378,6 @@ File loading exceeded 30 seconds
 ```
 
 
-### library/serialization/json.pl
-
-**Status:** ❌ Parse error
-
-**Details:**
-
-```
-ValueError: Unsupported DCG goal: NumberChars
-```
-
-
 ### library/sgml.pl
 
 **Status:** ❌ Timeout
@@ -591,6 +580,4 @@ File loading exceeded 30 seconds
 - **library/ordsets.pl** - ❌ Prolog error
 - **library/ugraphs.pl** - ❌ Prolog error
 
-### Parse Errors (1 file)
-
-- **library/serialization/json.pl** - ❌ Parse error
+### Parse Errors (0 files)

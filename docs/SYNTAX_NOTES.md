@@ -221,12 +221,31 @@ Operators can be used as regular functors by:
 |---------|---------|--------|
 | DCG rule | `rule --> body.` | ✅ Supported |
 | Terminals | `[a, b, c]` | ✅ Supported |
+| Variable goals | `X` (where X is bound to a list) | ✅ Supported |
 | Non-terminals | `noun_phrase` | ✅ Supported |
 | Sequence | `a, b, c` | ✅ Supported |
 | Alternatives | `(a ; b)` | ✅ Supported |
 | Embedded goals | `{write(x)}` | ✅ Supported |
 | Empty production | `[]` | ✅ Supported |
 | Cut in DCG | `!` | ✅ Supported |
+
+### Variable Goals in DCG Bodies
+
+A variable can be used directly as a DCG goal to match or generate a sequence of terminals:
+
+```prolog
+% Match characters stored in variable
+foo --> { X = "hello" }, X.
+?- phrase(foo, "hello").
+   true.
+
+% Generate characters from variable
+bar(X) --> X.
+?- phrase(bar("test"), Result).
+   Result = "test".
+```
+
+This is commonly used in parsing scenarios where the terminal sequence is computed dynamically, such as in JSON number parsing where `number_chars/2` produces the character list.
 
 **Expansion**: DCG rules are expanded to difference list predicates at parse time:
 ```prolog
