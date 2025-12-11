@@ -89,6 +89,29 @@ Vibe-Prolog supports the Edinburgh `<radix>'<number>` notation for bases 2-36:
 | Hex escape | `'\x48ello'` | Hello | ✅ Supported |
 | Operators as atoms | `';'`, `','`, `'|'` | (operators) | ✅ Supported |
 
+### Unquoted Atoms with Unicode Letters
+
+Vibe-Prolog supports Unicode letters in unquoted atoms, allowing atoms from virtually all writing systems:
+
+| Script | Examples | Status | Unicode Range |
+|--------|----------|--------|----------------|
+| **ASCII** | `atom`, `test_123` | ✅ Supported | U+0061-U+007A (lowercase), U+005F (underscore) |
+| **Greek** | `δ`, `α_test`, `γβ` | ✅ Supported | U+0370-U+03FF |
+| **Cyrillic** | `тест`, `п_1` | ✅ Supported | U+0400-U+04FF |
+| **Arabic** | `ا`, `ب_test` | ✅ Supported | U+0600-U+06FF |
+| **Devanagari** | `अ_test`, `आ` | ✅ Supported | U+0900-U+097F |
+| **CJK (Chinese/Japanese/Korean)** | `中`, `中文_test`, `日本` | ✅ Supported | U+4E00-U+9FFF (Han), others |
+| **Hiragana (Japanese)** | `あ`, `いろは` | ✅ Supported | U+3040-U+309F |
+| **Hangul (Korean)** | `한`, `한국` | ✅ Supported | U+AC00-U+D7AF |
+| **Latin Extended** | `café_test`, `Ñoño` | ✅ Supported | U+00C0-U+017F |
+
+**Rules for unquoted atoms:**
+- First character: lowercase ASCII letter (`a-z`), underscore (`_`), or **any Unicode letter**
+- Subsequent characters: ASCII letters/digits/underscores or **Unicode letters**
+- Examples: `δ`, `δ_test`, `test_δ_value`, `αβγ`, `тест`, `中文`
+
+**Note:** Variables (starting with uppercase or underscore) are ASCII-only per ISO Prolog semantics. Use quoted atoms for Unicode in variable contexts if needed.
+
 ### Double-Quoted Strings
 
 | Mode | Example | Result | Status |

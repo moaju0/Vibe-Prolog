@@ -234,8 +234,19 @@ __OPERATOR_GRAMMAR__
             | /-?\d+['][a-zA-Z0-9_]+/
             | /-?(?=[\d_]*\d)[\d_]+/
 
-    ATOM: /[a-z][a-zA-Z0-9_]*/ | /\{\}/ | /\$[a-zA-Z0-9_-]*/ | /[+\-*\/]/
+    // ATOM: unquoted atoms can start with lowercase ASCII letter, underscore, or Unicode letter.
+    // Subsequent characters can be ASCII letters, digits, underscores, or Unicode letters.
+    // Unicode letters include: Latin Extended (00C0-017F), Greek (0370-03FF), Cyrillic (0400-04FF),
+    // Arabic (0600-06FF), Devanagari (0900-097F), CJK Unified (4E00-9FFF), Hiragana (3040-309F),
+    // Hangul (AC00-D7AF), and other scripts. Priority 6 ensures it matches before number operators.
+    ATOM.6: /[a-z_\u00C0-\u017F\u0370-\u03FF\u0400-\u04FF\u0600-\u06FF\u0900-\u097F\u4E00-\u9FFF\u3040-\u309F\uAC00-\uD7AF][a-z0-9_\u00C0-\u017F\u0370-\u03FF\u0400-\u04FF\u0600-\u06FF\u0900-\u097F\u4E00-\u9FFF\u3040-\u309F\uAC00-\uD7AF]*/
+        | /\{\}/
+        | /\$[a-z_\u00C0-\u017F\u0370-\u03FF\u0400-\u04FF\u0600-\u06FF\u0900-\u097F\u4E00-\u9FFF\u3040-\u309F\uAC00-\uD7AF][a-z0-9_\u00C0-\u017F\u0370-\u03FF\u0400-\u04FF\u0600-\u06FF\u0900-\u097F\u4E00-\u9FFF\u3040-\u309F\uAC00-\uD7AF-]*/
+        | /[+\-*\/]/
 
+    // VARIABLE: unquoted variables must start with uppercase ASCII letter or underscore,
+    // then can contain ASCII letters, digits, and underscores.
+    // Unicode letters are not allowed in variable names per ISO Prolog semantics.
     VARIABLE: /[A-Z_][a-zA-Z0-9_]*/
 
     %import common.WS
