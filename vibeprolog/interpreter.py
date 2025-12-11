@@ -320,6 +320,8 @@ class PrologInterpreter:
                     else:
                         continue
                     self.predicate_docs[key] = processed_clause.doc
+            elif isinstance(item, PredicatePropertyDirective):
+                self._handle_predicate_property_directive(item, closed_predicates)
             elif isinstance(item, Directive):
                 self._handle_directive(item, closed_predicates, source_name)
                 if (

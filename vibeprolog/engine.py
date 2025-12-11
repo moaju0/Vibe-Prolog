@@ -910,6 +910,9 @@ class PrologEngine:
             props = self.predicate_properties[key]
             if "built_in" in props:
                 return props
+            # If it's not a built-in but has properties, return them
+            if props:
+                return props
         
         # Try module-scoped properties if interpreter is available
         interpreter = getattr(self, "interpreter", None)
@@ -925,7 +928,7 @@ class PrologEngine:
                 return properties
         
         # Fall back to global properties
-        properties = self.predicate_properties.setdefault(key, set())
+        properties = self.predicate_properties.get(key, set())
         if not properties:
             properties.add("static")
         if "dynamic" in properties and "static" in properties:
