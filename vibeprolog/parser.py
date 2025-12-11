@@ -1643,8 +1643,10 @@ class PrologParser:
         # Character conversion table: maps single chars to single chars
         # Initially identity (no conversions active)
         self._char_conversions: dict[str, str] = {}
-        # self._grammar_cache removed: grammar cache is no longer used
         self.parser = None
+        # Cache parsers keyed by module context and operator signature so we do
+        # not rebuild the Earley grammar for every clause/directive.
+        self._parser_cache: dict[tuple[str | None, tuple[tuple[int, str, str], ...]], Lark] = {}
 
     def set_char_conversion(self, from_char: str, to_char: str) -> None:
         """Set a character conversion.
@@ -1749,6 +1751,11 @@ class PrologParser:
         operator_rules = generate_operator_rules(operators)
         return PROLOG_GRAMMAR.replace("__OPERATOR_GRAMMAR__", operator_rules)
 
+    def _parser_cache_key(
+        self, operators: list[tuple[int, str, str]], module_name: str | None
+    ) -> tuple[str | None, tuple[tuple[int, str, str], ...]]:
+        return (module_name, tuple(operators))
+
     def _ensure_parser(
         self,
         cleaned_text: str,
@@ -1763,8 +1770,13 @@ class PrologParser:
         operators = _merge_operators(
             self._base_operator_definitions(module_name), directive_ops
         )
-        grammar = self._build_grammar(operators)
-        self.parser = self._create_parser(grammar)
+        cache_key = self._parser_cache_key(operators, module_name)
+        cached_parser = self._parser_cache.get(cache_key)
+        if cached_parser is None:
+            grammar = self._build_grammar(operators)
+            cached_parser = self._create_parser(grammar)
+            self._parser_cache[cache_key] = cached_parser
+        self.parser = cached_parser
 
     def _strip_block_comments(self, text: str) -> tuple[str, list[tuple[int, str]]]:
         """Strip block comments from text, handling nesting and quoted strings.

@@ -205,6 +205,8 @@ Operators can be used as regular functors by:
 
 Operator directives discovered in imported files are cached by resolved path and mtime. Re-consulting the same module (even in a new interpreter instance) reuses that metadata and skips re-reading transitive imports. Selective imports via `use_module(File, [Preds])` still withhold operators; caches only apply to full imports.
 
+Parser grammars are also cached per module context and operator signature, so the Earley parser is built once for a given operator set and reused across all directives/clauses in a consult. When an `op/3` directive changes the operator table, a new grammar is generated and cached under the new signature. Import scanning uses a lightweight directive parser for `use_module`/`ensure_loaded`/`consult` before falling back to the full parser, so import detection stays fast even in files with many directives.
+
 ## List Syntax
 
 | Feature | Example | Status |

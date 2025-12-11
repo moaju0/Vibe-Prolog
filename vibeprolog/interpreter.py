@@ -19,6 +19,8 @@ from vibeprolog.parser import (
     PredicateIndicator,
     PredicatePropertyDirective,
     PrologParser,
+    _split_top_level_commas,
+    _strip_quotes,
     _strip_comments,
     extract_op_directives,
     tokenize_prolog_statements,
@@ -807,6 +809,176 @@ class PrologInterpreter:
 
         return (resolved_import, None)
 
+    def _extract_parenthesized_content(self, text: str) -> tuple[str | None, str]:
+        """Return content inside the first balanced parentheses in ``text``.
+
+        The text may start with whitespace; comments should already be stripped.
+        Returns (None, text) when no balanced parentheses are found.
+        """
+        in_single = False
+        in_double = False
+        escape_next = False
+        depth = 0
+        start_index: int | None = None
+        for index, char in enumerate(text):
+            if start_index is None:
+                if char.isspace():
+                    continue
+                if char != "(":
+                    return (None, text)
+                start_index = index
+                depth = 1
+                continue
+
+            if escape_next:
+                escape_next = False
+                continue
+
+            if char == "\\" and (in_single or in_double):
+                escape_next = True
+                continue
+            if char == "'" and not in_double:
+                in_single = not in_single
+                continue
+            if char == '"' and not in_single:
+                in_double = not in_double
+                continue
+
+            if in_single or in_double:
+                continue
+
+            if char == "(":
+                depth += 1
+            elif char == ")":
+                depth -= 1
+                if depth == 0 and start_index is not None:
+                    content = text[start_index + 1:index]
+                    trailing = text[index + 1:]
+                    return (content, trailing)
+        return (None, text)
+
+    def _split_top_level_delimiter(self, text: str, delimiter: str) -> list[str]:
+        """Split text on a delimiter while respecting quoted/bracketed sections."""
+        parts: list[str] = []
+        current: list[str] = []
+        depth = 0
+        in_single = False
+        in_double = False
+        escape_next = False
+
+        for ch in text:
+            if escape_next:
+                current.append(ch)
+                escape_next = False
+                continue
+
+            if ch == "\\" and (in_single or in_double):
+                current.append(ch)
+                escape_next = True
+                continue
+
+            if ch == "'" and not in_double:
+                in_single = not in_single
+                current.append(ch)
+                continue
+            if ch == '"' and not in_single:
+                in_double = not in_double
+                current.append(ch)
+                continue
+
+            if not in_single and not in_double:
+                if ch in "([{":
+                    depth += 1
+                elif ch in ")]}" and depth > 0:
+                    depth -= 1
+
+                if ch == delimiter and depth == 0:
+                    parts.append("".join(current).strip())
+                    current = []
+                    continue
+
+            current.append(ch)
+
+        if current:
+            parts.append("".join(current).strip())
+        return parts
+
+    def _atom_from_token(self, token: str) -> Atom:
+        """Convert a token to an Atom, handling quoted atoms and strings."""
+        token = token.strip()
+        if not token:
+            raise ValueError("Empty atom token")
+        if token[0] in {"'", '"'} and token[-1] == token[0]:
+            return Atom(_strip_quotes(token))
+        if "(" in token or ")" in token:
+            raise ValueError("Complex token requires full parser")
+        return Atom(token)
+
+    def _parse_library_term(self, text: str):
+        segments = self._split_top_level_delimiter(text, "/")
+        if not segments:
+            raise ValueError("Empty library term")
+
+        term = self._atom_from_token(segments[0])
+        for segment in segments[1:]:
+            term = Compound("/", (term, self._atom_from_token(segment)))
+        return term
+
+    def _parse_import_spec(self, arg_text: str):
+        arg_text = arg_text.strip()
+        if not arg_text:
+            raise ValueError("Missing import spec")
+
+        if arg_text.startswith("library"):
+            inner, trailing = self._extract_parenthesized_content(arg_text[len("library"):])
+            if inner is None or trailing.strip():
+                raise ValueError("Malformed library/1 term")
+            return Compound("library", (self._parse_library_term(inner),))
+
+        if "/" in arg_text:
+            segments = self._split_top_level_delimiter(arg_text, "/")
+            if len(segments) > 1:
+                term = self._atom_from_token(segments[0])
+                for segment in segments[1:]:
+                    term = Compound("/", (term, self._atom_from_token(segment)))
+                return term
+
+        return self._atom_from_token(arg_text)
+
+    def _parse_import_directive_fast(self, directive: str) -> list[tuple[Any, bool]] | None:
+        """Parse simple import directives without invoking the full Earley parser."""
+        body = directive[2:].lstrip()
+        if not body:
+            return []
+
+        match = re.match(r"([a-z][A-Za-z0-9_]*)", body)
+        if not match:
+            return None
+        functor = match.group(1)
+        if functor not in {"use_module", "ensure_loaded", "consult"}:
+            return []
+
+        args_text, trailing = self._extract_parenthesized_content(body[match.end():])
+        if args_text is None:
+            return None
+
+        trailing_stripped = trailing.strip()
+        if trailing_stripped and trailing_stripped != ".":
+            return None
+
+        args = _split_top_level_commas(args_text)
+        include_operators = True
+        if functor == "use_module" and len(args) == 2:
+            include_operators = False
+        elif len(args) != 1:
+            return []
+
+        try:
+            file_term = self._parse_import_spec(args[0])
+        except ValueError:
+            return None
+
+        return [(file_term, include_operators)]
 
     def _extract_import_terms(
         self, prolog_code: str, directive_ops: list[tuple[int, str, str]]
@@ -831,6 +1003,12 @@ class PrologInterpreter:
             stripped = _strip_comments(chunk).strip()
             if not stripped.startswith(":-"):
                 continue
+
+            fast_result = self._parse_import_directive_fast(stripped)
+            if fast_result is not None:
+                imports.extend(fast_result)
+                continue
+
             try:
                 directives = self._import_scanner_parser.parse(
                     stripped,
