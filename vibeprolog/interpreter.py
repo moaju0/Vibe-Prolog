@@ -283,19 +283,19 @@ class PrologInterpreter:
         self,
         items: list,
         source_name: str,
-        closed_predicates: set[tuple[str, int]] | None = None,
-        last_predicate: tuple[str, int] | None = None,
-    ) -> tuple[str, int] | None:
+        closed_predicates: set[tuple[str, str, int]] | None = None,
+        last_predicate: tuple[str, str, int] | None = None,
+    ) -> tuple[str, str, int] | None:
         """Process parsed clauses and directives.
         
         Args:
             items: List of parsed clauses and directives
             source_name: Name of the source being consulted
-            closed_predicates: Set of predicates that have been "closed"
-            last_predicate: The last predicate key that was added
-            
+            closed_predicates: Set of predicates that have been "closed" as (module, functor, arity)
+            last_predicate: The last predicate key that was added as (module, functor, arity)
+
         Returns:
-            The last predicate key processed
+            The last predicate key processed as (module, functor, arity)
         """
         self._ensure_builtin_properties()
         if closed_predicates is None:
@@ -383,7 +383,7 @@ class PrologInterpreter:
         return last_predicate
 
     def _handle_directive(
-        self, directive: Directive, closed_predicates: set[tuple[str, int]], source_name=None
+        self, directive: Directive, closed_predicates: set[tuple[str, str, int]], source_name=None
     ):
         """Handle a directive."""
         goal = directive.goal
@@ -1292,15 +1292,27 @@ class PrologInterpreter:
         return result
 
     def _handle_predicate_property_directive(
-        self, directive: PredicatePropertyDirective, closed_predicates: set[tuple[str, int]]
+        self, directive: PredicatePropertyDirective, closed_predicates: set[tuple[str, str, int]]
     ) -> None:
         """Apply a predicate property directive."""
 
         context = f"{directive.property}/1"
-        module_name = self.current_module
         
         for indicator in directive.indicators:
-            key = self._validate_predicate_indicator(indicator, context)
+            # Parse module-qualified indicator
+            target_module_name, bare_indicator = self._parse_module_qualified_indicator(indicator, context)
+            
+            # If no module specified, use current module
+            if target_module_name is None:
+                target_module_name = self.current_module
+            
+            # Validate the bare indicator
+            key = self._validate_predicate_indicator(bare_indicator, context)
+            
+            # Ensure the target module exists
+            if target_module_name not in self.modules:
+                # Create the module if it doesn't exist
+                self._ensure_module_exists(target_module_name)
             
             # Check global properties for built-in check
             global_properties = self.predicate_properties.get(key, set())
@@ -1311,8 +1323,8 @@ class PrologInterpreter:
                 )
                 raise PrologThrow(error_term)
 
-            # Get or create module-scoped properties
-            properties = self._get_module_predicate_properties(module_name, key).copy()
+            # Get or create module-scoped properties for the target module
+            properties = self._get_module_predicate_properties(target_module_name, key).copy()
 
             if directive.property == "dynamic":
                 properties.discard("static")
@@ -1322,14 +1334,55 @@ class PrologInterpreter:
                 if "dynamic" not in properties:
                     properties.add("static")
 
-            # Update module-scoped properties
-            self._set_module_predicate_properties(module_name, key, properties)
+            # Update module-scoped properties for the target module
+            self._set_module_predicate_properties(target_module_name, key, properties)
             
             # Also update global for backward compatibility
             self.predicate_properties.setdefault(key, set()).update(properties)
 
-            if directive.property == "discontiguous" and key in closed_predicates:
-                closed_predicates.discard(key)
+            # For discontiguous directives, remove from closed_predicates using the qualified key
+            if directive.property == "discontiguous":
+                # Create the qualified key for closed_predicates
+                qualified_key = (target_module_name, key[0], key[1])
+                if qualified_key in closed_predicates:
+                    closed_predicates.discard(qualified_key)
+
+    def _ensure_module_exists(self, module_name: str) -> None:
+        """Ensure that a module exists, creating it if necessary."""
+        if module_name not in self.modules:
+            # Create a basic module with no exports
+            self.modules[module_name] = Module(module_name, None)
+
+    def _parse_module_qualified_indicator(
+        self, indicator: Any, context: str
+    ) -> tuple[str | None, Any]:
+        """Parse a potentially module-qualified predicate indicator.
+        
+        Returns a tuple of (module_name, bare_indicator) where:
+        - module_name is None if no module qualifier is present
+        - bare_indicator is the Name/Arity indicator without module qualification
+        """
+        # Check if this is a module-qualified indicator: :(Module, Indicator)
+        if (
+            isinstance(indicator, Compound)
+            and indicator.functor == ":"
+            and len(indicator.args) == 2
+        ):
+            module_term, bare_indicator = indicator.args
+            
+            # Validate that module is an atom
+            if isinstance(module_term, Variable):
+                error_term = PrologError.instantiation_error(context)
+                raise PrologThrow(error_term)
+            
+            if not isinstance(module_term, Atom):
+                error_term = PrologError.type_error("atom", module_term, context)
+                raise PrologThrow(error_term)
+            
+            return module_term.name, bare_indicator
+        else:
+            # No module qualification
+            return None, indicator
 
     def _validate_predicate_indicator(
         self, indicator: PredicateIndicator | Any, context: str
@@ -1464,14 +1517,23 @@ class PrologInterpreter:
         self,
         clause: Clause,
         source_name: str,
-        closed_predicates: set[tuple[str, int]],
-        last_predicate: tuple[str, int] | None,
-    ) -> tuple[str, int] | None:
+        closed_predicates: set[tuple[str, str, int]],
+        last_predicate: tuple[str, str, int] | None,
+    ) -> tuple[str, str, int] | None:
         """Insert a clause while enforcing predicate properties.
 
         Supports module-qualified clause heads like `Module:Head :- Body`.
         When the head is a `:/2` compound, the clause is added to the
         specified module rather than the current module.
+
+        Args:
+            clause: The clause to add
+            source_name: Source identifier for tracking
+            closed_predicates: Set of (module, functor, arity) predicates that are closed
+            last_predicate: Previous predicate key as (module, functor, arity)
+
+        Returns:
+            The qualified predicate key as (module, functor, arity) or None
         """
 
         head = clause.head
@@ -1562,8 +1624,11 @@ class PrologInterpreter:
             )
             raise PrologThrow(error_term)
 
+        # Create qualified key for closed_predicates tracking
+        qualified_key = (module_name, key[0], key[1])
+
         if (
-            key in closed_predicates
+            qualified_key in closed_predicates
             and "discontiguous" not in properties
         ):
             indicator = self._indicator_from_key(key)
@@ -1572,8 +1637,11 @@ class PrologInterpreter:
             )
             raise PrologThrow(error_term)
 
-        if last_predicate is not None and last_predicate != key:
-            last_properties = self._get_module_predicate_properties(module_name, last_predicate)
+        if last_predicate is not None and last_predicate != qualified_key:
+            # Extract module and key from last_predicate (module, functor, arity)
+            last_module, last_functor, last_arity = last_predicate
+            last_key = (last_functor, last_arity)
+            last_properties = self._get_module_predicate_properties(last_module, last_key)
             if not last_properties:
                 last_properties = {"static"}
             if "discontiguous" not in last_properties:
@@ -1581,14 +1649,14 @@ class PrologInterpreter:
 
         self.clauses.append(clause)
         self._add_module_predicate_source(module_name, key, source_name)
-        
+
         # Also update global tracking for backward compatibility
         self.predicate_properties.setdefault(key, set()).update(properties)
         self._predicate_sources.setdefault(key, set()).add(source_name)
 
         mod.predicates.setdefault(key, []).append(clause)
 
-        return key
+        return qualified_key
 
     def _execute_initialization_goals(self):
         """Execute collected initialization goals."""
@@ -1633,8 +1701,9 @@ class PrologInterpreter:
             raise PrologThrow(error_term)
         
         # Keep closed_predicates across chunks to enforce discontiguous requirements
-        closed_predicates: set[tuple[str, int]] = set()
-        last_predicate: tuple[str, int] | None = None
+        # Keys are (module, functor, arity) for module-aware tracking
+        closed_predicates: set[tuple[str, str, int]] = set()
+        last_predicate: tuple[str, str, int] | None = None
         
         for chunk in chunks:
             chunk = chunk.strip()

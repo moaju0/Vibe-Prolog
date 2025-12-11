@@ -525,6 +525,7 @@ To write Prolog code that works across multiple implementations:
 4. **Module system**:
    - ✅ Use standard `module/2` and `use_module/1,2`
    - ✅ Export predicates and operators explicitly
+   - ✅ Use module-qualified predicate directives (`Module:Name/Arity`) in `dynamic/1`, `multifile/1`, `discontiguous/1` for cross-module predicate property declarations
 
 5. **Comments**:
    - ✅ Use freely - fully portable

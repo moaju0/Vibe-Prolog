@@ -578,3 +578,149 @@ class TestModuleQualifiedClauseHeads:
         with pytest.raises(PrologThrow) as excinfo:
             prolog.consult_string("123:foo(a).")
         assert "type_error" in str(excinfo.value.term)
+
+
+class TestModuleQualifiedPredicateDirectives:
+    """Tests for module-qualified predicate property directives."""
+
+    def test_module_qualified_discontiguous_directive(self):
+        """Module-qualified discontiguous directives should work."""
+        prolog = PrologInterpreter()
+        prolog.consult_string("""
+            :- module(test, []).
+            :- discontiguous user:test_pred/2.
+            user:test_pred(a, 1).
+            foo(bar). % Intervening clause
+            user:test_pred(b, 2).
+        """)
+        
+        # Test that both clauses were loaded
+        result1 = prolog.query_once("user:test_pred(a, X)")
+        assert result1 is not None and result1["X"] == 1
+        
+        result2 = prolog.query_once("user:test_pred(b, X)")
+        assert result2 is not None and result2["X"] == 2
+
+    def test_module_qualified_dynamic_directive(self):
+        """Module-qualified dynamic directives should work."""
+        prolog = PrologInterpreter()
+        prolog.consult_string("""
+            :- module(test, []).
+            :- dynamic user:dynamic_pred/1.
+            user:dynamic_pred(test_value).
+        """)
+        
+        result = prolog.query_once("user:dynamic_pred(X)")
+        assert result is not None and result["X"] == "test_value"
+
+    def test_module_qualified_multifile_directive(self):
+        """Module-qualified multifile directives should work."""
+        prolog = PrologInterpreter()
+        prolog.consult_string("""
+            :- module(test, []).
+            :- multifile user:multifile_pred/1.
+            user:multifile_pred(test_value).
+        """)
+        
+        result = prolog.query_once("user:multifile_pred(X)")
+        assert result is not None and result["X"] == "test_value"
+
+    def test_module_qualified_goal_expansion_scenario(self):
+        """Test the specific scenario from the original issue with goal_expansion."""
+        prolog = PrologInterpreter()
+        prolog.consult_string("""
+            :- module(fmt, []).
+            :- discontiguous user:goal_expansion/2.
+            
+            % Multiple goal_expansion clauses like in format.pl
+            user:goal_expansion(format_(Fs,Args,Cs0,Cs), format:format_cells(Cells, Cs0, Cs)).
+            user:goal_expansion(format(Fs, Args), (current_output(Stream), format(Stream, Fs, Args))).
+            user:goal_expansion(format(Stream, Fs, Args), (pio:phrase_to_stream(format:format_(Fs, Args), Stream), flush_output(Stream))).
+        """)
+        
+        # Test that all clauses were loaded without permission errors
+        result1 = prolog.query_once("user:goal_expansion(format_(A,B,C,D), X)")
+        assert result1 is not None
+        
+        result2 = prolog.query_once("user:goal_expansion(format(A,B), X)")
+        assert result2 is not None
+        
+        result3 = prolog.query_once("user:goal_expansion(format(A,B,C), X)")
+        assert result3 is not None
+
+    def test_module_qualified_directive_with_invalid_module(self):
+        """Module-qualified directives with invalid module names should raise errors."""
+        prolog = PrologInterpreter()
+        
+        # Test with variable module name
+        with pytest.raises(PrologThrow) as excinfo:
+            prolog.consult_string("""
+                :- module(test, []).
+                :- discontiguous Var:test_pred/1.
+            """)
+        assert "instantiation_error" in str(excinfo.value.term)
+        
+        # Test with non-atom module name
+        with pytest.raises(PrologThrow) as excinfo:
+            prolog.consult_string("""
+                :- module(test, []).
+                :- discontiguous 123:test_pred/1.
+            """)
+        assert "type_error" in str(excinfo.value.term)
+
+    def test_module_qualified_directive_creates_module_if_needed(self):
+        """Module-qualified directives should create the target module if it doesn't exist."""
+        prolog = PrologInterpreter()
+        prolog.consult_string("""
+            :- module(test, []).
+            :- discontiguous nonexistent_module:test_pred/1.
+            nonexistent_module:test_pred(value).
+        """)
+        
+        # Check that the module was created
+        assert "nonexistent_module" in prolog.modules
+        
+        # Test that the clause was added to the correct module by checking the module's predicates
+        nonexistent_module = prolog.modules["nonexistent_module"]
+        assert ("test_pred", 1) in nonexistent_module.predicates
+        assert len(nonexistent_module.predicates[("test_pred", 1)]) == 1
+
+    def test_mixed_module_qualified_and_regular_directives(self):
+        """Test that regular and module-qualified directives can coexist."""
+        prolog = PrologInterpreter()
+        prolog.consult_string("""
+            :- module(test, [local_pred/1]).
+            :- discontiguous user:test_pred/1.
+            :- dynamic local_pred/1.
+            
+            user:test_pred(user_value).
+            local_pred(local_value).
+        """)
+        
+        # Test both predicates work
+        result1 = prolog.query_once("user:test_pred(X)")
+        assert result1 is not None and result1["X"] == "user_value"
+        
+        result2 = prolog.query_once("test:local_pred(X)")
+        assert result2 is not None and result2["X"] == "local_value"
+
+    def test_module_qualified_discontiguous_error_without_directive(self):
+        """Non-contiguous module-qualified predicates without discontiguous should raise error.
+
+        This test verifies that the closed_predicates mechanism works correctly with
+        module-qualified predicates. Without the :- discontiguous directive, adding
+        clauses for the same predicate after an intervening clause should raise a
+        permission_error.
+        """
+        prolog = PrologInterpreter()
+
+        with pytest.raises(PrologThrow) as excinfo:
+            prolog.consult_string("""
+                :- module(test, []).
+                user:test_pred(a, 1).
+                foo(bar). % Intervening clause
+                user:test_pred(b, 2).  % Should fail - discontiguous not declared
+            """)
+
+        # Should get a permission_error for modifying a static procedure
+        assert "permission_error" in str(excinfo.value.term)
