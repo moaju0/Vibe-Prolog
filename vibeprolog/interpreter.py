@@ -283,6 +283,10 @@ class PrologInterpreter:
     def _call_term_expansion(self, term) -> Any:
         """Call term_expansion/2 hook on a term.
         
+        Note: term_expansion/2 may non-standardly expand a term into a list.
+        This function currently uses the first successful expansion and returns
+        that, or the original term if there is no expansion.
+        
         Args:
             term: The term to expand
             
@@ -307,24 +311,24 @@ class PrologInterpreter:
         # Try to call term_expansion/2
         try:
             # Look for term_expansion/2 clauses in all modules, starting with user
-            solutions = list(self.engine._solve_goals([
+            solutions_iter = self.engine._solve_goals([
                 Compound("term_expansion", [term, Variable("Expanded")])
-            ], Substitution()))
+            ], Substitution())
             
-            if solutions:
+            first_solution = next(solutions_iter, None)
+            if first_solution is not None:
                 # Return the first successful expansion
-                expanded_term = solutions[0].bindings.get("Expanded")
+                expanded_term = first_solution.bindings.get("Expanded")
                 if expanded_term is not None:
                     return expanded_term
-                else:
-                    return term
-            else:
-                # No expansion occurred
-                return term
-                
-        except Exception:
-            # If term expansion fails for any reason, return the original term
-            # This prevents term expansion errors from breaking consultation
+            # No expansion occurred
+            return term
+        except Exception as e:
+            # If term expansion fails for any reason, warn and return the original term
+            try:
+                warnings.warn(f"Term expansion failed for term '{term}': {e}")
+            except Exception:
+                pass
             return term
 
     def _apply_term_expansion(self, item) -> Any:
@@ -343,7 +347,7 @@ class PrologInterpreter:
         if isinstance(item, Clause):
             # Try to expand the clause head
             expanded_head = self._call_term_expansion(item.head)
-            if expanded_head != item.head:
+            if expanded_head != item.head and isinstance(expanded_head, (Atom, Compound)):
                 # Create a new clause with the expanded head
                 return Clause(
                     head=expanded_head,
@@ -1842,10 +1846,15 @@ class PrologInterpreter:
                 error_term = PrologError.syntax_error(str(exc), "consult/1")
                 raise PrologThrow(error_term)
             # Apply term expansion to each item
+            # Note: term_expansion/2 may non-standardly expand to a list.
+            # If an expansion yields a list, extend the results; otherwise append.
             expanded_items = []
             for item in items:
                 expanded_item = self._apply_term_expansion(item)
-                expanded_items.append(expanded_item)
+                if hasattr(expanded_item, "elements") and isinstance(expanded_item.elements, list):
+                    expanded_items.extend(expanded_item.elements)
+                else:
+                    expanded_items.append(expanded_item)
             
             # Process each expanded item immediately so char_conversion directives
             # take effect before subsequent parsing
