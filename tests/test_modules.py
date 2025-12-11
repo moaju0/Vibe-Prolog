@@ -590,6 +590,7 @@ class TestModuleQualifiedPredicateDirectives:
             :- module(test, []).
             :- discontiguous user:test_pred/2.
             user:test_pred(a, 1).
+            foo(bar). % Intervening clause
             user:test_pred(b, 2).
         """)
         
