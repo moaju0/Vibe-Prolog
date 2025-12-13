@@ -1,9 +1,10 @@
 """Main Prolog interpreter interface."""
 
 import copy
-import pickle
 import io
+import pickle
 import re
+import shutil
 import sys
 import warnings
 from pathlib import Path
@@ -73,6 +74,23 @@ class SerializedParsedModule(TypedDict):
 
 
 SERIALIZED_PARSED_CACHE_VERSION = 1
+
+
+def clear_ast_caches() -> None:
+    """Clear cached AST artifacts on disk and in process-wide state."""
+
+    _GLOBAL_OPERATOR_CACHE.clear()
+    for root in LIBRARY_SEARCH_PATHS:
+        cache_dir = root / ".vibe_parsed_cache"
+        try:
+            shutil.rmtree(cache_dir)
+        except FileNotFoundError:
+            continue
+        except OSError as exc:
+            warnings.warn(
+                f"Failed to remove AST cache directory {cache_dir}: {exc}",
+                RuntimeWarning,
+            )
 
 
 class Module:
