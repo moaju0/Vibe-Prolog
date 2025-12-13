@@ -2,6 +2,10 @@
 
 This document provides detailed notes on Vibe-Prolog's syntax features, including extensions, deviations, and compatibility considerations.
 
+## Module Parsing Cache
+
+Repeatedly consulting the same file reuses a per-interpreter cache of parsed directives and clauses. Cache keys include the resolved file path, the operator table version, active character conversions, the conditional-compilation stack, and the file's modification time. When any of these inputs change, the parser runs again to keep syntax handling (operators, `char_conversion/2`, conditionals) consistent with the source.
+
 ## Number Literal Formats
 
 ### Decimal Numbers

@@ -1,11 +1,12 @@
 """Main Prolog interpreter interface."""
 
+import copy
 import io
 import re
 import sys
 import warnings
 from pathlib import Path
-from typing import Any, TypedDict
+from typing import Any, Callable, TypedDict
 
 from lark.exceptions import LarkError
 
@@ -53,6 +54,14 @@ class OperatorCacheEntry(TypedDict):
 
 
 _GLOBAL_OPERATOR_CACHE: dict[str, OperatorCacheEntry] = {}
+
+
+class ParsedModuleCacheEntry(TypedDict):
+    items: list[Clause | Directive]
+    operator_version: int
+    char_conversions: tuple[tuple[str, str], ...]
+    conditional_state: tuple[tuple[bool, bool, bool], ...]
+    file_mtime: float | None
 
 
 class Module:
@@ -108,7 +117,10 @@ class PrologInterpreter:
         # process-wide cache to avoid re-tokenizing common library modules
         # across interpreter instances.
         self._import_operator_cache: dict[str, OperatorCacheEntry] = {}
+        self._parsed_module_cache: dict[str, ParsedModuleCacheEntry] = {}
         self._current_source_path: Path | None = None
+        self._parser_invocation_count = 0
+        self._parser_invocation_hook: Callable[[], None] | None = None
         # Stack for conditional compilation directives (if/else/endif)
         # Each entry is (is_active, has_seen_else, any_branch_taken) where:
         # - is_active: True if we are currently including code
@@ -901,6 +913,24 @@ class PrologInterpreter:
         except OSError:
             return None
 
+    def _parser_config_signature(self) -> tuple[
+        int, tuple[tuple[str, str], ...], tuple[tuple[bool, bool, bool], ...]
+    ]:
+        """Return the parser configuration relevant for cache validation."""
+
+        return (
+            self.operator_table.version,
+            tuple(sorted(self.parser.get_char_conversions().items())),
+            tuple(self._conditional_stack),
+        )
+
+    def _record_parser_invocation(self) -> None:
+        """Increment parser invocation counters and trigger optional hook."""
+
+        self._parser_invocation_count += 1
+        if self._parser_invocation_hook is not None:
+            self._parser_invocation_hook()
+
     def _is_operator_cache_valid(self, entry: OperatorCacheEntry) -> bool:
         """Validate a cache entry by comparing mtimes."""
         for path_str, cached_mtime in entry["mtimes"].items():
@@ -936,6 +966,47 @@ class PrologInterpreter:
         }
         self._import_operator_cache[cache_key] = entry
         _GLOBAL_OPERATOR_CACHE[cache_key] = entry
+
+    def _parsed_module_cache_key(self, path: Path) -> str:
+        """Return a stable cache key for parsed module contents."""
+
+        return self._operator_cache_key(path)
+
+    def _get_parsed_module_cache(
+        self, path: Path, file_mtime: float | None
+    ) -> list[Clause | Directive] | None:
+        """Return cached parsed items if parser state and mtimes still match."""
+
+        cache_key = self._parsed_module_cache_key(path)
+        entry = self._parsed_module_cache.get(cache_key)
+        signature = self._parser_config_signature()
+        if entry is None:
+            return None
+        if (
+            entry["file_mtime"] == file_mtime
+            and entry["operator_version"] == signature[0]
+            and entry["char_conversions"] == signature[1]
+            and entry["conditional_state"] == signature[2]
+        ):
+            return copy.deepcopy(entry["items"])
+        self._parsed_module_cache.pop(cache_key, None)
+        return None
+
+    def _store_parsed_module_cache(
+        self, path: Path, file_mtime: float | None, items: list[Clause | Directive]
+    ) -> None:
+        """Persist parsed items keyed by file path and parser configuration."""
+
+        cache_key = self._parsed_module_cache_key(path)
+        operator_version, conversions, conditional_state = self._parser_config_signature()
+        entry: ParsedModuleCacheEntry = {
+            "items": items,  # we deepcopy on read so do not need deepcopy here
+            "operator_version": operator_version,
+            "char_conversions": conversions,
+            "conditional_state": conditional_state,
+            "file_mtime": file_mtime,
+        }
+        self._parsed_module_cache[cache_key] = entry
 
     def _resolve_import_for_operators(
         self, import_term: Any, base_path: Path | None
@@ -1790,7 +1861,15 @@ class PrologInterpreter:
         finally:
             self.initialization_goals.clear()  # Clear after execution
 
-    def _consult_code(self, prolog_code: str, source_name: str):
+    def _consult_code(
+        self,
+        prolog_code: str,
+        source_name: str,
+        *,
+        cache_path: Path | None = None,
+        file_mtime: float | None = None,
+        cached_items: list[Clause | Directive] | None = None,
+    ):
         """
         Process Prolog code: parse, process items, create engine, and run initialization goals.
 
@@ -1815,51 +1894,67 @@ class PrologInterpreter:
 
         # Parse and process incrementally to support char_conversion taking effect
         # between clauses/directives. We split by period-terminated statements.
-        all_items = []
+        all_items: list[Clause | Directive] = []
+
+        def _process_parsed_items(
+            parsed_items: list[Clause | Directive],
+            last_pred: tuple[str, str, int] | None,
+        ) -> tuple[str, str, int] | None:
+            for item in parsed_items:
+                expanded_item = self._apply_term_expansion(item)
+                if hasattr(expanded_item, "elements") and isinstance(expanded_item.elements, list):
+                    items_to_process = list(expanded_item.elements)
+                else:
+                    items_to_process = [expanded_item]
+
+                last_pred = self._process_items(
+                    items_to_process,
+                    source_name,
+                    closed_predicates,
+                    last_pred,
+                )
+                all_items.extend(items_to_process)
+            return last_pred
+
         try:
-            chunks = self._split_clauses(prolog_code)
+            chunks = [] if cached_items is not None else self._split_clauses(prolog_code)
         except ValueError as exc:
             error_term = PrologError.syntax_error(str(exc), "consult/1")
             raise PrologThrow(error_term)
-        
+
         # Keep closed_predicates across chunks to enforce discontiguous requirements
         # Keys are (module, functor, arity) for module-aware tracking
         closed_predicates: set[tuple[str, str, int]] = set()
         last_predicate: tuple[str, str, int] | None = None
-        
-        for chunk in chunks:
-            chunk = chunk.strip()
-            if not chunk:
-                continue
-            try:
-                # char_conversion directives should not be affected by char conversions
-                # since they need to be parsed as-is to set the conversions
-                is_char_conversion = re.match(r"\s*:-\s*char_conversion\b", chunk)
-                items = self.parser.parse(
-                    chunk,
-                    "consult/1",
-                    apply_char_conversions=not is_char_conversion,
-                    directive_ops=directive_ops,
-                    module_name=self.current_module,
-                )
-            except (ValueError, LarkError) as exc:
-                error_term = PrologError.syntax_error(str(exc), "consult/1")
-                raise PrologThrow(error_term)
-            # Apply term expansion to each item
-            # Note: term_expansion/2 may non-standardly expand to a list.
-            # If an expansion yields a list, extend the results; otherwise append.
-            expanded_items = []
-            for item in items:
-                expanded_item = self._apply_term_expansion(item)
-                if hasattr(expanded_item, "elements") and isinstance(expanded_item.elements, list):
-                    expanded_items.extend(expanded_item.elements)
-                else:
-                    expanded_items.append(expanded_item)
-            
-            # Process each expanded item immediately so char_conversion directives
-            # take effect before subsequent parsing
-            last_predicate = self._process_items(expanded_items, source_name, closed_predicates, last_predicate)
-            all_items.extend(expanded_items)
+        parsed_items_for_cache: list[Clause | Directive] = []
+
+        if cached_items is not None:
+            last_predicate = _process_parsed_items(cached_items, last_predicate)
+        else:
+            for chunk in chunks:
+                chunk = chunk.strip()
+                if not chunk:
+                    continue
+                try:
+                    # char_conversion directives should not be affected by char conversions
+                    # since they need to be parsed as-is to set the conversions
+                    is_char_conversion = re.match(r"\s*:-\s*char_conversion\b", chunk)
+                    self._record_parser_invocation()
+                    items = self.parser.parse(
+                        chunk,
+                        "consult/1",
+                        apply_char_conversions=not is_char_conversion,
+                        directive_ops=directive_ops,
+                        module_name=self.current_module,
+                    )
+                    parsed_items_for_cache.extend(items)
+                except (ValueError, LarkError) as exc:
+                    error_term = PrologError.syntax_error(str(exc), "consult/1")
+                    raise PrologThrow(error_term)
+                # Apply term expansion to each item
+                # Note: term_expansion/2 may non-standardly expand to a list.
+                # If an expansion yields a list, extend the results; otherwise append.
+                last_predicate = _process_parsed_items(items, last_predicate)
 
         # Check for unclosed conditional directives
         if self._conditional_stack:
@@ -1870,6 +1965,9 @@ class PrologInterpreter:
             # Clear the stack before raising to allow recovery
             self._conditional_stack.clear()
             raise PrologThrow(error_term)
+
+        if cache_path is not None and cached_items is None:
+            self._store_parsed_module_cache(cache_path, file_mtime, parsed_items_for_cache)
 
         self.engine = PrologEngine(
             self.clauses,
@@ -1911,11 +2009,19 @@ class PrologInterpreter:
     def consult(self, filepath: str | Path):
         """Load Prolog clauses from a file."""
         resolved_path = self._resolve_consult_target(filepath)
+        file_mtime = self._safe_mtime(resolved_path)
+        cached_items = self._get_parsed_module_cache(resolved_path, file_mtime)
         with open(resolved_path, "r") as f:
             content = f.read()
         self._consult_counter += 1
         source_name = f"file:{resolved_path}#{self._consult_counter}"
-        self._consult_code(content, source_name)
+        self._consult_code(
+            content,
+            source_name,
+            cache_path=resolved_path,
+            file_mtime=file_mtime,
+            cached_items=cached_items,
+        )
 
     def consult_string(self, prolog_code: str):
         """Load Prolog clauses from a string."""

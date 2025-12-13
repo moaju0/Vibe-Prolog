@@ -448,6 +448,7 @@ Basic variant tabling is available via the `:- table` directive.
 | Clause body module resolution     | ✅      | Unqualified goals resolve via imports → defining module → user |
 | `use_module/1,2`                  | ✅      | Supports full and selective imports, including `library(Name)`; library/ preferred over examples/modules/ for module resolution |
 | `consult/1` with `library(Name)`  | ✅      | `consult("library(dcgs)")` resolves via library search paths just like `use_module/1` |
+| Parsed module cache               | ✅📘    | Parsed directives/clauses cached per interpreter using resolved path, operator table version, char conversions, conditional stack, and file mtime to avoid redundant parsing |
 | **Operator exports in module/2**  | ✅      | **SWI-Prolog compatible - operators can be exported**          |
 | Imported operator discovery       | ✅      | Two-pass parsing: operators from `use_module` targets are pre-scanned and registered before parsing dependent code. Handles block comments, line comments, and recursive imports |
 | **Module-scoped predicate namespaces** | ✅  | Each module can define predicates with the same name/arity without conflict. `library(a):foo/1` and `library(b):foo/1` are distinct |

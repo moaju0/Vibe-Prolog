@@ -56,7 +56,14 @@ class OperatorTable:
         self._builtin_conflict = builtin_conflict
         self._module_operators: dict[str, dict[tuple[str, str], OperatorInfo]] = {}
         self._shadowed_operators: set[tuple[str, str, str]] = set()
+        self._version = 0
         self._seed_defaults()
+
+    @property
+    def version(self) -> int:
+        """Return a monotonic counter that increments on table changes."""
+
+        return self._version
 
     def _seed_defaults(self) -> None:
         """Populate ISO-ish default operators."""
@@ -71,6 +78,7 @@ class OperatorTable:
             mod: dict(ops) for mod, ops in self._module_operators.items()
         }
         clone._shadowed_operators = set(self._shadowed_operators)
+        clone._version = self._version
         return clone
 
     def set_builtin_conflict(self, mode: str) -> None:
@@ -197,6 +205,7 @@ class OperatorTable:
             module_name: If provided, the operator is scoped to this module
         """
         key = (name, spec)
+        changed = False
 
         if name in self._protected_ops:
             is_user_scope = module_name is not None and module_name == "user"
@@ -211,36 +220,62 @@ class OperatorTable:
                 if module_name is not None and module_name != "user":
                     module_ops = self._module_operators.setdefault(module_name, {})
                     if precedence_value == 0:
-                        module_ops.pop(key, None)
+                        removed = module_ops.pop(key, None)
+                        changed = removed is not None
                     else:
-                        module_ops[key] = OperatorInfo(precedence_value, spec)
-                return
+                        info = OperatorInfo(precedence_value, spec)
+                        previous = module_ops.get(key)
+                        module_ops[key] = info
+                        changed = changed or (previous != info)
+                    if changed:
+                        self._version += 1
+                    return
+                else:
+                    return
             elif self._builtin_conflict == "shadow":
                 if module_name is not None:
                     module_ops = self._module_operators.setdefault(module_name, {})
                     if precedence_value == 0:
-                        module_ops.pop(key, None)
+                        removed = module_ops.pop(key, None)
                         self._shadowed_operators.discard((module_name, name, spec))
+                        changed = removed is not None
                     else:
-                        module_ops[key] = OperatorInfo(
-                            precedence_value, spec
-                        )
-                        self._shadowed_operators.add((module_name, name, spec))
+                        info = OperatorInfo(precedence_value, spec)
+                        previous = module_ops.get(key)
+                        module_ops[key] = info
+                        shadow_key = (module_name, name, spec)
+                        if shadow_key not in self._shadowed_operators:
+                            changed = True
+                        elif previous != info:
+                            changed = True
+                        self._shadowed_operators.add(shadow_key)
+                    if changed:
+                        self._version += 1
                     return
                 else:
                     return
 
         if precedence_value == 0:
-            self._table.pop(key, None)
+            removed = self._table.pop(key, None)
+            changed = changed or (removed is not None)
             if module_name is not None and module_name in self._module_operators:
-                self._module_operators[module_name].pop(key, None)
+                removed_module = self._module_operators[module_name].pop(key, None)
+                changed = changed or (removed_module is not None)
+            if changed:
+                self._version += 1
             return
 
-        self._table[key] = OperatorInfo(precedence_value, spec)
+        info = OperatorInfo(precedence_value, spec)
+        previous = self._table.get(key)
+        self._table[key] = info
+        changed = changed or (previous != info)
         if module_name is not None:
-            self._module_operators.setdefault(module_name, {})[key] = OperatorInfo(
-                precedence_value, spec
-            )
+            module_ops = self._module_operators.setdefault(module_name, {})
+            module_previous = module_ops.get(key)
+            module_ops[key] = info
+            changed = changed or (module_previous != info)
+        if changed:
+            self._version += 1
 
     def get_module_operators(self, module_name: str) -> dict[tuple[str, str], OperatorInfo]:
         """Get all operators defined in a specific module.
