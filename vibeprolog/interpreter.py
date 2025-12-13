@@ -1000,7 +1000,7 @@ class PrologInterpreter:
         cache_key = self._parsed_module_cache_key(path)
         operator_version, conversions, conditional_state = self._parser_config_signature()
         entry: ParsedModuleCacheEntry = {
-            "items": copy.deepcopy(items),
+            "items": items,  # we deepcopy on read so do not need deepcopy here
             "operator_version": operator_version,
             "char_conversions": conversions,
             "conditional_state": conditional_state,

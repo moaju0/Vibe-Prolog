@@ -220,15 +220,18 @@ class OperatorTable:
                 if module_name is not None and module_name != "user":
                     module_ops = self._module_operators.setdefault(module_name, {})
                     if precedence_value == 0:
-                        changed = module_ops.pop(key, None) is not None
+                        removed = module_ops.pop(key, None)
+                        changed = removed is not None
                     else:
                         info = OperatorInfo(precedence_value, spec)
                         previous = module_ops.get(key)
                         module_ops[key] = info
-                        changed = previous != info
-                if changed:
-                    self._version += 1
-                return
+                        changed = changed or (previous != info)
+                    if changed:
+                        self._version += 1
+                    return
+                else:
+                    return
             elif self._builtin_conflict == "shadow":
                 if module_name is not None:
                     module_ops = self._module_operators.setdefault(module_name, {})
@@ -237,9 +240,7 @@ class OperatorTable:
                         self._shadowed_operators.discard((module_name, name, spec))
                         changed = removed is not None
                     else:
-                        info = OperatorInfo(
-                            precedence_value, spec
-                        )
+                        info = OperatorInfo(precedence_value, spec)
                         previous = module_ops.get(key)
                         module_ops[key] = info
                         shadow_key = (module_name, name, spec)
@@ -256,10 +257,10 @@ class OperatorTable:
 
         if precedence_value == 0:
             removed = self._table.pop(key, None)
-            changed = changed or removed is not None
+            changed = changed or (removed is not None)
             if module_name is not None and module_name in self._module_operators:
                 removed_module = self._module_operators[module_name].pop(key, None)
-                changed = changed or removed_module is not None
+                changed = changed or (removed_module is not None)
             if changed:
                 self._version += 1
             return
@@ -267,14 +268,12 @@ class OperatorTable:
         info = OperatorInfo(precedence_value, spec)
         previous = self._table.get(key)
         self._table[key] = info
-        if previous != info:
-            changed = True
+        changed = changed or (previous != info)
         if module_name is not None:
             module_ops = self._module_operators.setdefault(module_name, {})
             module_previous = module_ops.get(key)
             module_ops[key] = info
-            if module_previous != info:
-                changed = True
+            changed = changed or (module_previous != info)
         if changed:
             self._version += 1
 

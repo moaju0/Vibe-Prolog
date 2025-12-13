@@ -1,6 +1,6 @@
 """Tests for parsed module caching in the interpreter."""
 
-import time
+import os
 
 from vibeprolog import PrologInterpreter
 
@@ -67,8 +67,9 @@ def test_parsed_module_cache_invalidated_on_mtime_change(tmp_path):
     prolog.consult(module_path)
     first_parse_calls = parse_calls
 
-    time.sleep(1.1)
+    stat_before = module_path.stat()
     module_path.write_text(":- module(cached, [p/0]).\n:- dynamic p/0.\np.\np.\n")
+    os.utime(module_path, (stat_before.st_atime, stat_before.st_mtime + 1))
 
     prolog.consult(module_path)
 
