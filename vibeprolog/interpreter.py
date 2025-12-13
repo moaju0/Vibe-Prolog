@@ -970,7 +970,8 @@ class PrologInterpreter:
                 payload: SerializedParsedModule = pickle.load(handle)
         except (OSError, pickle.PickleError):
             return None
-        except Exception:
+        except Exception as e:
+            warnings.warn(f"Failed to load parsed module cache from {cache_file}: {e}", RuntimeWarning)
             return None
 
         signature = self._parser_config_signature()
