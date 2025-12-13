@@ -244,9 +244,7 @@ class OperatorTable:
                         previous = module_ops.get(key)
                         module_ops[key] = info
                         shadow_key = (module_name, name, spec)
-                        if shadow_key not in self._shadowed_operators:
-                            changed = True
-                        elif previous != info:
+                        if shadow_key not in self._shadowed_operators or previous != info:
                             changed = True
                         self._shadowed_operators.add(shadow_key)
                     if changed:

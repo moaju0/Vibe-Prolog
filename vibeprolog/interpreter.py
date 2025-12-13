@@ -1892,10 +1892,6 @@ class PrologInterpreter:
             error_term = PrologError.syntax_error(str(exc), "consult/1")
             raise PrologThrow(error_term)
 
-        # Parse and process incrementally to support char_conversion taking effect
-        # between clauses/directives. We split by period-terminated statements.
-        all_items: list[Clause | Directive] = []
-
         def _process_parsed_items(
             parsed_items: list[Clause | Directive],
             last_pred: tuple[str, str, int] | None,
@@ -1913,7 +1909,6 @@ class PrologInterpreter:
                     closed_predicates,
                     last_pred,
                 )
-                all_items.extend(items_to_process)
             return last_pred
 
         try:
